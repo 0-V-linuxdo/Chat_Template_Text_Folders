@@ -3,6 +3,8 @@
 # [Chat] Template Text Folders
 在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 
+---
+
 支持的浏览器：
 Chrome/Firefox/Safari
 
@@ -10,3 +12,5 @@ Chrome/Firefox/Safari
 - Adguard (app version) - All
 - violentmonkey - Chrome/Firefox
 - Stay - Safari
+
+---
