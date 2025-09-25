@@ -1,1 +1,8 @@
-PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTQ1Ij48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTMwIiBoZWlnaHQ9IjQwIiByeD0iOCIgcnk9IjgiIGZpbGw9IiNmMDQ4NDgiLz48dGV4dCB4PSI2NSIgeT0iMjAiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iI2ZmZmZmZiI+VGVtcGxhdGU8L3RleHQ+PHJlY3QgeD0iMCIgeT0iNTAiIHdpZHRoPSI4MCIgaGVpZ2h0PSI0MCIgcng9IjgiIHJ5PSI4IiBmaWxsPSIjNDI4NWY0Ii8+PHRleHQgeD0iNDAiIHk9IjcwIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiNmZmZmZmYiPlRleHQ8L3RleHQ+PHJlY3QgeD0iMCIgeT0iMTAwIiB3aWR0aD0iMTEwIiBoZWlnaHQ9IjQwIiByeD0iOCIgcnk9IjgiIGZpbGw9IiMzNGE4NTMiLz48dGV4dCB4PSI1NSIgeT0iMTIwIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiNmZmZmZmYiPkZvbGRlcnM8L3RleHQ+PC9zdmc+
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="145">
+  <rect x="0" y="0" width="130" height="40" rx="8" ry="8" fill="#f04848"/>
+  <text x="65" y="20" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="#ffffff">Template</text>
+  <rect x="0" y="50" width="80" height="40" rx="8" ry="8" fill="#4285f4"/>
+  <text x="40" y="70" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="#ffffff">Text</text>
+  <rect x="0" y="100" width="110" height="40" rx="8" ry="8" fill="#34a853"/>
+  <text x="55" y="120" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="#ffffff">Folders</text>
+</svg>
