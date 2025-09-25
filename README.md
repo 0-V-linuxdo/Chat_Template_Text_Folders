@@ -1,7 +1,8 @@
 <img src="./Icon.svg" alt="图标" width="60" height="60"/>
 
 # [Chat] Template Text Folders
-在AI页面上添加预设文本文件夹和按钮，提升输入效率。
+简介：
+在AI网页底部，添加 `提示词模版` 文件夹+按钮，提升输入效率！
 
 ---
 
@@ -12,5 +13,3 @@ Chrome/Firefox/Safari
 - Adguard (app version) - All
 - violentmonkey - Chrome/Firefox
 - Stay - Safari
-
----
