@@ -11,7 +11,14 @@
 ---
 
 支持的浏览器：
-Chrome/Firefox/Safari
+- Chrome
+- Firefox
+- Safari
+
+注意：
+Firefox/Safari 获取剪切板内容，需要手动确认！
+
+---
 
 支持的脚本管理器：
 - Adguard (app version) - All
