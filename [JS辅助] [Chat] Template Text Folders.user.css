@@ -1,0 +1,149 @@
+@-moz-document domain("lmarena.ai"), domain("chat01.ai") {
+/* Type 1️⃣: 为脚本按钮栏留出空间 */
+main {
+    padding-bottom: 40px !important;
+}
+}
+
+@-moz-document domain("claude.ai") {
+/* Type 1️⃣: 为脚本按钮栏留出空间 */
+/* 备用选择器，适用于可能的类名变化 */
+div.sticky[class*="bottom-0"][class*="w-full"]:has(fieldset) {
+    bottom: 30px !important;
+}
+}
+
+@-moz-document domain("grok.com") {
+/* Type 1️⃣: 为脚本按钮栏留出空间 */
+main {
+    padding-bottom: 13px !important;
+}
+}
+
+@-moz-document url-prefix("https://kagi.com/assistant") {
+/* Type 1️⃣: 为脚本按钮栏留出空间 */
+div.main-center-box {
+    padding-bottom: 20px !important;
+}
+}
+
+@-moz-document domain("setapp.typingcloud.com") {
+/* Type 1️⃣: 为脚本按钮栏留出空间 */
+main {
+    padding-bottom: 30px !important;
+}
+}
+
+@-moz-document domain("perplexity.ai") {
+/* Type 0️⃣: 为脚本按钮栏留出空间 */
+.erp-tab\:p-0 {
+    padding-bottom: 20px !important;
+}
+
+/* [Perplexity] 辅助 */
+/* 收窄 匿名模式选择器 */
+div[data-placement="top-start"] .w-sideBarWidth {
+  width: 100% !important;
+}
+}
+
+@-moz-document url-prefix("https://www.perplexity.ai/settings"), url-prefix("https://www.perplexity.ai/discover"), url-prefix("https://www.perplexity.ai/spaces"), url-prefix("https://www.perplexity.ai/library") {
+/* [Perplexity] 辅助 */
+/* 在特定页面隐藏 */
+div.folder-buttons-container {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.erp-tab\:p-0 {
+    padding-bottom: 0px !important;
+}
+}
+
+@-moz-document domain("poe.com") {
+/* Type 2️⃣: 为脚本按钮栏留出空间 */
+footer {
+    padding-bottom: 40px !important;
+}
+}
+
+@-moz-document url-prefix("https://poe.com/explore"), url("https://poe.com/chats"), url("https://poe.com/settings") {
+/* [Poe] 辅助 */
+/* 在特定页面隐藏 */
+div.folder-buttons-container {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+}
+
+@-moz-document domain("monica.im") {
+/* Type 3️⃣: 为脚本按钮栏留出空间 */
+#root {
+    padding-bottom: 40px !important;
+}
+}
+
+@-moz-document domain("monica.im") {
+/* [Monica] 辅助 */
+/* 显示层级 */
+div[class^="chat-input-v2--"][class^="chat-input--"],
+div[class^="chat-input-v2-"][class^="chat-input-"] {
+    z-index: 100 !important;
+}
+}
+
+@-moz-document url("https://monica.im/home/search") {
+/* [Monica] 辅助 */
+/* 在特定页面隐藏 */
+div.folder-buttons-container {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+#root {
+    padding-bottom: 0px !important;
+}
+}
+
+@-moz-document url("https://chat01.ai/zh/history"), url("https://chat01.ai/zh/pricing"), url("https://chat01.ai/zh/credits"), url("https://chat01.ai/zh/keys") {
+/* [Chat01] 辅助 */
+/* 在特定页面隐藏 */
+div.folder-buttons-container {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+}
+
+@-moz-document domain("linux.do") {
+/* [linux.do] 辅助 (暂时不用了) */
+
+/* 为脚本按钮栏留出空间 */
+#reply-control {
+    bottom: 40px !important;
+    z-index: 100 !important;
+}
+
+.folder-buttons-container {
+    position: fixed;
+    bottom: 0px;
+    right: 0px;
+    width: 80%;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 60s ease;
+}
+
+.folder-buttons-container:hover {
+    opacity: 1;
+    transition: opacity 0.01s ease;
+    background-color: auto;
+}
+}
+
+@-moz-document url("https://grok.dairoot.cn/admin") {
+/* 在特定页面隐藏 */
+div.folder-buttons-container {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+}
