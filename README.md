@@ -9,7 +9,12 @@
 - 减少重复输入，提升输入效率！
 
   <details open>
-  <summary>示例：ChatHub网页</summary>
+  <summary>示例1：ChatGPT网页</summary>
+  <img width="1447" height="1061" alt="image" src="https://github.com/user-attachments/assets/a1367bff-c6aa-4344-a10b-3baa78be276a" />
+  </details>
+
+  <details>
+  <summary>示例2：ChatHub网页</summary>
   <img width="1447" height="1060" alt="image" src="https://github.com/user-attachments/assets/7be6b735-74bf-4d3e-bcee-d09d2441f5b2" />
   </details>
 
