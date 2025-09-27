@@ -30,6 +30,9 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 - violentmonkey - Chrome/Firefox
 - Stay - Safari
 
+其他：
+- Arc Boost
+
 提示：
 脚本数据存储在 本地 - 浏览器localstorage 中！
 
