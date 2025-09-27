@@ -39,7 +39,8 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 
 其他：
 - Arc Boost
-<details>
+  
+  <details>
   <summary>示例：ChatHub</summary>
   <img width="1445" height="1060" alt="image" src="https://github.com/user-attachments/assets/c717cdf0-5504-402b-bdc3-d7de0cd5f879" />
   </details>
