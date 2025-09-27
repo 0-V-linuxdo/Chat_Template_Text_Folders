@@ -10,7 +10,7 @@
 </details>
 
 <details open>
-<summary>主要内容</summary>
+<summary>安装步骤</summary>
   
 1. 用户脚本 userscript 安装：
 [点击安装 用户脚本](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20250911%5D%20.user.js)
