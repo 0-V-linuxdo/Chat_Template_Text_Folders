@@ -9,7 +9,7 @@
 - 减少重复输入，提升输入效率！
 
   <details open>
-  <summary>示例：ChatHub</summary>
+  <summary>示例：ChatHub网页</summary>
   <img width="1447" height="1060" alt="image" src="https://github.com/user-attachments/assets/7be6b735-74bf-4d3e-bcee-d09d2441f5b2" />
   </details>
 
@@ -47,7 +47,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 - Arc Boost
   
   <details>
-  <summary>示例：ChatHub</summary>
+  <summary>示例：ChatHub插件</summary>
   <img width="1445" height="1060" alt="image" src="https://github.com/user-attachments/assets/c717cdf0-5504-402b-bdc3-d7de0cd5f879" />
   </details>
 
