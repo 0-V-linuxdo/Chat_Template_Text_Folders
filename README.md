@@ -7,8 +7,11 @@
 
 ---
 
-安装：
+userscript 安装：
 [点击安装](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20250911%5D%20.user.js)
+
+userstyle 安装：
+[点击安装]()
 
 ---
 
