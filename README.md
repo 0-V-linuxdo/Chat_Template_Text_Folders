@@ -7,6 +7,12 @@
   
 - 在AI网页底部，添加 `提示词模版` 文件夹+按钮，
 - 减少重复输入，提升输入效率！
+
+  <details open>
+  <summary>示例：ChatHub</summary>
+  <img width="1447" height="1060" alt="image" src="https://github.com/user-attachments/assets/7be6b735-74bf-4d3e-bcee-d09d2441f5b2" />
+  </details>
+
 </details>
 
 <details open>
