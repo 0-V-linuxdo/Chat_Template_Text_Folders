@@ -2,14 +2,14 @@
 
 # [Chat] Template Text Folders
 
-<details>
+<details open>
 <summary>简介</summary>
   
 - 在AI网页底部，添加 `提示词模版` 文件夹+按钮，
 - 减少重复输入，提升输入效率！
 </details>
 
-<details>
+<details open>
 <summary>主要内容</summary>
   
 1. 用户脚本 userscript 安装：
