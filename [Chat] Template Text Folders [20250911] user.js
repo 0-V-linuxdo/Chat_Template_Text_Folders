@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20250911] 1.6 Final
+// @name         [Chat] Template Text Folders [20250911] 1.6
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20250911]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
