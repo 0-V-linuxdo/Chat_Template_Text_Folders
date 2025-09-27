@@ -1,3 +1,11 @@
+/* ==UserStyle==
+@name           [Chat] Template Text Folders
+@namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
+@description    为各种AI聊天网站添加底部间距，为脚本按钮栏留出空间 
+@version        1.0.0
+@license        MIT
+==/UserStyle== */
+
 @-moz-document domain("lmarena.ai"), domain("chat01.ai") {
 /* Type 1️⃣: 为脚本按钮栏留出空间 */
 main {
