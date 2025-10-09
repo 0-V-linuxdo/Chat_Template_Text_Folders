@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251009] +fix
+// @name         [Chat] Template Text Folders [20251009] +fix2
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251009]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -2776,7 +2776,10 @@
         const yyyy = date.getFullYear();
         const mm = String(date.getMonth() + 1).padStart(2, '0');
         const dd = String(date.getDate()).padStart(2, '0');
-        const fileName = `ChatGPT Template Text Folders [${yyyy}-${mm}-${dd}].json`;
+        const hh = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const ss = String(date.getSeconds()).padStart(2, '0');
+        const fileName = `[Chat] Template Text Folders「${yyyy}-${mm}-${dd}」「${hh}：${minutes}：${ss}」.json`;
         const dataStr = JSON.stringify(buttonConfig, null, 2);
         const blob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
