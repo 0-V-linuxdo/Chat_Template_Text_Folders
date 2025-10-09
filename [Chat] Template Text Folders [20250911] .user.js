@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20250911] 1.6
+// @name         [Chat] Template Text Folders [20251009] +fix
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20250911]
+// @version      [20251009]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -10,6 +10,11 @@
 //
 // @match        https://claude.*/*
 // @match        https://*.fuclaude.com/*
+//
+// @match        https://gemini.google.com/*
+// @match        https://aistudio.google.com/*
+//
+// @match        https://copilot.microsoft.com/*
 //
 // @match        https://grok.com/*
 // @match        https://grok.dairoot.cn/*
@@ -34,14 +39,50 @@
 // @match        https://*.aivvm.*/*
 // @match        https://linux.do/discourse-ai/ai-bot/*
 //
+// @match        https://cursor.com/agents
+//
 // @grant        none
-// @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTQ1Ij48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTMwIiBoZWlnaHQ9IjQwIiByeD0iOCIgcnk9IjgiIGZpbGw9IiNmMDQ4NDgiLz48dGV4dCB4PSI2NSIgeT0iMjAiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iI2ZmZmZmZiI+VGVtcGxhdGU8L3RleHQ+PHJlY3QgeD0iMCIgeT0iNTAiIHdpZHRoPSI4MCIgaGVpZ2h0PSI0MCIgcng9IjgiIHJ5PSI4IiBmaWxsPSIjNDI4NWY0Ii8+PHRleHQgeD0iNDAiIHk9IjcwIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiNmZmZmZmYiPlRleHQ8L3RleHQ+PHJlY3QgeD0iMCIgeT0iMTAwIiB3aWR0aD0iMTEwIiBoZWlnaHQ9IjQwIiByeD0iOCIgcnk9IjgiIGZpbGw9IiMzNGE4NTMiLz48dGV4dCB4PSI1NSIgeT0iMTIwIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiNmZmZmZmYiPkZvbGRlcnM8L3RleHQ+PC9zdmc+
+// @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
 // ==/UserScript==
 
 (function () {
     'use strict';
 
     console.log("🎉 [Chat] Template Text Folders [20250211] V2.2");
+
+    let trustedHTMLPolicy = null;
+    const resolveTrustedTypes = () => {
+        if (trustedHTMLPolicy) {
+            return trustedHTMLPolicy;
+        }
+        const globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+        const trustedTypesAPI = globalObj && globalObj.trustedTypes ? globalObj.trustedTypes : null;
+        if (!trustedTypesAPI) {
+            return null;
+        }
+        try {
+            trustedHTMLPolicy = trustedTypesAPI.createPolicy('chat_template_text_folders_policy', {
+                createHTML: (input) => input
+            });
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders Trusted Types policy creation failed', error);
+            trustedHTMLPolicy = null;
+        }
+        return trustedHTMLPolicy;
+    };
+
+    const setTrustedHTML = (element, html) => {
+        if (!element) {
+            return;
+        }
+        const value = typeof html === 'string' ? html : (html == null ? '' : String(html));
+        const policy = resolveTrustedTypes();
+        if (policy) {
+            element.innerHTML = policy.createHTML(value);
+        } else {
+            element.innerHTML = value;
+        }
+    };
 
     // 用于统一创建 overlay + dialog，样式与默认逻辑保持一致
     // 复用时只需传入自定义的内容与回调，外观也可统一
@@ -512,15 +553,15 @@
             // ProseMirror需要保持基本结构
             const firstP = target.querySelector('p');
             if (firstP) {
-                firstP.innerHTML = '<br class="ProseMirror-trailingBreak">';
+                setTrustedHTML(firstP, '<br class="ProseMirror-trailingBreak">');
                 // 删除其他段落
                 const otherPs = target.querySelectorAll('p:not(:first-child)');
                 otherPs.forEach(p => p.remove());
             } else {
-                target.innerHTML = '<p><br class="ProseMirror-trailingBreak"></p>';
+                setTrustedHTML(target, '<p><br class="ProseMirror-trailingBreak"></p>');
             }
         } else {
-            target.innerHTML = '';
+            setTrustedHTML(target, '');
         }
     };
 
@@ -1476,7 +1517,7 @@
             width: 400px;
             max-width: 90vw;
         `;
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
                 🗑️ 确认删除文件夹 "${folderName}"？
             </h3>
@@ -1535,7 +1576,7 @@
                     border-radius: 4px;
                 ">删除</button>
             </div>
-        `;
+        `);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
         currentConfirmOverlay = overlay;
@@ -1606,7 +1647,7 @@
             width: 400px;
             max-width: 90vw;
         `;
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
                 🗑️ 确认删除按钮 "${btnName}"？
             </h3>
@@ -1669,7 +1710,7 @@
                     border-radius:4px;
                 ">删除</button>
             </div>
-        `;
+        `);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
         currentConfirmOverlay = overlay;
@@ -1987,14 +2028,14 @@
         `;
 
         // Combine all sections
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             ${previewSection}
             ${tabNavigation}
             ${textTemplateTab}
             ${styleSettingsTab}
             ${submitSettingsTab}
             ${footerButtons}
-        `;
+        `);
 
         // Add tab switching functionality
         const setupTabs = () => {
@@ -2356,11 +2397,11 @@
         `;
 
         // Combine all sections
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             ${previewSection}
             ${settingsSection}
             ${footerButtons}
-        `;
+        `);
 
         // 添加事件监听器
         const setupPreviewUpdates = () => {
@@ -2544,7 +2585,7 @@
                 });
                 text = textParts.join('');
                 // 清空contenteditable内容
-                focusedElement.innerHTML = '';
+                setTrustedHTML(focusedElement, '');
             }
             if (text) {
                 navigator.clipboard.writeText(text).then(() => {
@@ -2800,7 +2841,7 @@
             z-index: 13001;
         `;
 
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             <div style="
                 display: flex;
                 align-items: center;
@@ -2978,7 +3019,7 @@
                     transition: all 0.2s ease;
                 ">确认导入</button>
             </div>
-        `;
+        `);
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -3155,7 +3196,7 @@
             max-width: 90vw;
         `;
 
-        dialog.innerHTML = `
+        setTrustedHTML(dialog, `
             <h3 style="margin:0 0 20px 0;font-size:18px;font-weight:600; color: var(--text-color, #333333);">🛠️ 配置管理</h3>
             <div style="
                 display:flex;
@@ -3216,7 +3257,7 @@
                     border-radius:4px;
                 ">关闭</button>
             </div>
-        `;
+        `);
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -3329,7 +3370,7 @@
 
     const renderFolderList = () => {
         if (!folderListContainer) return;
-        folderListContainer.innerHTML = '';
+        setTrustedHTML(folderListContainer, '');
         const foldersArray = buttonConfig.folderOrder.map(fname => [fname, buttonConfig.folders[fname]]).filter(([f,c])=>c);
         foldersArray.forEach(([fname, fconfig]) => {
             const folderItem = document.createElement('div');
@@ -3616,11 +3657,11 @@
     };
 
     const renderButtonList = () => {
-    if (!buttonListContainer) return;
-    buttonListContainer.innerHTML = '';
-    if (!selectedFolderName) return;
-    const currentFolderConfig = buttonConfig.folders[selectedFolderName];
-    if (!currentFolderConfig) return;
+        if (!buttonListContainer) return;
+        setTrustedHTML(buttonListContainer, '');
+        if (!selectedFolderName) return;
+        const currentFolderConfig = buttonConfig.folders[selectedFolderName];
+        if (!currentFolderConfig) return;
 
     const rightHeader = document.createElement('div');
     rightHeader.style.display = 'flex';
@@ -3635,7 +3676,7 @@
     folderNameLabel.style.margin = '0';
 
     const folderNameText = document.createElement('span');
-    folderNameText.innerHTML = `➤ <strong>${selectedFolderName}</strong>`;
+    setTrustedHTML(folderNameText, `➤ <strong>${selectedFolderName}</strong>`);
 
     const buttonCountBadge = document.createElement('span');
     buttonCountBadge.id = 'currentFolderButtonCount';
@@ -4373,14 +4414,14 @@ function showAutomationSettingsDialog() {
     table.style.borderCollapse = 'collapse';
 
     const thead = document.createElement('thead');
-    thead.innerHTML = `
+    setTrustedHTML(thead, `
         <tr style="border-bottom:1px solid var(--border-color);">
             <th style="text-align:left;padding:4px;">备注名称</th>
             <th style="text-align:left;padding:4px;">网址</th>
             <th style="text-align:left;padding:4px;">自动提交方式</th>
             <th style="width:80px;"></th>
         </tr>
-    `;
+    `);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
@@ -4390,11 +4431,11 @@ function showAutomationSettingsDialog() {
     dialog.appendChild(tableContainer);
 
     function renderDomainRules() {
-        tbody.innerHTML = '';
+        setTrustedHTML(tbody, '');
         buttonConfig.domainAutoSubmitSettings.forEach((rule, idx) => {
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid var(--border-color)';
-            tr.innerHTML = `
+            setTrustedHTML(tr, `
                 <td style="padding:4px;">${rule.name}</td>
                 <td style="padding:4px;">${rule.domain}</td>
                 <td style="padding:4px;">${rule.method}</td>
@@ -4406,7 +4447,7 @@ function showAutomationSettingsDialog() {
                         background:none;border:none;cursor:pointer;color:var(--danger-color,#ef4444);
                     ">🗑️</button>
                 </td>
-            `;
+            `);
             tbody.appendChild(tr);
         });
 
@@ -4495,7 +4536,7 @@ function showStyleSettingsDialog() {
     styleTable.style.borderCollapse = 'collapse';
 
     const thead = document.createElement('thead');
-    thead.innerHTML = `
+    setTrustedHTML(thead, `
         <tr style="border-bottom:1px solid var(--border-color);">
             <th style="text-align:left;padding:4px;">备注名称</th>
             <th style="text-align:left;padding:4px;">网址</th>
@@ -4503,7 +4544,7 @@ function showStyleSettingsDialog() {
             <th style="text-align:left;padding:4px;">自定义CSS</th>
             <th style="width:80px;"></th>
         </tr>
-    `;
+    `);
     styleTable.appendChild(thead);
 
     const tbody = document.createElement('tbody');
@@ -4512,11 +4553,11 @@ function showStyleSettingsDialog() {
     dialog.appendChild(tableContainer);
 
     function renderDomainStyles() {
-        tbody.innerHTML = '';
+        setTrustedHTML(tbody, '');
         buttonConfig.domainStyleSettings.forEach((item, idx) => {
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid var(--border-color)';
-            tr.innerHTML = `
+            setTrustedHTML(tr, `
                 <td style="padding:4px;">${item.name || ''}</td>
                 <td style="padding:4px;">${item.domain || ''}</td>
                 <td style="padding:4px;">${item.height || ''}</td>
@@ -4532,7 +4573,7 @@ function showStyleSettingsDialog() {
                         background:none;border:none;cursor:pointer;color:var(--danger-color,#ef4444);
                     ">🗑️</button>
                 </td>
-            `;
+            `);
             tbody.appendChild(tr);
         });
 
@@ -4950,7 +4991,7 @@ function isValidDomainInput(str) {
             const clearButton = existingContainer.querySelector('button:last-child');
 
             // 清空容器
-            existingContainer.innerHTML = '';
+            setTrustedHTML(existingContainer, '');
 
             // 重新添加未隐藏的文件夹按钮
             buttonConfig.folderOrder.forEach((name) => {
@@ -5060,7 +5101,7 @@ function isValidDomainInput(str) {
                 if (matchedStyle.cssCode) {
                     const styleEl = document.createElement('style');
                     styleEl.setAttribute('data-domain-style', matchedStyle.domain);
-                    styleEl.innerHTML = matchedStyle.cssCode;
+                    styleEl.textContent = matchedStyle.cssCode;
                     document.head.appendChild(styleEl);
                     console.log(`✅ 已注入自定义CSS至 <head> 来自：${matchedStyle.name}`);
                 }
