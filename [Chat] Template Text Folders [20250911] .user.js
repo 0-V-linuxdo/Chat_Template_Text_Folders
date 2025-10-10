@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251009] +fix2
+// @name         [Chat] Template Text Folders [20251009] +Enhanced
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251009]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -39,7 +39,9 @@
 // @match        https://*.aivvm.*/*
 // @match        https://linux.do/discourse-ai/ai-bot/*
 //
-// @match        https://cursor.com/agents
+// @match        https://cursor.com/*
+//
+// @match        https://www.notion.so/*
 //
 // @grant        none
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -83,6 +85,123 @@
             element.innerHTML = value;
         }
     };
+
+    const UI_HOST_ID = 'cttf-ui-host';
+    let latestThemeValues = null;
+    let uiShadowRoot = null;
+    let uiMainLayer = null;
+    let uiOverlayLayer = null;
+
+    const ensureUIRoot = () => {
+        if (uiShadowRoot && uiShadowRoot.host && uiShadowRoot.host.isConnected) {
+            return uiShadowRoot;
+        }
+
+        if (!document.body) {
+            return null;
+        }
+
+        let hostElement = document.getElementById(UI_HOST_ID);
+        if (!hostElement) {
+            hostElement = document.createElement('div');
+            hostElement.id = UI_HOST_ID;
+            document.body.appendChild(hostElement);
+        }
+
+        uiShadowRoot = hostElement.shadowRoot;
+        if (!uiShadowRoot) {
+            uiShadowRoot = hostElement.attachShadow({ mode: 'open' });
+            const baseStyle = document.createElement('style');
+            baseStyle.textContent = `
+                :host {
+                    all: initial;
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: 1000;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
+                :host *, :host *::before, :host *::after {
+                    box-sizing: border-box;
+                    font-family: inherit;
+                }
+                .hide-scrollbar {
+                    scrollbar-width: none;
+                }
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+            `;
+            uiShadowRoot.appendChild(baseStyle);
+        }
+
+        if (!uiMainLayer || !uiMainLayer.isConnected) {
+            uiMainLayer = uiShadowRoot.getElementById('cttf-main-layer');
+            if (!uiMainLayer) {
+                uiMainLayer = document.createElement('div');
+                uiMainLayer.id = 'cttf-main-layer';
+                uiMainLayer.style.position = 'fixed';
+                uiMainLayer.style.inset = '0';
+                uiMainLayer.style.pointerEvents = 'none';
+                uiShadowRoot.appendChild(uiMainLayer);
+            }
+        }
+
+        if (!uiOverlayLayer || !uiOverlayLayer.isConnected) {
+            uiOverlayLayer = uiShadowRoot.getElementById('cttf-overlay-layer');
+            if (!uiOverlayLayer) {
+                uiOverlayLayer = document.createElement('div');
+                uiOverlayLayer.id = 'cttf-overlay-layer';
+                uiOverlayLayer.style.position = 'fixed';
+                uiOverlayLayer.style.inset = '0';
+                uiOverlayLayer.style.pointerEvents = 'none';
+                uiOverlayLayer.style.zIndex = '20000';
+                uiShadowRoot.appendChild(uiOverlayLayer);
+            }
+        }
+
+        if (latestThemeValues && hostElement) {
+            Object.entries(latestThemeValues).forEach(([key, value]) => {
+                hostElement.style.setProperty(toCSSVariableName(key), value);
+            });
+        }
+
+        return uiShadowRoot;
+    };
+
+    const getShadowRoot = () => ensureUIRoot();
+
+    const getMainLayer = () => {
+        const root = ensureUIRoot();
+        return root ? uiMainLayer : null;
+    };
+
+    const getOverlayLayer = () => {
+        const root = ensureUIRoot();
+        return root ? uiOverlayLayer : null;
+    };
+
+    const appendToMainLayer = (node) => {
+        const container = getMainLayer();
+        return container ? container.appendChild(node) : document.body.appendChild(node);
+    };
+
+    const appendToOverlayLayer = (node) => {
+        const container = getOverlayLayer();
+        if (container) {
+            container.appendChild(node);
+        } else {
+            document.body.appendChild(node);
+        }
+        return node;
+    };
+
+    const queryUI = (selector) => {
+        const root = getShadowRoot();
+        return root ? root.querySelector(selector) : document.querySelector(selector);
+    };
+
+    const toCSSVariableName = (key) => `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
 
     // 用于统一创建 overlay + dialog，样式与默认逻辑保持一致
     // 复用时只需传入自定义的内容与回调，外观也可统一
@@ -137,6 +256,10 @@
         // 向overlay添加dialog
         overlay.appendChild(dialog);
 
+        // 将 overlay 挂载到 Shadow DOM 覆盖层
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
+
         // 入场动画
         setTimeout(() => {
             overlay.style.opacity = '1';
@@ -155,26 +278,26 @@
     }
 
     // 主题样式配置（使用CSS变量）
+    const applyThemeToHost = (themeValues) => {
+        const root = ensureUIRoot();
+        const host = root ? root.host : null;
+        if (!host) {
+            return;
+        }
+        Object.entries(themeValues).forEach(([key, value]) => {
+            host.style.setProperty(toCSSVariableName(key), value);
+        });
+    };
+
     const setCSSVariables = (currentTheme) => {
-        const root = document.documentElement;
-        root.style.setProperty('--folder-bg', currentTheme.folderBg);
-        root.style.setProperty('--dialog-bg', currentTheme.dialogBg);
-        root.style.setProperty('--text-color', currentTheme.textColor);
-        root.style.setProperty('--border-color', currentTheme.borderColor);
-        root.style.setProperty('--shadow-color', currentTheme.shadowColor);
-        root.style.setProperty('--button-bg', currentTheme.buttonBg);
-        root.style.setProperty('--button-hover-bg', currentTheme.buttonHoverBg);
-        root.style.setProperty('--danger-color', currentTheme.dangerColor);
-        root.style.setProperty('--success-color', currentTheme.successColor);
-        root.style.setProperty('--add-color', currentTheme.addColor);
-        root.style.setProperty('--primary-color', currentTheme.primaryColor);
-        root.style.setProperty('--info-color', currentTheme.infoColor);
-        root.style.setProperty('--cancel-color', currentTheme.cancelColor);
-        root.style.setProperty('--overlay-bg', currentTheme.overlayBg || 'rgba(0, 0, 0, 0.5)');
-        root.style.setProperty('--tab-bg', currentTheme.tabBg);
-        root.style.setProperty('--tab-active-bg', currentTheme.tabActiveBg);
-        root.style.setProperty('--tab-hover-bg', currentTheme.tabHoverBg);
-        root.style.setProperty('--tab-border', currentTheme.tabBorder);
+        latestThemeValues = currentTheme;
+        const apply = () => applyThemeToHost(currentTheme);
+
+        if (document.body) {
+            apply();
+        } else {
+            window.addEventListener('DOMContentLoaded', apply, { once: true });
+        }
     };
 
     const theme = {
@@ -1343,6 +1466,7 @@
         buttonListContainer.style.transition = 'all 0.3s ease';
         buttonListContainer.classList.add('button-list');
         buttonListContainer.setAttribute('data-folder-list', folderName);
+        buttonListContainer.style.pointerEvents = 'auto';
 
         Object.entries(folderConfig.buttons).forEach(([name, config]) => {
             const customButton = createCustomButton(name, config, folderName);
@@ -1378,7 +1502,10 @@
         });
 
         document.addEventListener('click', (e) => {
-            if (!folderButton.contains(e.target) && !buttonListContainer.contains(e.target)) {
+            const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+            const clickedInsideButton = path.includes(folderButton);
+            const clickedInsideList = path.includes(buttonListContainer);
+            if (!clickedInsideButton && !clickedInsideList) {
                 // 点击了其他地方，关闭弹窗
                 if (buttonListContainer.style.display !== 'none') {
                     buttonListContainer.style.display = 'none';
@@ -1391,13 +1518,12 @@
             }
         });
 
-        // 将buttonListContainer移动到body以避免事件传播干扰
-        document.body.appendChild(buttonListContainer);
+        appendToMainLayer(buttonListContainer);
         return folderButton;
     };
 
     const toggleFolder = (folderName, state) => {
-        const buttonList = document.querySelector(`.button-list[data-folder-list="${folderName}"]`);
+        const buttonList = queryUI(`.button-list[data-folder-list="${folderName}"]`);
         if (!buttonList) {
             console.warn(`⚠️ 未找到与文件夹 "${folderName}" 关联的弹窗。`);
             return;
@@ -1418,7 +1544,8 @@
             }
         }
         // 关闭其他文件夹的弹窗
-        const allButtonLists = document.querySelectorAll('.button-list');
+        const root = getShadowRoot();
+        const allButtonLists = root ? Array.from(root.querySelectorAll('.button-list')) : [];
         allButtonLists.forEach(bl => {
             if (bl.getAttribute('data-folder-list') !== folderName) {
                 bl.style.display = 'none';
@@ -1578,7 +1705,8 @@
             </div>
         `);
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfirmOverlay = overlay;
 
         // 动画效果
@@ -1712,7 +1840,8 @@
             </div>
         `);
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfirmOverlay = overlay;
 
         // 动画效果
@@ -2066,7 +2195,8 @@
 
         // Rest of the existing dialog setup code...
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfirmOverlay = overlay;
 
         // Setup tabs
@@ -2425,7 +2555,8 @@
         setupPreviewUpdates();
 
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfirmOverlay = overlay;
 
         // Animation effect
@@ -3025,7 +3156,8 @@
         `);
 
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfirmOverlay = overlay;
 
         // 动画效果
@@ -3263,7 +3395,8 @@
         `);
 
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentConfigOverlay = overlay;
 
         // 动画效果
@@ -3633,14 +3766,14 @@
         }, 0);
 
         // 更新文件夹总数计数
-        const folderCountBadge = document.getElementById('folderCountBadge');
+        const folderCountBadge = queryUI('#folderCountBadge');
         if (folderCountBadge) {
             folderCountBadge.textContent = totalFolders.toString();
             folderCountBadge.title = `共有 ${totalFolders} 个文件夹`;
         }
 
         // 更新按钮总数计数
-        const totalButtonCountBadge = document.getElementById('totalButtonCountBadge');
+        const totalButtonCountBadge = queryUI('#totalButtonCountBadge');
         if (totalButtonCountBadge) {
             totalButtonCountBadge.textContent = totalButtons.toString();
             totalButtonCountBadge.title = `所有文件夹共有 ${totalButtons} 个按钮`;
@@ -3649,7 +3782,7 @@
         // 更新当前文件夹按钮数计数
         if (selectedFolderName && buttonConfig.folders[selectedFolderName]) {
             const currentFolderButtonCount = Object.keys(buttonConfig.folders[selectedFolderName].buttons).length;
-            const currentFolderBadge = document.getElementById('currentFolderButtonCount');
+            const currentFolderBadge = queryUI('#currentFolderButtonCount');
             if (currentFolderBadge) {
                 currentFolderBadge.textContent = currentFolderButtonCount.toString();
                 currentFolderBadge.title = `"${selectedFolderName}" 文件夹有 ${currentFolderButtonCount} 个按钮`;
@@ -3999,7 +4132,7 @@
         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
 
         // 更新容器高度
-        const container = document.querySelector('.folder-buttons-container');
+        const container = queryUI('.folder-buttons-container');
         if (container) {
             container.style.height = clamped + 'px';
         }
@@ -4342,7 +4475,8 @@
         dialog.appendChild(footer);
 
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
         currentSettingsOverlay = overlay;
 
         // 动画效果
@@ -4499,8 +4633,6 @@ function showAutomationSettingsDialog() {
     addDiv.appendChild(addBtn);
     dialog.appendChild(addDiv);
 
-    // 将 overlay 加入文档流
-    document.body.appendChild(overlay);
 }
 
 
@@ -4636,7 +4768,6 @@ function showStyleSettingsDialog() {
     dialog.style.position = 'relative';
     dialog.appendChild(closeSaveBtn);
 
-    document.body.appendChild(overlay);
 }
 
     /**
@@ -4774,8 +4905,6 @@ function showEditDomainStyleDialog(index) {
 
     dialog.appendChild(footer2);
 
-    // 最后将 overlay 插入文档
-    document.body.appendChild(overlay);
 }
 
 
@@ -4910,7 +5039,6 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     dialog.appendChild(container);
     dialog.appendChild(btnRow);
 
-    document.body.appendChild(overlay);
 }
 
 function isValidDomainInput(str) {
@@ -4927,7 +5055,8 @@ function isValidDomainInput(str) {
     });
 
     const createButtonContainer = () => {
-        let existingContainer = document.querySelector('.folder-buttons-container');
+        const root = getShadowRoot();
+        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
         if (existingContainer) {
             // 使用updateButtonContainer来处理已存在的容器
             updateButtonContainer();
@@ -4936,6 +5065,7 @@ function isValidDomainInput(str) {
         // 创建新容器
         const buttonContainer = document.createElement('div');
         buttonContainer.classList.add('folder-buttons-container');
+        buttonContainer.style.pointerEvents = 'auto';
 
         // 设置固定定位和位置
         buttonContainer.style.position = 'fixed';
@@ -4987,7 +5117,8 @@ function isValidDomainInput(str) {
     };
 
     const updateButtonContainer = () => {
-        let existingContainer = document.querySelector('.folder-buttons-container');
+        const root = getShadowRoot();
+        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
         if (existingContainer) {
             // 保存所有功能按钮的引用
             const settingsButton = existingContainer.querySelector('button:nth-last-child(2)');
@@ -5017,14 +5148,14 @@ function isValidDomainInput(str) {
 
     const attachButtonsToTextarea = (textarea) => {
         // 仅附加一次按钮容器
-        let buttonContainer = document.querySelector('.folder-buttons-container');
+        let buttonContainer = queryUI('.folder-buttons-container');
         if (!buttonContainer) {
             buttonContainer = createButtonContainer();
             // 插入按钮容器到 textarea 的父元素之后
             // 根据ChatGPT的DOM结构，可能需要调整插入位置
             // textarea.parentElement.insertBefore(buttonContainer, textarea.nextSibling);
             // console.log("✅ 按钮容器已附加到 textarea 元素。");
-            document.body.appendChild(buttonContainer);
+            appendToMainLayer(buttonContainer);
             console.log("✅ 按钮容器已固定到窗口底部。");
         } else {
             console.log("ℹ️ 按钮容器已存在，跳过附加。");
@@ -5093,7 +5224,7 @@ function isValidDomainInput(str) {
             const matchedStyle = buttonConfig.domainStyleSettings.find(s => currentHost.includes(s.domain));
             if (matchedStyle) {
                 // 1) 更新按钮栏高度
-                const container = document.querySelector('.folder-buttons-container');
+                const container = queryUI('.folder-buttons-container');
                 if (container) {
                     const clamped = Math.min(200, Math.max(20, matchedStyle.height || 40));
                     container.style.height = clamped + 'px';
