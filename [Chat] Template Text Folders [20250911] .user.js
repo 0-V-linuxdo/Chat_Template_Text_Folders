@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix6.2
+// @name         [Chat] Template Text Folders [20251011] +fix6.6
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -1722,6 +1722,7 @@
     let currentConfirmOverlay = null;
     let currentSettingsOverlay = null;
     let currentConfigOverlay = null; // 新增的独立配置设置弹窗
+    let currentStyleOverlay = null;
 
     const showDeleteFolderConfirmDialog = (folderName, rerenderFn) => {
         if (currentConfirmOverlay) {
@@ -4737,8 +4738,138 @@ function showAutomationSettingsDialog() {
     listBody.classList.add('hide-scrollbar');
 
     listContainer.appendChild(listHeader);
-    listContainer.appendChild(listBody);
-    dialog.appendChild(listContainer);
+   listContainer.appendChild(listBody);
+   dialog.appendChild(listContainer);
+
+    const showAutomationRuleDeleteConfirmDialog = (rule, onConfirm) => {
+        if (!rule) {
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+            return;
+        }
+        if (currentConfirmOverlay) {
+            closeExistingOverlay(currentConfirmOverlay);
+        }
+
+        const overlay = document.createElement('div');
+        overlay.classList.add('confirm-overlay');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay-bg, rgba(0, 0, 0, 0.5));
+            backdrop-filter: blur(2px);
+            z-index: 13000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.classList.add('confirm-dialog');
+        dialog.style.cssText = `
+            background-color: var(--dialog-bg, #ffffff);
+            color: var(--text-color, #333333);
+            border-radius: 4px;
+            padding: 24px;
+            box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
+            border: 1px solid var(--border-color, #e5e7eb);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            width: 420px;
+            max-width: 90vw;
+        `;
+
+        const ruleName = rule.name || rule.domain || '未命名规则';
+        const ruleDomain = rule.domain || '（未指定网址）';
+        const ruleMethod = rule.method || '-';
+        const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
+
+        setTrustedHTML(dialog, `
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
+                🗑️ 确认删除自动化规则 "${ruleName}"？
+            </h3>
+            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！</p>
+            <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 12px; border-radius:6px; background-color: var(--button-bg, #f3f4f6);">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                    <div style="
+                        width:44px;
+                        height:44px;
+                        border-radius:12px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        background-color: var(--dialog-bg, #ffffff);
+                        border: 1px solid var(--border-color, #e5e7eb);
+                        overflow:hidden;
+                    ">
+                        <img src="${faviconUrl}" alt="${ruleName}" style="width:24px; height:24px; object-fit:contain;" referrerpolicy="no-referrer">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-size:14px; font-weight:600; color: var(--text-color, #333333);">${ruleName}</span>
+                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280);">${ruleDomain}</span>
+                    </div>
+                </div>
+                <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
+                    <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
+                    自动提交方式：<strong>${ruleMethod}</strong>
+                </p>
+            </div>
+            <div style="
+                display:flex;
+                justify-content: flex-end;
+                gap: 12px;
+                border-top:1px solid var(--border-color, #e5e7eb);
+                padding-top:16px;
+            ">
+                <button id="cancelAutomationRuleDelete" style="
+                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                    background-color: var(--cancel-color, #6B7280);
+                    color: white;
+                    border-radius:4px;
+                ">取消</button>
+                <button id="confirmAutomationRuleDelete" style="
+                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                    background-color: var(--danger-color, #ef4444);
+                    color: white;
+                    border-radius:4px;
+                ">删除</button>
+            </div>
+        `);
+
+        overlay.appendChild(dialog);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
+        currentConfirmOverlay = overlay;
+
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+            dialog.style.transform = 'scale(1)';
+        }, 10);
+
+        const cancelBtn = dialog.querySelector('#cancelAutomationRuleDelete');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                closeExistingOverlay(overlay);
+                currentConfirmOverlay = null;
+            });
+        }
+
+        const confirmBtn = dialog.querySelector('#confirmAutomationRuleDelete');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                if (typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+                closeExistingOverlay(overlay);
+                currentConfirmOverlay = null;
+            });
+        }
+    };
 
     function renderDomainRules() {
         setTrustedHTML(listBody, '');
@@ -4897,8 +5028,12 @@ function showAutomationSettingsDialog() {
                 deleteBtn.style.backgroundColor = 'transparent';
             });
             deleteBtn.addEventListener('click', () => {
-                buttonConfig.domainAutoSubmitSettings.splice(idx, 1);
-                renderDomainRules();
+                const ruleToDelete = buttonConfig.domainAutoSubmitSettings[idx];
+                showAutomationRuleDeleteConfirmDialog(ruleToDelete, () => {
+                    buttonConfig.domainAutoSubmitSettings.splice(idx, 1);
+                    localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                    renderDomainRules();
+                });
             });
 
             right.appendChild(methodBadge);
@@ -4944,8 +5079,8 @@ function showAutomationSettingsDialog() {
 
 function showStyleSettingsDialog() {
     // 若已存在则关闭
-    if (currentConfirmOverlay) {
-        closeExistingOverlay(currentConfirmOverlay);
+    if (currentStyleOverlay) {
+        closeExistingOverlay(currentStyleOverlay);
     }
 
     // 使用统一弹窗
@@ -4953,11 +5088,11 @@ function showStyleSettingsDialog() {
         title: '🎨 样式管理',
         width: '750px',
         onClose: () => {
-            currentConfirmOverlay = null;
+            currentStyleOverlay = null;
         },
         closeOnOverlayClick: false
     });
-    currentConfirmOverlay = overlay;
+    currentStyleOverlay = overlay;
 
     // 说明文字
     const desc = document.createElement('p');
@@ -5035,6 +5170,164 @@ function showStyleSettingsDialog() {
     styleListContainer.appendChild(styleHeader);
     styleListContainer.appendChild(styleListBody);
     dialog.appendChild(styleListContainer);
+
+    const showStyleRuleDeleteConfirmDialog = (styleItem, onConfirm) => {
+        if (!styleItem) {
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+            return;
+        }
+
+        if (currentConfirmOverlay) {
+            closeExistingOverlay(currentConfirmOverlay);
+        }
+
+        const overlay = document.createElement('div');
+        overlay.classList.add('confirm-overlay');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay-bg, rgba(0, 0, 0, 0.5));
+            backdrop-filter: blur(2px);
+            z-index: 13000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.classList.add('confirm-dialog');
+        dialog.style.cssText = `
+            background-color: var(--dialog-bg, #ffffff);
+            color: var(--text-color, #333333);
+            border-radius: 4px;
+            padding: 24px;
+            box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
+            border: 1px solid var(--border-color, #e5e7eb);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            width: 420px;
+            max-width: 90vw;
+        `;
+
+        const styleName = styleItem.name || styleItem.domain || '未命名样式';
+        const styleDomain = styleItem.domain || '（未指定网址）';
+        const styleHeight = styleItem.height ? `${styleItem.height}px` : '默认高度';
+        const faviconUrl = styleItem.favicon || generateDomainFavicon(styleItem.domain);
+        const cssRaw = (styleItem.cssCode || '').trim();
+        const cssContent = cssRaw || '（未配置自定义 CSS）';
+        const cssLineCount = cssContent.split('\n').length;
+        const cssTextareaHeight = Math.min(Math.max(cssLineCount, 6), 24) * 18;
+        const escapeHtml = (str = '') => String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        setTrustedHTML(dialog, `
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
+                🗑️ 确认删除样式 "${escapeHtml(styleName)}"？
+            </h3>
+            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！</p>
+            <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 16px; border-radius:6px; background-color: var(--button-bg, #f3f4f6); display:flex; flex-direction:column; gap:14px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="
+                        width:48px;
+                        height:48px;
+                        border-radius:14px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        background-color: var(--dialog-bg, #ffffff);
+                        border: 1px solid var(--border-color, #e5e7eb);
+                        overflow:hidden;
+                        flex-shrink:0;
+                    ">
+                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:26px; height:26px; object-fit:contain;" referrerpolicy="no-referrer">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                        <span style="font-size:15px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
+                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <p style="margin:0; position:relative; padding-left:14px; color: var(--text-color, #333333); font-size:13px;">
+                        <span style="position:absolute; left:0; top:0.65em; transform:translateY(-50%); width:5px; height:5px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
+                        按钮栏高度：<strong>${escapeHtml(styleHeight)}</strong>
+                    </p>
+                </div>
+            </div>
+            <div style="margin: 16px 0 22px 0; display:flex; flex-direction:column; gap:8px;">
+                <label style="font-size:13px; font-weight:600; color: var(--text-color, #333333);">🧶 自定义 CSS：</label>
+                <textarea readonly style="
+                    width:100%;
+                    min-height:${cssTextareaHeight}px;
+                    background-color: var(--dialog-bg, #ffffff);
+                    color: var(--text-color, #1f2937);
+                    border:1px solid var(--border-color, #d1d5db);
+                    border-radius:6px;
+                    padding:12px;
+                    font-size:13px;
+                    line-height:1.5;
+                    resize:vertical;
+                    font-family: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+                    white-space:pre-wrap;
+                    word-break:break-word;
+                    overflow-wrap:break-word;
+                ">${escapeHtml(cssContent)}</textarea>
+            </div>
+            <div style="
+                display:flex;
+                justify-content: flex-end;
+                gap: 12px;
+                border-top:1px solid var(--border-color, #e5e7eb);
+                padding-top:16px;
+            ">
+                <button id="cancelStyleRuleDelete" style="
+                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                    background-color: var(--cancel-color, #6B7280);
+                    color: white;
+                    border-radius:4px;
+                ">取消</button>
+                <button id="confirmStyleRuleDelete" style="
+                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                    background-color: var(--danger-color, #ef4444);
+                    color: white;
+                    border-radius:4px;
+                ">删除</button>
+            </div>
+        `);
+
+        overlay.appendChild(dialog);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
+        currentConfirmOverlay = overlay;
+
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+            dialog.style.transform = 'scale(1)';
+        }, 10);
+
+        dialog.querySelector('#cancelStyleRuleDelete')?.addEventListener('click', () => {
+            closeExistingOverlay(overlay);
+            currentConfirmOverlay = null;
+        });
+
+        dialog.querySelector('#confirmStyleRuleDelete')?.addEventListener('click', () => {
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+            closeExistingOverlay(overlay);
+            currentConfirmOverlay = null;
+        });
+    };
 
     function renderDomainStyles() {
         setTrustedHTML(styleListBody, '');
@@ -5210,9 +5503,12 @@ function showStyleSettingsDialog() {
                 deleteBtn.style.backgroundColor = 'transparent';
             });
             deleteBtn.addEventListener('click', () => {
-                buttonConfig.domainStyleSettings.splice(idx, 1);
-                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                renderDomainStyles();
+                const styleToDelete = buttonConfig.domainStyleSettings[idx];
+                showStyleRuleDeleteConfirmDialog(styleToDelete, () => {
+                    buttonConfig.domainStyleSettings.splice(idx, 1);
+                    localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                    renderDomainStyles();
+                });
             });
 
             right.appendChild(heightBadge);
@@ -5263,7 +5559,7 @@ function showStyleSettingsDialog() {
     closeSaveBtn.addEventListener('click', () => {
         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
         closeExistingOverlay(overlay);
-        currentConfirmOverlay = null;
+        currentStyleOverlay = null;
     });
     dialog.style.position = 'relative';
     dialog.appendChild(closeSaveBtn);
