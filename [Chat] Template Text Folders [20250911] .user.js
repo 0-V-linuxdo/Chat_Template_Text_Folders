@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251009] +Enhanced
+// @name         [Chat] Template Text Folders [20251011] +Enhanced
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251009]
+// @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -3378,26 +3378,22 @@
                     </div>
                 </div>
             </div>
-            <!-- 底部关闭按钮 -->
-            <div style="
-                display:flex;
-                justify-content:flex-end;
-                border-top:1px solid var(--border-color, #e5e7eb);
-                padding-top:16px;
-            ">
-                <button id="closeConfigDialog" style="
-                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                    background-color: var(--cancel-color, #6B7280);
-                    color: white;
-                    border-radius:4px;
-                ">关闭</button>
-            </div>
         `);
 
         overlay.appendChild(dialog);
         overlay.style.pointerEvents = 'auto';
         appendToOverlayLayer(overlay);
         currentConfigOverlay = overlay;
+
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) {
+                closeExistingOverlay(overlay);
+                if (currentConfigOverlay === overlay) {
+                    currentConfigOverlay = null;
+                }
+                console.log("✅ 配置管理弹窗已通过点击外部关闭");
+            }
+        });
 
         // 动画效果
         setTimeout(() => {
@@ -3492,12 +3488,6 @@
                     }, 50);
                 }, 100);
             }
-        });
-
-        dialog.querySelector('#closeConfigDialog').addEventListener('click', () => {
-            closeExistingOverlay(overlay);
-            currentConfigOverlay = null;
-            console.log("✅ 配置管理弹窗已手动关闭");
         });
     };
 
