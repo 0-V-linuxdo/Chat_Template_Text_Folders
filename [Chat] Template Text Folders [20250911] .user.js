@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +Enhanced
+// @name         [Chat] Template Text Folders [20251011] +fix
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -4559,9 +4559,11 @@ function showAutomationSettingsDialog() {
 
     function renderDomainRules() {
         setTrustedHTML(tbody, '');
-        buttonConfig.domainAutoSubmitSettings.forEach((rule, idx) => {
+        buttonConfig.domainAutoSubmitSettings.forEach((rule, idx, rules) => {
             const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid var(--border-color)';
+            if (idx !== rules.length - 1) {
+                tr.style.borderBottom = '1px solid var(--border-color)';
+            }
             setTrustedHTML(tr, `
                 <td style="padding:4px;">${rule.name}</td>
                 <td style="padding:4px;">${rule.domain}</td>
@@ -4679,9 +4681,11 @@ function showStyleSettingsDialog() {
 
     function renderDomainStyles() {
         setTrustedHTML(tbody, '');
-        buttonConfig.domainStyleSettings.forEach((item, idx) => {
+        buttonConfig.domainStyleSettings.forEach((item, idx, styles) => {
             const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid var(--border-color)';
+            if (idx !== styles.length - 1) {
+                tr.style.borderBottom = '1px solid var(--border-color)';
+            }
             setTrustedHTML(tr, `
                 <td style="padding:4px;">${item.name || ''}</td>
                 <td style="padding:4px;">${item.domain || ''}</td>
