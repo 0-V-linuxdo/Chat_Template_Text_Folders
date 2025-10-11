@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix4-3
+// @name         [Chat] Template Text Folders [20251011] +fix5-6
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -202,6 +202,37 @@
     };
 
     const toCSSVariableName = (key) => `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
+
+    /**
+     * 自动根据内容调整 textarea 高度，确保上下内边距空间充足。
+     * @param {HTMLTextAreaElement} textarea
+     * @param {{minRows?: number, maxRows?: number}} options
+     */
+    const autoResizeTextarea = (textarea, options = {}) => {
+        if (!textarea) return;
+        const { minRows = 1, maxRows = 5 } = options;
+        textarea.style.height = 'auto';
+        const styles = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(styles.lineHeight) || (parseFloat(styles.fontSize) * 1.2) || 20;
+        const paddingTop = parseFloat(styles.paddingTop) || 0;
+        const paddingBottom = parseFloat(styles.paddingBottom) || 0;
+        const borderTop = parseFloat(styles.borderTopWidth) || 0;
+        const borderBottom = parseFloat(styles.borderBottomWidth) || 0;
+        const minHeight = (lineHeight * minRows) + paddingTop + paddingBottom + borderTop + borderBottom;
+        const maxHeight = (lineHeight * maxRows) + paddingTop + paddingBottom + borderTop + borderBottom;
+        let targetHeight = textarea.scrollHeight;
+        if (targetHeight < minHeight) {
+            targetHeight = minHeight;
+        } else if (targetHeight > maxHeight) {
+            targetHeight = maxHeight;
+            textarea.style.overflowY = 'auto';
+        } else {
+            textarea.style.overflowY = 'hidden';
+        }
+        textarea.style.minHeight = `${minHeight}px`;
+        textarea.style.maxHeight = `${maxHeight}px`;
+        textarea.style.height = `${targetHeight}px`;
+    };
 
     // 用于统一创建 overlay + dialog，样式与默认逻辑保持一致
     // 复用时只需传入自定义的内容与回调，外观也可统一
@@ -5296,17 +5327,31 @@ function showEditDomainStyleDialog(index) {
     faviconLabel2.style.fontWeight = '600';
     faviconLabel2.style.color = 'var(--text-color, #1f2937)';
 
-    const faviconRow2 = document.createElement('div');
-    faviconRow2.style.display = 'flex';
-    faviconRow2.style.alignItems = 'center';
-    faviconRow2.style.gap = '12px';
+    const faviconFieldWrapper2 = document.createElement('div');
+    faviconFieldWrapper2.style.display = 'flex';
+    faviconFieldWrapper2.style.alignItems = 'flex-start';
+    faviconFieldWrapper2.style.gap = '12px';
 
     const faviconPreviewHolder2 = document.createElement('div');
-    const faviconInput2 = document.createElement('input');
-    faviconInput2.type = 'text';
-    faviconInput2.style.flex = '1';
-    faviconInput2.style.height = '40px';
-    faviconInput2.style.padding = '0 12px';
+    faviconPreviewHolder2.style.width = '40px';
+    faviconPreviewHolder2.style.height = '40px';
+    faviconPreviewHolder2.style.borderRadius = '10px';
+    faviconPreviewHolder2.style.display = 'flex';
+    faviconPreviewHolder2.style.alignItems = 'center';
+    faviconPreviewHolder2.style.justifyContent = 'center';
+    faviconPreviewHolder2.style.backgroundColor = 'transparent';
+    faviconPreviewHolder2.style.flexShrink = '0';
+
+    const faviconControls2 = document.createElement('div');
+    faviconControls2.style.display = 'flex';
+    faviconControls2.style.flexDirection = 'column';
+    faviconControls2.style.gap = '8px';
+    faviconControls2.style.flex = '1';
+
+    const faviconInput2 = document.createElement('textarea');
+    faviconInput2.rows = 1;
+    faviconInput2.style.flex = '1 1 auto';
+    faviconInput2.style.padding = '10px 12px';
     faviconInput2.style.border = '1px solid var(--border-color, #d1d5db)';
     faviconInput2.style.borderRadius = '6px';
     faviconInput2.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
@@ -5314,31 +5359,65 @@ function showEditDomainStyleDialog(index) {
     faviconInput2.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
     faviconInput2.style.outline = 'none';
     faviconInput2.style.fontSize = '14px';
+    faviconInput2.style.lineHeight = '1.5';
+    faviconInput2.style.resize = 'vertical';
+    faviconInput2.style.overflowY = 'hidden';
     faviconInput2.placeholder = '可填写自定义图标地址';
     faviconInput2.value = styleItem.favicon || '';
+    const resizeFaviconTextarea2 = () => autoResizeTextarea(faviconInput2, { minRows: 1, maxRows: 4 });
 
-    const autoFaviconBtn2 = document.createElement('button');
-    autoFaviconBtn2.type = 'button';
-    autoFaviconBtn2.textContent = '自动获取';
-    autoFaviconBtn2.style.backgroundColor = 'var(--primary-color, #3B82F6)';
-    autoFaviconBtn2.style.color = '#fff';
-    autoFaviconBtn2.style.border = 'none';
-    autoFaviconBtn2.style.borderRadius = '6px';
-    autoFaviconBtn2.style.padding = '8px 12px';
-    autoFaviconBtn2.style.fontSize = '13px';
-    autoFaviconBtn2.style.cursor = 'pointer';
-
-    faviconRow2.appendChild(faviconPreviewHolder2);
-    faviconRow2.appendChild(faviconInput2);
-    faviconRow2.appendChild(autoFaviconBtn2);
+    const faviconActionsRow2 = document.createElement('div');
+    faviconActionsRow2.style.display = 'flex';
+    faviconActionsRow2.style.alignItems = 'center';
+    faviconActionsRow2.style.gap = '8px';
+    faviconActionsRow2.style.flexWrap = 'nowrap';
+    faviconActionsRow2.style.fontSize = '12px';
+    faviconActionsRow2.style.color = 'var(--muted-text-color, #6b7280)';
+    faviconActionsRow2.style.justifyContent = 'flex-start';
 
     const faviconHelp2 = document.createElement('span');
     faviconHelp2.textContent = '留空时系统将使用该网址的默认 Favicon。';
-    faviconHelp2.style.fontSize = '12px';
-    faviconHelp2.style.color = 'var(--muted-text-color, #6b7280)';
+    faviconHelp2.style.flex = '1';
+    faviconHelp2.style.minWidth = '0';
+    faviconHelp2.style.marginRight = '12px';
 
-    faviconLabel2.appendChild(faviconRow2);
-    faviconLabel2.appendChild(faviconHelp2);
+    const autoFaviconBtn2 = document.createElement('button');
+    autoFaviconBtn2.type = 'button';
+    autoFaviconBtn2.setAttribute('aria-label', '自动获取站点图标');
+    autoFaviconBtn2.title = '自动获取站点图标';
+    autoFaviconBtn2.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    autoFaviconBtn2.style.color = '#fff';
+    autoFaviconBtn2.style.border = '1px solid var(--border-color, #d1d5db)';
+    autoFaviconBtn2.style.borderRadius = '50%';
+    autoFaviconBtn2.style.width = '32px';
+    autoFaviconBtn2.style.height = '32px';
+    autoFaviconBtn2.style.display = 'flex';
+    autoFaviconBtn2.style.alignItems = 'center';
+    autoFaviconBtn2.style.justifyContent = 'center';
+    autoFaviconBtn2.style.cursor = 'pointer';
+    autoFaviconBtn2.style.boxShadow = '0 2px 6px rgba(59, 130, 246, 0.16)';
+    autoFaviconBtn2.style.flexShrink = '0';
+    autoFaviconBtn2.style.padding = '0';
+
+    const autoFaviconIcon2 = document.createElement('img');
+    autoFaviconIcon2.src = 'https://www.google.com/favicon.ico';
+    autoFaviconIcon2.alt = 'Google';
+    autoFaviconIcon2.style.width = '18px';
+    autoFaviconIcon2.style.height = '18px';
+    autoFaviconIcon2.loading = 'lazy';
+    autoFaviconIcon2.referrerPolicy = 'no-referrer';
+    autoFaviconBtn2.appendChild(autoFaviconIcon2);
+
+    faviconActionsRow2.appendChild(faviconHelp2);
+    faviconActionsRow2.appendChild(autoFaviconBtn2);
+
+    faviconControls2.appendChild(faviconInput2);
+    faviconControls2.appendChild(faviconActionsRow2);
+
+    faviconFieldWrapper2.appendChild(faviconPreviewHolder2);
+    faviconFieldWrapper2.appendChild(faviconControls2);
+
+    faviconLabel2.appendChild(faviconFieldWrapper2);
     container.appendChild(faviconLabel2);
 
     let faviconManuallyEdited2 = false;
@@ -5354,6 +5433,8 @@ function showEditDomainStyleDialog(index) {
         );
     };
     updateStyleFaviconPreview();
+    resizeFaviconTextarea2();
+    requestAnimationFrame(resizeFaviconTextarea2);
 
     const getStyleFallbackFavicon = () => generateDomainFavicon(domainInput.value.trim());
 
@@ -5362,6 +5443,7 @@ function showEditDomainStyleDialog(index) {
         faviconInput2.value = autoUrl;
         faviconManuallyEdited2 = false;
         updateStyleFaviconPreview();
+        resizeFaviconTextarea2();
     });
 
     domainInput.addEventListener('input', () => {
@@ -5369,11 +5451,13 @@ function showEditDomainStyleDialog(index) {
             faviconInput2.value = getStyleFallbackFavicon();
         }
         updateStyleFaviconPreview();
+        resizeFaviconTextarea2();
     });
 
     faviconInput2.addEventListener('input', () => {
         faviconManuallyEdited2 = true;
         updateStyleFaviconPreview();
+        resizeFaviconTextarea2();
     });
     nameInput.addEventListener('input', updateStyleFaviconPreview);
 
@@ -5551,17 +5635,31 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     faviconLabel.style.fontWeight = '600';
     faviconLabel.style.color = 'var(--text-color, #1f2937)';
 
-    const faviconRow = document.createElement('div');
-    faviconRow.style.display = 'flex';
-    faviconRow.style.alignItems = 'center';
-    faviconRow.style.gap = '12px';
+    const faviconFieldWrapper = document.createElement('div');
+    faviconFieldWrapper.style.display = 'flex';
+    faviconFieldWrapper.style.alignItems = 'flex-start';
+    faviconFieldWrapper.style.gap = '12px';
 
     const faviconPreviewHolder = document.createElement('div');
-    const faviconInput = document.createElement('input');
-    faviconInput.type = 'text';
-    faviconInput.style.flex = '1';
-    faviconInput.style.height = '40px';
-    faviconInput.style.padding = '0 12px';
+    faviconPreviewHolder.style.width = '40px';
+    faviconPreviewHolder.style.height = '40px';
+    faviconPreviewHolder.style.borderRadius = '10px';
+    faviconPreviewHolder.style.display = 'flex';
+    faviconPreviewHolder.style.alignItems = 'center';
+    faviconPreviewHolder.style.justifyContent = 'center';
+    faviconPreviewHolder.style.backgroundColor = 'transparent';
+    faviconPreviewHolder.style.flexShrink = '0';
+
+    const faviconControls = document.createElement('div');
+    faviconControls.style.display = 'flex';
+    faviconControls.style.flexDirection = 'column';
+    faviconControls.style.gap = '8px';
+    faviconControls.style.flex = '1';
+
+    const faviconInput = document.createElement('textarea');
+    faviconInput.rows = 1;
+    faviconInput.style.flex = '1 1 auto';
+    faviconInput.style.padding = '10px 12px';
     faviconInput.style.border = '1px solid var(--border-color, #d1d5db)';
     faviconInput.style.borderRadius = '6px';
     faviconInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
@@ -5569,31 +5667,64 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     faviconInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
     faviconInput.style.outline = 'none';
     faviconInput.style.fontSize = '14px';
+    faviconInput.style.lineHeight = '1.5';
+    faviconInput.style.resize = 'vertical';
+    faviconInput.style.overflowY = 'hidden';
     faviconInput.placeholder = 'https:// 或 data:image/svg+xml;base64...';
     faviconInput.value = presetFavicon || '';
+    const resizeFaviconTextarea = () => autoResizeTextarea(faviconInput, { minRows: 1, maxRows: 4 });
 
-    const autoFaviconBtn = document.createElement('button');
-    autoFaviconBtn.type = 'button';
-    autoFaviconBtn.textContent = '自动获取';
-    autoFaviconBtn.style.backgroundColor = 'var(--primary-color, #3B82F6)';
-    autoFaviconBtn.style.color = '#fff';
-    autoFaviconBtn.style.border = 'none';
-    autoFaviconBtn.style.borderRadius = '6px';
-    autoFaviconBtn.style.padding = '8px 12px';
-    autoFaviconBtn.style.fontSize = '13px';
-    autoFaviconBtn.style.cursor = 'pointer';
-
-    faviconRow.appendChild(faviconPreviewHolder);
-    faviconRow.appendChild(faviconInput);
-    faviconRow.appendChild(autoFaviconBtn);
+    const faviconActionsRow = document.createElement('div');
+    faviconActionsRow.style.display = 'flex';
+    faviconActionsRow.style.alignItems = 'center';
+    faviconActionsRow.style.gap = '8px';
+    faviconActionsRow.style.flexWrap = 'nowrap';
+    faviconActionsRow.style.fontSize = '12px';
+    faviconActionsRow.style.color = 'var(--muted-text-color, #6b7280)';
+    faviconActionsRow.style.justifyContent = 'flex-start';
 
     const faviconHelp = document.createElement('span');
     faviconHelp.textContent = '留空时将自动根据网址生成 Google Favicon。';
-    faviconHelp.style.fontSize = '12px';
-    faviconHelp.style.color = 'var(--muted-text-color, #6b7280)';
+    faviconHelp.style.flex = '1';
+    faviconHelp.style.minWidth = '0';
+    faviconHelp.style.marginRight = '12px';
 
-    faviconLabel.appendChild(faviconRow);
-    faviconLabel.appendChild(faviconHelp);
+    const autoFaviconBtn = document.createElement('button');
+    autoFaviconBtn.type = 'button';
+    autoFaviconBtn.setAttribute('aria-label', '自动获取站点图标');
+    autoFaviconBtn.title = '自动获取站点图标';
+    autoFaviconBtn.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    autoFaviconBtn.style.border = '1px solid var(--border-color, #d1d5db)';
+    autoFaviconBtn.style.borderRadius = '50%';
+    autoFaviconBtn.style.width = '32px';
+    autoFaviconBtn.style.height = '32px';
+    autoFaviconBtn.style.display = 'flex';
+    autoFaviconBtn.style.alignItems = 'center';
+    autoFaviconBtn.style.justifyContent = 'center';
+    autoFaviconBtn.style.cursor = 'pointer';
+    autoFaviconBtn.style.boxShadow = '0 2px 6px rgba(59, 130, 246, 0.16)';
+    autoFaviconBtn.style.flexShrink = '0';
+    autoFaviconBtn.style.padding = '0';
+
+    const autoFaviconIcon = document.createElement('img');
+    autoFaviconIcon.src = 'https://www.google.com/favicon.ico';
+    autoFaviconIcon.alt = 'Google';
+    autoFaviconIcon.style.width = '18px';
+    autoFaviconIcon.style.height = '18px';
+    autoFaviconIcon.loading = 'lazy';
+    autoFaviconIcon.referrerPolicy = 'no-referrer';
+    autoFaviconBtn.appendChild(autoFaviconIcon);
+
+    faviconActionsRow.appendChild(faviconHelp);
+    faviconActionsRow.appendChild(autoFaviconBtn);
+
+    faviconControls.appendChild(faviconInput);
+    faviconControls.appendChild(faviconActionsRow);
+
+    faviconFieldWrapper.appendChild(faviconPreviewHolder);
+    faviconFieldWrapper.appendChild(faviconControls);
+
+    faviconLabel.appendChild(faviconFieldWrapper);
     container.appendChild(faviconLabel);
 
     let faviconManuallyEdited = false;
@@ -5643,6 +5774,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         faviconInput.value = autoUrl;
         faviconManuallyEdited = false;
         updateFaviconPreview();
+        resizeFaviconTextarea();
     });
 
     domainInput.addEventListener('input', () => {
@@ -5650,16 +5782,20 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
             faviconInput.value = getFallbackFavicon();
         }
         updateFaviconPreview();
+        resizeFaviconTextarea();
     });
 
     faviconInput.addEventListener('input', () => {
         faviconManuallyEdited = true;
         updateFaviconPreview();
+        resizeFaviconTextarea();
     });
 
     nameInputRef.addEventListener('input', updateFaviconPreview);
 
     updateFaviconPreview();
+    resizeFaviconTextarea();
+    requestAnimationFrame(resizeFaviconTextarea);
 
     // 自动提交方式
     const methodLabel = document.createElement('label');
