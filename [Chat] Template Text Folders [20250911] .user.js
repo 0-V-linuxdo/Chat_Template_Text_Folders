@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix
+// @name         [Chat] Template Text Folders [20251011] +fix3
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -4773,7 +4773,7 @@ function showEditDomainStyleDialog(index) {
     if (currentAddDomainOverlay) {
         closeExistingOverlay(currentAddDomainOverlay);
     }
-    const isEdit = (typeof index === 'number');
+    const isEdit = typeof index === 'number';
     const styleItem = isEdit
         ? { ...buttonConfig.domainStyleSettings[index] }
         : {
@@ -4783,102 +4783,160 @@ function showEditDomainStyleDialog(index) {
             cssCode: ''
         };
 
-    // 使用统一弹窗
     const { overlay, dialog } = createUnifiedDialog({
-        title: isEdit ? '编辑自定义样式' : '新建自定义样式',
-        width: '400px',
+        title: isEdit ? '✏️ 编辑自定义样式' : '🆕 新建自定义样式',
+        width: '480px',
         onClose: () => {
             currentAddDomainOverlay = null;
         }
     });
     currentAddDomainOverlay = overlay;
 
-    // 对话框表单
-    const title2 = document.createElement('h3');
-    title2.textContent = isEdit ? '编辑自定义样式' : '新建自定义样式';
-    dialog.appendChild(title2);
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '12px';
+    container.style.marginBottom = '16px';
+    container.style.padding = '16px';
+    container.style.borderRadius = '6px';
+    container.style.border = '1px solid var(--border-color, #e5e7eb)';
+    container.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
 
     const nameLabel = document.createElement('label');
     nameLabel.textContent = '备注名称：';
+    nameLabel.style.display = 'flex';
+    nameLabel.style.flexDirection = 'column';
+    nameLabel.style.gap = '6px';
+    nameLabel.style.fontSize = '13px';
+    nameLabel.style.fontWeight = '600';
+    nameLabel.style.color = 'var(--text-color, #1f2937)';
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
-    nameInput.value = styleItem.name;
-    nameInput.style.cssText = `
-        width:100%;margin-bottom:8px;padding:6px;
-        border:1px solid var(--border-color);border-radius:4px;
-    `;
-    dialog.appendChild(nameLabel);
-    dialog.appendChild(nameInput);
+    nameInput.value = styleItem.name || '';
+    nameInput.style.width = '100%';
+    nameInput.style.height = '40px';
+    nameInput.style.padding = '0 12px';
+    nameInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    nameInput.style.borderRadius = '6px';
+    nameInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    nameInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    nameInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    nameInput.style.outline = 'none';
+    nameInput.style.fontSize = '14px';
+    nameLabel.appendChild(nameInput);
+    container.appendChild(nameLabel);
 
     const domainLabel = document.createElement('label');
     domainLabel.textContent = '网址：';
+    domainLabel.style.display = 'flex';
+    domainLabel.style.flexDirection = 'column';
+    domainLabel.style.gap = '6px';
+    domainLabel.style.fontSize = '13px';
+    domainLabel.style.fontWeight = '600';
+    domainLabel.style.color = 'var(--text-color, #1f2937)';
     const domainInput = document.createElement('input');
     domainInput.type = 'text';
-    domainInput.value = styleItem.domain;
-    domainInput.style.cssText = `
-        width:100%;margin-bottom:8px;padding:6px;
-        border:1px solid var(--border-color);border-radius:4px;
-    `;
-    dialog.appendChild(domainLabel);
-    dialog.appendChild(domainInput);
+    domainInput.value = styleItem.domain || '';
+    domainInput.style.width = '100%';
+    domainInput.style.height = '40px';
+    domainInput.style.padding = '0 12px';
+    domainInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    domainInput.style.borderRadius = '6px';
+    domainInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    domainInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    domainInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    domainInput.style.outline = 'none';
+    domainInput.style.fontSize = '14px';
+    domainLabel.appendChild(domainInput);
+    container.appendChild(domainLabel);
 
     const heightLabel = document.createElement('label');
-    heightLabel.textContent = '按钮栏高度(px)：';
+    heightLabel.textContent = '按钮栏高度 (px)：';
+    heightLabel.style.display = 'flex';
+    heightLabel.style.flexDirection = 'column';
+    heightLabel.style.gap = '6px';
+    heightLabel.style.fontSize = '13px';
+    heightLabel.style.fontWeight = '600';
+    heightLabel.style.color = 'var(--text-color, #1f2937)';
     const heightInput = document.createElement('input');
     heightInput.type = 'number';
     heightInput.min = '20';
     heightInput.max = '200';
+    heightInput.step = '1';
     heightInput.value = styleItem.height;
-    heightInput.style.cssText = `
-        width:100%;margin-bottom:8px;padding:6px;
-        border:1px solid var(--border-color);border-radius:4px;
-    `;
-    dialog.appendChild(heightLabel);
-    dialog.appendChild(heightInput);
+    heightInput.style.width = '100%';
+    heightInput.style.height = '40px';
+    heightInput.style.padding = '0 12px';
+    heightInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    heightInput.style.borderRadius = '6px';
+    heightInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    heightInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    heightInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    heightInput.style.outline = 'none';
+    heightInput.style.fontSize = '14px';
+    heightLabel.appendChild(heightInput);
+    container.appendChild(heightLabel);
 
     const cssLabel = document.createElement('label');
-    cssLabel.textContent = '自定义CSS：';
+    cssLabel.textContent = '自定义 CSS：';
+    cssLabel.style.display = 'flex';
+    cssLabel.style.flexDirection = 'column';
+    cssLabel.style.gap = '6px';
+    cssLabel.style.fontSize = '13px';
+    cssLabel.style.fontWeight = '600';
+    cssLabel.style.color = 'var(--text-color, #1f2937)';
     const cssTextarea = document.createElement('textarea');
-    cssTextarea.value = styleItem.cssCode;
-    cssTextarea.style.cssText = `
-        width:100%;height:80px;margin-bottom:8px;padding:6px;
-        border:1px solid var(--border-color);border-radius:4px;resize:vertical;
-    `;
-    dialog.appendChild(cssLabel);
-    dialog.appendChild(cssTextarea);
+    cssTextarea.value = styleItem.cssCode || '';
+    cssTextarea.style.width = '100%';
+    cssTextarea.style.minHeight = '120px';
+    cssTextarea.style.padding = '12px';
+    cssTextarea.style.border = '1px solid var(--border-color, #d1d5db)';
+    cssTextarea.style.borderRadius = '6px';
+    cssTextarea.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    cssTextarea.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    cssTextarea.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    cssTextarea.style.outline = 'none';
+    cssTextarea.style.resize = 'vertical';
+    cssTextarea.style.fontSize = '13px';
+    cssTextarea.style.lineHeight = '1.5';
+    cssLabel.appendChild(cssTextarea);
+    container.appendChild(cssLabel);
 
-    // 底部按钮
+    dialog.appendChild(container);
+
     const footer2 = document.createElement('div');
-    footer2.style.textAlign = 'right';
     footer2.style.display = 'flex';
-    footer2.style.justifyContent = 'flex-end';
+    footer2.style.justifyContent = 'space-between';
+    footer2.style.alignItems = 'center';
     footer2.style.gap = '12px';
+    footer2.style.marginTop = '20px';
+    footer2.style.paddingTop = '20px';
+    footer2.style.borderTop = '1px solid var(--border-color, #e5e7eb)';
 
     const cancelBtn2 = document.createElement('button');
     cancelBtn2.textContent = '取消';
-    cancelBtn2.style.cssText = `
-        background-color: var(--cancel-color, #6B7280);
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        padding: 6px 12px;
-        cursor: pointer;
-    `;
+    cancelBtn2.style.backgroundColor = 'var(--cancel-color, #6B7280)';
+    cancelBtn2.style.color = '#fff';
+    cancelBtn2.style.border = 'none';
+    cancelBtn2.style.borderRadius = '4px';
+    cancelBtn2.style.padding = '8px 16px';
+    cancelBtn2.style.fontSize = '14px';
+    cancelBtn2.style.cursor = 'pointer';
     cancelBtn2.addEventListener('click', () => {
         closeExistingOverlay(overlay);
+        currentAddDomainOverlay = null;
     });
     footer2.appendChild(cancelBtn2);
 
     const saveBtn2 = document.createElement('button');
     saveBtn2.textContent = isEdit ? '保存' : '创建';
-    saveBtn2.style.cssText = `
-        background-color: var(--success-color,#22c55e);
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        padding: 6px 12px;
-        cursor: pointer;
-    `;
+    saveBtn2.style.backgroundColor = 'var(--success-color,#22c55e)';
+    saveBtn2.style.color = '#fff';
+    saveBtn2.style.border = 'none';
+    saveBtn2.style.borderRadius = '4px';
+    saveBtn2.style.padding = '8px 16px';
+    saveBtn2.style.fontSize = '14px';
+    saveBtn2.style.cursor = 'pointer';
     saveBtn2.addEventListener('click', () => {
         const updatedItem = {
             domain: domainInput.value.trim(),
@@ -4893,12 +4951,12 @@ function showEditDomainStyleDialog(index) {
         }
         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
         closeExistingOverlay(overlay);
+        currentAddDomainOverlay = null;
         showStyleSettingsDialog(); // 刷新列表
     });
     footer2.appendChild(saveBtn2);
 
     dialog.appendChild(footer2);
-
 }
 
 
@@ -4909,8 +4967,8 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     const isEdit = !!ruleData && ruleData.domain;
 
     const { overlay, dialog } = createUnifiedDialog({
-        title: isEdit ? '编辑自动化规则' : '新建新网址规则',
-        width: '400px',
+        title: isEdit ? '✏️ 编辑自动化规则' : '🆕 新建新网址规则',
+        width: '480px',
         onClose: () => {
             // 关闭时的回调可写在此
         }
@@ -4920,18 +4978,34 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     const container = document.createElement('div');
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
-    container.style.gap = '8px';
-    container.style.marginBottom = '8px';
+    container.style.gap = '12px';
+    container.style.marginBottom = '16px';
+    container.style.padding = '16px';
+    container.style.borderRadius = '6px';
+    container.style.border = '1px solid var(--border-color, #e5e7eb)';
+    container.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
 
     // 网址
     const domainLabel = document.createElement('label');
     domainLabel.textContent = '网址：';
+    domainLabel.style.display = 'flex';
+    domainLabel.style.flexDirection = 'column';
+    domainLabel.style.gap = '6px';
+    domainLabel.style.fontSize = '13px';
+    domainLabel.style.fontWeight = '600';
+    domainLabel.style.color = 'var(--text-color, #1f2937)';
     const domainInput = document.createElement('input');
     domainInput.type = 'text';
     domainInput.style.width = '100%';
-    domainInput.style.padding = '6px';
-    domainInput.style.border = '1px solid var(--border-color)';
-    domainInput.style.borderRadius = '4px';
+    domainInput.style.height = '40px';
+    domainInput.style.padding = '0 12px';
+    domainInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    domainInput.style.borderRadius = '6px';
+    domainInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    domainInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    domainInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    domainInput.style.outline = 'none';
+    domainInput.style.fontSize = '14px';
     if(isEdit) {
         domainInput.value = ruleData.domain;
     } else {
@@ -4944,12 +5018,24 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     // 备注名称
     const nameLabel = document.createElement('label');
     nameLabel.textContent = '备注名称：';
+    nameLabel.style.display = 'flex';
+    nameLabel.style.flexDirection = 'column';
+    nameLabel.style.gap = '6px';
+    nameLabel.style.fontSize = '13px';
+    nameLabel.style.fontWeight = '600';
+    nameLabel.style.color = 'var(--text-color, #1f2937)';
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.style.width = '100%';
-    nameInput.style.padding = '6px';
-    nameInput.style.border = '1px solid var(--border-color)';
-    nameInput.style.borderRadius = '4px';
+    nameInput.style.height = '40px';
+    nameInput.style.padding = '0 12px';
+    nameInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    nameInput.style.borderRadius = '6px';
+    nameInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    nameInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    nameInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    nameInput.style.outline = 'none';
+    nameInput.style.fontSize = '14px';
     if(isEdit) {
         nameInput.value = ruleData.name;
     } else {
@@ -4962,11 +5048,23 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     // 自动提交方式
     const methodLabel = document.createElement('label');
     methodLabel.textContent = '自动提交方式：';
+    methodLabel.style.display = 'flex';
+    methodLabel.style.flexDirection = 'column';
+    methodLabel.style.gap = '6px';
+    methodLabel.style.fontSize = '13px';
+    methodLabel.style.fontWeight = '600';
+    methodLabel.style.color = 'var(--text-color, #1f2937)';
     const methodSelect = document.createElement('select');
     methodSelect.style.width = '100%';
-    methodSelect.style.padding = '6px';
-    methodSelect.style.border = '1px solid var(--border-color)';
-    methodSelect.style.borderRadius = '4px';
+    methodSelect.style.height = '40px';
+    methodSelect.style.padding = '0 12px';
+    methodSelect.style.border = '1px solid var(--border-color, #d1d5db)';
+    methodSelect.style.borderRadius = '6px';
+    methodSelect.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    methodSelect.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    methodSelect.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    methodSelect.style.outline = 'none';
+    methodSelect.style.fontSize = '14px';
 
     ['Enter','Cmd+Enter','模拟点击提交按钮'].forEach(val => {
         const opt = document.createElement('option');
@@ -4985,10 +5083,13 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
 
     // 确认 & 取消 按钮
     const btnRow = document.createElement('div');
-    btnRow.style.textAlign = 'right';
     btnRow.style.display = 'flex';
-    btnRow.style.justifyContent = 'flex-end';
-    btnRow.style.gap = '8px';
+    btnRow.style.justifyContent = 'space-between';
+    btnRow.style.alignItems = 'center';
+    btnRow.style.gap = '12px';
+    btnRow.style.marginTop = '20px';
+    btnRow.style.paddingTop = '20px';
+    btnRow.style.borderTop = '1px solid var(--border-color, #e5e7eb)';
 
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = '取消';
@@ -4996,7 +5097,8 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     cancelBtn.style.color = '#fff';
     cancelBtn.style.border = 'none';
     cancelBtn.style.borderRadius = '4px';
-    cancelBtn.style.padding = '6px 12px';
+    cancelBtn.style.padding = '8px 16px';
+    cancelBtn.style.fontSize = '14px';
     cancelBtn.style.cursor = 'pointer';
     cancelBtn.addEventListener('click', () => {
         overlay.remove();
@@ -5008,7 +5110,8 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     confirmBtn.style.color = '#fff';
     confirmBtn.style.border = 'none';
     confirmBtn.style.borderRadius = '4px';
-    confirmBtn.style.padding = '6px 12px';
+    confirmBtn.style.padding = '8px 16px';
+    confirmBtn.style.fontSize = '14px';
     confirmBtn.style.cursor = 'pointer';
     confirmBtn.addEventListener('click', () => {
         const newData = {
