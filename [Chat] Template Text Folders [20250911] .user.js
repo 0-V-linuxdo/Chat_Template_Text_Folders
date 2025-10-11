@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix3
+// @name         [Chat] Template Text Folders [20251011] +fix4-3
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -436,6 +436,51 @@
         }
     };
 
+    const generateDomainFavicon = (domain) => {
+        if (!domain) return '';
+        const trimmed = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(trimmed)}&sz=32`;
+    };
+
+    const createFaviconElement = (faviconUrl, label, fallbackEmoji = '🌐') => {
+        const wrapper = document.createElement('div');
+        wrapper.style.width = '32px';
+        wrapper.style.height = '32px';
+        wrapper.style.borderRadius = '8px';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.backgroundColor = 'rgba(148, 163, 184, 0.15)';
+        wrapper.style.flexShrink = '0';
+
+        if (faviconUrl) {
+            const img = document.createElement('img');
+            img.src = faviconUrl;
+            img.alt = label || 'site icon';
+            img.style.width = '24px';
+            img.style.height = '24px';
+            img.style.objectFit = 'cover';
+            img.referrerPolicy = 'no-referrer';
+            img.loading = 'lazy';
+            img.onerror = () => {
+                wrapper.innerHTML = '';
+                const emoji = document.createElement('span');
+                emoji.textContent = fallbackEmoji;
+                emoji.style.fontSize = '16px';
+                wrapper.appendChild(emoji);
+            };
+            wrapper.appendChild(img);
+        } else {
+            const emoji = document.createElement('span');
+            emoji.textContent = fallbackEmoji;
+            emoji.style.fontSize = '16px';
+            wrapper.appendChild(emoji);
+        }
+
+        return wrapper;
+    };
+
     // 默认配置
     const defaultConfig = {
         folders: {
@@ -457,12 +502,14 @@
             {
                 domain: "chatgpt.com",
                 name: "ChatGPT",
-                method: "模拟点击提交按钮"
+                method: "模拟点击提交按钮",
+                favicon: generateDomainFavicon("chatgpt.com")
             },
             {
                 domain: "chathub.gg",
                 name: "ChatHub",
-                method: "Enter"
+                method: "Enter",
+                favicon: generateDomainFavicon("chathub.gg")
             }
         ],
         /**
@@ -530,7 +577,28 @@
         }
     };
 
+    const ensureDomainMetadata = () => {
+        let updated = false;
+        (buttonConfig.domainAutoSubmitSettings || []).forEach(rule => {
+            if (!rule.favicon) {
+                rule.favicon = generateDomainFavicon(rule.domain);
+                updated = true;
+            }
+        });
+        (buttonConfig.domainStyleSettings || []).forEach(item => {
+            if (!item.favicon) {
+                item.favicon = generateDomainFavicon(item.domain);
+                updated = true;
+            }
+        });
+        if (updated) {
+            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+            console.log("✅ 已为自动化与样式配置补全 favicon 信息。");
+        }
+    };
+
     ensureButtonTypes();
+    ensureDomainMetadata();
 
     // 确保工具文件夹存在并包含必要的工具按钮
     const ensureToolFolder = () => {
@@ -4528,76 +4596,249 @@ function showAutomationSettingsDialog() {
     infoDiv.appendChild(closeAutomationBtn);
     dialog.appendChild(infoDiv);
 
-    // 2) 表格容器 + 渲染 domainAutoSubmitSettings
-    const tableContainer = document.createElement('div');
-    tableContainer.style.border = '1px solid var(--border-color)';
-    tableContainer.style.padding = '10px';
-    tableContainer.style.borderRadius = '8px';
-    tableContainer.style.maxHeight = '300px';
-    tableContainer.style.overflow = 'auto';
+    // 2) 列表容器 + 渲染 domainAutoSubmitSettings
+    const listContainer = document.createElement('div');
+    listContainer.style.cssText = `
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--dialog-bg, #ffffff);
+        max-height: 320px;
+    `;
 
-    const table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
+    const listHeader = document.createElement('div');
+    listHeader.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        background-color: var(--button-bg, #f3f4f6);
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-color, #333333);
+        flex-shrink: 0;
+    `;
 
-    const thead = document.createElement('thead');
-    setTrustedHTML(thead, `
-        <tr style="border-bottom:1px solid var(--border-color);">
-            <th style="text-align:left;padding:4px;">备注名称</th>
-            <th style="text-align:left;padding:4px;">网址</th>
-            <th style="text-align:left;padding:4px;">自动提交方式</th>
-            <th style="width:80px;"></th>
-        </tr>
-    `);
-    table.appendChild(thead);
+    const headerLeft = document.createElement('div');
+    headerLeft.textContent = '自动化规则';
+    headerLeft.style.flex = '1';
+    headerLeft.style.textAlign = 'left';
+    headerLeft.style.paddingLeft = '4px';
 
-    const tbody = document.createElement('tbody');
-    tbody.id = 'domainRuleTbody';
-    table.appendChild(tbody);
-    tableContainer.appendChild(table);
-    dialog.appendChild(tableContainer);
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.alignItems = 'center';
+    headerRight.style.gap = '12px';
+    headerRight.style.width = '200px';
+    headerRight.style.justifyContent = 'flex-end';
+
+    const methodHeader = document.createElement('div');
+    methodHeader.textContent = '提交方式';
+    methodHeader.style.width = '90px';
+    methodHeader.style.textAlign = 'center';
+    methodHeader.style.fontSize = '12px';
+
+    const actionHeader = document.createElement('div');
+    actionHeader.textContent = '操作';
+    actionHeader.style.width = '80px';
+    actionHeader.style.textAlign = 'center';
+    actionHeader.style.fontSize = '12px';
+
+    headerRight.appendChild(methodHeader);
+    headerRight.appendChild(actionHeader);
+    listHeader.appendChild(headerLeft);
+    listHeader.appendChild(headerRight);
+
+    const listBody = document.createElement('div');
+    listBody.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        overflow-y: auto;
+        max-height: 260px;
+    `;
+    listBody.classList.add('hide-scrollbar');
+
+    listContainer.appendChild(listHeader);
+    listContainer.appendChild(listBody);
+    dialog.appendChild(listContainer);
 
     function renderDomainRules() {
-        setTrustedHTML(tbody, '');
-        buttonConfig.domainAutoSubmitSettings.forEach((rule, idx, rules) => {
-            const tr = document.createElement('tr');
-            if (idx !== rules.length - 1) {
-                tr.style.borderBottom = '1px solid var(--border-color)';
-            }
-            setTrustedHTML(tr, `
-                <td style="padding:4px;">${rule.name}</td>
-                <td style="padding:4px;">${rule.domain}</td>
-                <td style="padding:4px;">${rule.method}</td>
-                <td style="padding:4px;">
-                    <button class="editRuleBtn" data-idx="${idx}" style="
-                        background:none;border:none;cursor:pointer;color:var(--primary-color,#3B82F6);
-                    ">✏️</button>
-                    <button class="deleteRuleBtn" data-idx="${idx}" style="
-                        background:none;border:none;cursor:pointer;color:var(--danger-color,#ef4444);
-                    ">🗑️</button>
-                </td>
-            `);
-            tbody.appendChild(tr);
-        });
+        setTrustedHTML(listBody, '');
+        const rules = buttonConfig.domainAutoSubmitSettings;
+        let metadataPatched = false;
 
-        // 删除、编辑逻辑
-        tbody.querySelectorAll('.deleteRuleBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const delIdx = parseInt(btn.getAttribute('data-idx'), 10);
-                buttonConfig.domainAutoSubmitSettings.splice(delIdx, 1);
-                renderDomainRules();
+        if (!rules.length) {
+            const emptyState = document.createElement('div');
+            emptyState.textContent = '暂无自动化规则，点击下方“+ 新建”开始配置。';
+            emptyState.style.cssText = `
+                padding: 18px;
+                border-radius: 6px;
+                border: 1px dashed var(--border-color, #e5e7eb);
+                background-color: var(--button-bg, #f3f4f6);
+                color: var(--muted-text-color, #6b7280);
+                font-size: 13px;
+                text-align: center;
+            `;
+            listBody.appendChild(emptyState);
+            return;
+        }
+
+        rules.forEach((rule, idx) => {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                padding: 8px 10px;
+                border: 1px solid var(--border-color, #e5e7eb);
+                border-radius: 6px;
+                background-color: var(--button-bg, #f3f4f6);
+                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            `;
+            item.addEventListener('mouseenter', () => {
+                item.style.borderColor = 'var(--primary-color, #3B82F6)';
+                item.style.boxShadow = '0 3px 8px rgba(0,0,0,0.1)';
             });
-        });
-        tbody.querySelectorAll('.editRuleBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const editIdx = parseInt(btn.getAttribute('data-idx'), 10);
-                const ruleToEdit = buttonConfig.domainAutoSubmitSettings[editIdx];
+            item.addEventListener('mouseleave', () => {
+                item.style.borderColor = 'var(--border-color, #e5e7eb)';
+                item.style.boxShadow = 'none';
+            });
+
+            const left = document.createElement('div');
+            left.style.display = 'flex';
+            left.style.alignItems = 'center';
+            left.style.gap = '12px';
+            left.style.flex = '1';
+            left.style.minWidth = '0';
+
+            const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
+            if (!rule.favicon && rule.domain) {
+                rule.favicon = faviconUrl;
+                metadataPatched = true;
+            }
+            const faviconBadge = createFaviconElement(faviconUrl, rule.name || rule.domain);
+            faviconBadge.title = rule.domain || '';
+
+            const infoWrapper = document.createElement('div');
+            infoWrapper.style.display = 'flex';
+            infoWrapper.style.flexDirection = 'column';
+            infoWrapper.style.gap = '4px';
+            infoWrapper.style.minWidth = '0';
+
+            const nameEl = document.createElement('span');
+            nameEl.textContent = rule.name || rule.domain || '未命名规则';
+            nameEl.style.fontWeight = '600';
+            nameEl.style.fontSize = '14px';
+            nameEl.style.color = 'var(--text-color, #1f2937)';
+
+            const domainEl = document.createElement('span');
+            domainEl.textContent = rule.domain || '';
+            domainEl.style.fontSize = '12px';
+            domainEl.style.color = 'var(--muted-text-color, #6b7280)';
+            domainEl.style.whiteSpace = 'nowrap';
+            domainEl.style.overflow = 'hidden';
+            domainEl.style.textOverflow = 'ellipsis';
+            domainEl.style.maxWidth = '260px';
+            domainEl.title = rule.domain || '';
+
+            infoWrapper.appendChild(nameEl);
+            infoWrapper.appendChild(domainEl);
+            left.appendChild(faviconBadge);
+            left.appendChild(infoWrapper);
+
+            const right = document.createElement('div');
+            right.style.display = 'flex';
+            right.style.alignItems = 'center';
+            right.style.gap = '8px';
+            right.style.width = '200px';
+            right.style.justifyContent = 'flex-end';
+
+            const methodBadge = document.createElement('span');
+            methodBadge.textContent = rule.method || '-';
+            methodBadge.style.cssText = `
+                padding: 4px 10px;
+                background-color: rgba(59,130,246,0.12);
+                color: var(--primary-color, #3B82F6);
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 600;
+                white-space: nowrap;
+            `;
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✏️';
+            editBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--primary-color, #3B82F6);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background-color 0.2s ease;
+            `;
+            editBtn.addEventListener('mouseenter', () => {
+                editBtn.style.backgroundColor = 'rgba(59,130,246,0.12)';
+            });
+            editBtn.addEventListener('mouseleave', () => {
+                editBtn.style.backgroundColor = 'transparent';
+            });
+            editBtn.addEventListener('click', () => {
+                const ruleToEdit = buttonConfig.domainAutoSubmitSettings[idx];
                 showDomainRuleEditorDialog(ruleToEdit, (newData) => {
-                    buttonConfig.domainAutoSubmitSettings[editIdx] = newData;
+                    buttonConfig.domainAutoSubmitSettings[idx] = newData;
                     renderDomainRules();
                 });
             });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--danger-color, #ef4444);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background-color 0.2s ease;
+            `;
+            deleteBtn.addEventListener('mouseenter', () => {
+                deleteBtn.style.backgroundColor = 'rgba(239,68,68,0.12)';
+            });
+            deleteBtn.addEventListener('mouseleave', () => {
+                deleteBtn.style.backgroundColor = 'transparent';
+            });
+            deleteBtn.addEventListener('click', () => {
+                buttonConfig.domainAutoSubmitSettings.splice(idx, 1);
+                renderDomainRules();
+            });
+
+            right.appendChild(methodBadge);
+            right.appendChild(editBtn);
+            right.appendChild(deleteBtn);
+
+            item.appendChild(left);
+            item.appendChild(right);
+            listBody.appendChild(item);
         });
+        if (metadataPatched) {
+            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+        }
     }
     renderDomainRules();
 
@@ -4649,77 +4890,268 @@ function showStyleSettingsDialog() {
     desc.textContent = '您可根据不同网址，自定义按钮栏高度和注入CSS样式。';
     dialog.appendChild(desc);
 
-    // 表格容器
-    const tableContainer = document.createElement('div');
-    tableContainer.style.border = '1px solid var(--border-color)';
-    tableContainer.style.padding = '10px';
-    tableContainer.style.borderRadius = '8px';
-    tableContainer.style.maxHeight = '300px';
-    tableContainer.style.overflow = 'auto';
-    tableContainer.style.marginBottom = '12px';
+    // 列表容器
+    const styleListContainer = document.createElement('div');
+    styleListContainer.style.cssText = `
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--dialog-bg, #ffffff);
+        max-height: 320px;
+        margin-bottom: 12px;
+    `;
 
-    const styleTable = document.createElement('table');
-    styleTable.style.width = '100%';
-    styleTable.style.borderCollapse = 'collapse';
+    const styleHeader = document.createElement('div');
+    styleHeader.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        background-color: var(--button-bg, #f3f4f6);
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-color, #333333);
+        flex-shrink: 0;
+    `;
 
-    const thead = document.createElement('thead');
-    setTrustedHTML(thead, `
-        <tr style="border-bottom:1px solid var(--border-color);">
-            <th style="text-align:left;padding:4px;">备注名称</th>
-            <th style="text-align:left;padding:4px;">网址</th>
-            <th style="text-align:left;padding:4px;">高度(px)</th>
-            <th style="text-align:left;padding:4px;">自定义CSS</th>
-            <th style="width:80px;"></th>
-        </tr>
-    `);
-    styleTable.appendChild(thead);
+    const styleHeaderLeft = document.createElement('div');
+    styleHeaderLeft.textContent = '自定义样式';
+    styleHeaderLeft.style.flex = '1';
+    styleHeaderLeft.style.textAlign = 'left';
+    styleHeaderLeft.style.paddingLeft = '4px';
 
-    const tbody = document.createElement('tbody');
-    styleTable.appendChild(tbody);
-    tableContainer.appendChild(styleTable);
-    dialog.appendChild(tableContainer);
+    const styleHeaderRight = document.createElement('div');
+    styleHeaderRight.style.display = 'flex';
+    styleHeaderRight.style.alignItems = 'center';
+    styleHeaderRight.style.gap = '12px';
+    styleHeaderRight.style.width = '220px';
+    styleHeaderRight.style.justifyContent = 'flex-end';
+
+    const heightHeader = document.createElement('div');
+    heightHeader.textContent = '高度(px)';
+    heightHeader.style.width = '90px';
+    heightHeader.style.textAlign = 'center';
+    heightHeader.style.fontSize = '12px';
+
+    const styleActionHeader = document.createElement('div');
+    styleActionHeader.textContent = '操作';
+    styleActionHeader.style.width = '80px';
+    styleActionHeader.style.textAlign = 'center';
+    styleActionHeader.style.fontSize = '12px';
+
+    styleHeaderRight.appendChild(heightHeader);
+    styleHeaderRight.appendChild(styleActionHeader);
+    styleHeader.appendChild(styleHeaderLeft);
+    styleHeader.appendChild(styleHeaderRight);
+
+    const styleListBody = document.createElement('div');
+    styleListBody.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        overflow-y: auto;
+        max-height: 260px;
+    `;
+    styleListBody.classList.add('hide-scrollbar');
+
+    styleListContainer.appendChild(styleHeader);
+    styleListContainer.appendChild(styleListBody);
+    dialog.appendChild(styleListContainer);
 
     function renderDomainStyles() {
-        setTrustedHTML(tbody, '');
-        buttonConfig.domainStyleSettings.forEach((item, idx, styles) => {
-            const tr = document.createElement('tr');
-            if (idx !== styles.length - 1) {
-                tr.style.borderBottom = '1px solid var(--border-color)';
-            }
-            setTrustedHTML(tr, `
-                <td style="padding:4px;">${item.name || ''}</td>
-                <td style="padding:4px;">${item.domain || ''}</td>
-                <td style="padding:4px;">${item.height || ''}</td>
-                <td style="padding:4px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                    title="${(item.cssCode || '').replace(/"/g, '&quot;')}">
-                    ${(item.cssCode || '').substring(0, 30).replace(/\n/g, ' ')}...
-                </td>
-                <td style="padding:4px;">
-                    <button class="editStyleBtn" data-idx="${idx}" style="
-                        background:none;border:none;cursor:pointer;color:var(--primary-color,#3B82F6);
-                    ">✏️</button>
-                    <button class="deleteStyleBtn" data-idx="${idx}" style="
-                        background:none;border:none;cursor:pointer;color:var(--danger-color,#ef4444);
-                    ">🗑️</button>
-                </td>
-            `);
-            tbody.appendChild(tr);
-        });
+        setTrustedHTML(styleListBody, '');
+        const styles = buttonConfig.domainStyleSettings;
+        let metadataPatched = false;
 
-        tbody.querySelectorAll('.deleteStyleBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const index = parseInt(btn.getAttribute('data-idx'), 10);
-                buttonConfig.domainStyleSettings.splice(index, 1);
+        if (!styles.length) {
+            const emptyState = document.createElement('div');
+            emptyState.textContent = '尚未配置任何样式，点击下方“+ 新建”添加。';
+            emptyState.style.cssText = `
+                padding: 18px;
+                border-radius: 6px;
+                border: 1px dashed var(--border-color, #e5e7eb);
+                background-color: var(--button-bg, #f3f4f6);
+                color: var(--muted-text-color, #6b7280);
+                font-size: 13px;
+                text-align: center;
+            `;
+            styleListBody.appendChild(emptyState);
+            return;
+        }
+
+        styles.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 8px 10px;
+                border: 1px solid var(--border-color, #e5e7eb);
+                border-radius: 6px;
+                background-color: var(--button-bg, #f3f4f6);
+                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            `;
+            row.addEventListener('mouseenter', () => {
+                row.style.borderColor = 'var(--info-color, #6366F1)';
+                row.style.boxShadow = '0 3px 8px rgba(0,0,0,0.1)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.borderColor = 'var(--border-color, #e5e7eb)';
+                row.style.boxShadow = 'none';
+            });
+
+            const left = document.createElement('div');
+            left.style.display = 'flex';
+            left.style.alignItems = 'flex-start';
+            left.style.gap = '12px';
+            left.style.flex = '1';
+            left.style.minWidth = '0';
+
+            const faviconUrl = item.favicon || generateDomainFavicon(item.domain);
+            if (!item.favicon && item.domain) {
+                item.favicon = faviconUrl;
+                metadataPatched = true;
+            }
+            const faviconBadge = createFaviconElement(faviconUrl, item.name || item.domain, '🎨');
+            faviconBadge.title = item.domain || '自定义样式';
+
+            const infoColumn = document.createElement('div');
+            infoColumn.style.display = 'flex';
+            infoColumn.style.flexDirection = 'column';
+            infoColumn.style.gap = '4px';
+            infoColumn.style.minWidth = '0';
+
+            const nameEl = document.createElement('span');
+            nameEl.textContent = item.name || '未命名样式';
+            nameEl.style.fontWeight = '600';
+            nameEl.style.fontSize = '14px';
+            nameEl.style.color = 'var(--text-color, #1f2937)';
+
+            const domainEl = document.createElement('span');
+            domainEl.textContent = item.domain || '未设置域名';
+            domainEl.style.fontSize = '12px';
+            domainEl.style.color = 'var(--muted-text-color, #6b7280)';
+            domainEl.style.whiteSpace = 'nowrap';
+            domainEl.style.overflow = 'hidden';
+            domainEl.style.textOverflow = 'ellipsis';
+            domainEl.style.maxWidth = '260px';
+
+            const cssSnippet = (item.cssCode || '').replace(/\s+/g, ' ').trim();
+            const snippetText = cssSnippet
+                ? (cssSnippet.length > 80 ? `${cssSnippet.slice(0, 80)}…` : cssSnippet)
+                : '无自定义CSS';
+
+            const cssPreview = document.createElement('code');
+            cssPreview.textContent = snippetText;
+            cssPreview.style.cssText = `
+                font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 12px;
+                color: var(--muted-text-color, #6b7280);
+                background-color: rgba(17,24,39,0.04);
+                border-radius: 4px;
+                padding: 4px 6px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 320px;
+            `;
+            cssPreview.title = item.cssCode || '无自定义CSS';
+
+            infoColumn.appendChild(nameEl);
+            infoColumn.appendChild(domainEl);
+            infoColumn.appendChild(cssPreview);
+            left.appendChild(faviconBadge);
+            left.appendChild(infoColumn);
+
+            const right = document.createElement('div');
+            right.style.display = 'flex';
+            right.style.alignItems = 'center';
+            right.style.gap = '8px';
+            right.style.width = '220px';
+            right.style.justifyContent = 'flex-end';
+
+            const heightBadge = document.createElement('span');
+            heightBadge.textContent = item.height ? `${item.height}px` : '默认高度';
+            heightBadge.style.cssText = `
+                padding: 4px 10px;
+                background-color: rgba(16,185,129,0.12);
+                color: var(--success-color, #22c55e);
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 600;
+                white-space: nowrap;
+            `;
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✏️';
+            editBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--primary-color, #3B82F6);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background-color 0.2s ease;
+            `;
+            editBtn.addEventListener('mouseenter', () => {
+                editBtn.style.backgroundColor = 'rgba(59,130,246,0.12)';
+            });
+            editBtn.addEventListener('mouseleave', () => {
+                editBtn.style.backgroundColor = 'transparent';
+            });
+            editBtn.addEventListener('click', () => {
+                showEditDomainStyleDialog(idx);
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--danger-color, #ef4444);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background-color 0.2s ease;
+            `;
+            deleteBtn.addEventListener('mouseenter', () => {
+                deleteBtn.style.backgroundColor = 'rgba(239,68,68,0.12)';
+            });
+            deleteBtn.addEventListener('mouseleave', () => {
+                deleteBtn.style.backgroundColor = 'transparent';
+            });
+            deleteBtn.addEventListener('click', () => {
+                buttonConfig.domainStyleSettings.splice(idx, 1);
                 localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
                 renderDomainStyles();
             });
+
+            right.appendChild(heightBadge);
+            right.appendChild(editBtn);
+            right.appendChild(deleteBtn);
+
+            row.appendChild(left);
+            row.appendChild(right);
+            styleListBody.appendChild(row);
         });
-        tbody.querySelectorAll('.editStyleBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const index = parseInt(btn.getAttribute('data-idx'), 10);
-                showEditDomainStyleDialog(index);
-            });
-        });
+        if (metadataPatched) {
+            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+        }
     }
     renderDomainStyles();
 
@@ -4780,8 +5212,13 @@ function showEditDomainStyleDialog(index) {
             domain: window.location.hostname,
             name: document.title || '新样式',
             height: 40,
-            cssCode: ''
+            cssCode: '',
+            favicon: generateDomainFavicon(window.location.hostname)
         };
+    const presetStyleDomain = styleItem.domain || '';
+    if (!styleItem.favicon) {
+        styleItem.favicon = generateDomainFavicon(presetStyleDomain);
+    }
 
     const { overlay, dialog } = createUnifiedDialog({
         title: isEdit ? '✏️ 编辑自定义样式' : '🆕 新建自定义样式',
@@ -4849,6 +5286,96 @@ function showEditDomainStyleDialog(index) {
     domainInput.style.fontSize = '14px';
     domainLabel.appendChild(domainInput);
     container.appendChild(domainLabel);
+
+    const faviconLabel2 = document.createElement('label');
+    faviconLabel2.textContent = '站点图标：';
+    faviconLabel2.style.display = 'flex';
+    faviconLabel2.style.flexDirection = 'column';
+    faviconLabel2.style.gap = '6px';
+    faviconLabel2.style.fontSize = '13px';
+    faviconLabel2.style.fontWeight = '600';
+    faviconLabel2.style.color = 'var(--text-color, #1f2937)';
+
+    const faviconRow2 = document.createElement('div');
+    faviconRow2.style.display = 'flex';
+    faviconRow2.style.alignItems = 'center';
+    faviconRow2.style.gap = '12px';
+
+    const faviconPreviewHolder2 = document.createElement('div');
+    const faviconInput2 = document.createElement('input');
+    faviconInput2.type = 'text';
+    faviconInput2.style.flex = '1';
+    faviconInput2.style.height = '40px';
+    faviconInput2.style.padding = '0 12px';
+    faviconInput2.style.border = '1px solid var(--border-color, #d1d5db)';
+    faviconInput2.style.borderRadius = '6px';
+    faviconInput2.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    faviconInput2.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    faviconInput2.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    faviconInput2.style.outline = 'none';
+    faviconInput2.style.fontSize = '14px';
+    faviconInput2.placeholder = '可填写自定义图标地址';
+    faviconInput2.value = styleItem.favicon || '';
+
+    const autoFaviconBtn2 = document.createElement('button');
+    autoFaviconBtn2.type = 'button';
+    autoFaviconBtn2.textContent = '自动获取';
+    autoFaviconBtn2.style.backgroundColor = 'var(--primary-color, #3B82F6)';
+    autoFaviconBtn2.style.color = '#fff';
+    autoFaviconBtn2.style.border = 'none';
+    autoFaviconBtn2.style.borderRadius = '6px';
+    autoFaviconBtn2.style.padding = '8px 12px';
+    autoFaviconBtn2.style.fontSize = '13px';
+    autoFaviconBtn2.style.cursor = 'pointer';
+
+    faviconRow2.appendChild(faviconPreviewHolder2);
+    faviconRow2.appendChild(faviconInput2);
+    faviconRow2.appendChild(autoFaviconBtn2);
+
+    const faviconHelp2 = document.createElement('span');
+    faviconHelp2.textContent = '留空时系统将使用该网址的默认 Favicon。';
+    faviconHelp2.style.fontSize = '12px';
+    faviconHelp2.style.color = 'var(--muted-text-color, #6b7280)';
+
+    faviconLabel2.appendChild(faviconRow2);
+    faviconLabel2.appendChild(faviconHelp2);
+    container.appendChild(faviconLabel2);
+
+    let faviconManuallyEdited2 = false;
+    const updateStyleFaviconPreview = () => {
+        const imgUrl = faviconInput2.value.trim() || generateDomainFavicon(domainInput.value.trim());
+        faviconPreviewHolder2.innerHTML = '';
+        faviconPreviewHolder2.appendChild(
+            createFaviconElement(
+                imgUrl,
+                nameInput.value.trim() || domainInput.value.trim() || '样式',
+                '🎨'
+            )
+        );
+    };
+    updateStyleFaviconPreview();
+
+    const getStyleFallbackFavicon = () => generateDomainFavicon(domainInput.value.trim());
+
+    autoFaviconBtn2.addEventListener('click', () => {
+        const autoUrl = getStyleFallbackFavicon();
+        faviconInput2.value = autoUrl;
+        faviconManuallyEdited2 = false;
+        updateStyleFaviconPreview();
+    });
+
+    domainInput.addEventListener('input', () => {
+        if (!faviconManuallyEdited2) {
+            faviconInput2.value = getStyleFallbackFavicon();
+        }
+        updateStyleFaviconPreview();
+    });
+
+    faviconInput2.addEventListener('input', () => {
+        faviconManuallyEdited2 = true;
+        updateStyleFaviconPreview();
+    });
+    nameInput.addEventListener('input', updateStyleFaviconPreview);
 
     const heightLabel = document.createElement('label');
     heightLabel.textContent = '按钮栏高度 (px)：';
@@ -4938,11 +5465,13 @@ function showEditDomainStyleDialog(index) {
     saveBtn2.style.fontSize = '14px';
     saveBtn2.style.cursor = 'pointer';
     saveBtn2.addEventListener('click', () => {
+        const sanitizedDomain = domainInput.value.trim();
         const updatedItem = {
-            domain: domainInput.value.trim(),
+            domain: sanitizedDomain,
             name: nameInput.value.trim() || '未命名样式',
             height: parseInt(heightInput.value, 10) || 40,
-            cssCode: cssTextarea.value
+            cssCode: cssTextarea.value,
+            favicon: faviconInput2.value.trim() || generateDomainFavicon(sanitizedDomain)
         };
         if (isEdit) {
             buttonConfig.domainStyleSettings[index] = updatedItem;
@@ -4965,6 +5494,8 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     // ruleData 若为空对象，则视为新建，否则编辑
     // 统一使用 createUnifiedDialog
     const isEdit = !!ruleData && ruleData.domain;
+    const presetDomain = isEdit ? (ruleData.domain || '') : (window.location.hostname || '');
+    const presetFavicon = (isEdit && ruleData.favicon) ? ruleData.favicon : generateDomainFavicon(presetDomain);
 
     const { overlay, dialog } = createUnifiedDialog({
         title: isEdit ? '✏️ 编辑自动化规则' : '🆕 新建新网址规则',
@@ -5001,20 +5532,85 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     domainInput.style.padding = '0 12px';
     domainInput.style.border = '1px solid var(--border-color, #d1d5db)';
     domainInput.style.borderRadius = '6px';
-    domainInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+   domainInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
     domainInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
     domainInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
     domainInput.style.outline = 'none';
     domainInput.style.fontSize = '14px';
-    if(isEdit) {
-        domainInput.value = ruleData.domain;
-    } else {
-        // 新建时，可选自动填当前页面
-        domainInput.value = window.location.hostname || '';
-    }
+    domainInput.value = presetDomain;
     domainLabel.appendChild(domainInput);
     container.appendChild(domainLabel);
 
+    // favicon
+    const faviconLabel = document.createElement('label');
+    faviconLabel.textContent = '站点图标：';
+    faviconLabel.style.display = 'flex';
+    faviconLabel.style.flexDirection = 'column';
+    faviconLabel.style.gap = '6px';
+    faviconLabel.style.fontSize = '13px';
+    faviconLabel.style.fontWeight = '600';
+    faviconLabel.style.color = 'var(--text-color, #1f2937)';
+
+    const faviconRow = document.createElement('div');
+    faviconRow.style.display = 'flex';
+    faviconRow.style.alignItems = 'center';
+    faviconRow.style.gap = '12px';
+
+    const faviconPreviewHolder = document.createElement('div');
+    const faviconInput = document.createElement('input');
+    faviconInput.type = 'text';
+    faviconInput.style.flex = '1';
+    faviconInput.style.height = '40px';
+    faviconInput.style.padding = '0 12px';
+    faviconInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    faviconInput.style.borderRadius = '6px';
+    faviconInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    faviconInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    faviconInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    faviconInput.style.outline = 'none';
+    faviconInput.style.fontSize = '14px';
+    faviconInput.placeholder = 'https:// 或 data:image/svg+xml;base64...';
+    faviconInput.value = presetFavicon || '';
+
+    const autoFaviconBtn = document.createElement('button');
+    autoFaviconBtn.type = 'button';
+    autoFaviconBtn.textContent = '自动获取';
+    autoFaviconBtn.style.backgroundColor = 'var(--primary-color, #3B82F6)';
+    autoFaviconBtn.style.color = '#fff';
+    autoFaviconBtn.style.border = 'none';
+    autoFaviconBtn.style.borderRadius = '6px';
+    autoFaviconBtn.style.padding = '8px 12px';
+    autoFaviconBtn.style.fontSize = '13px';
+    autoFaviconBtn.style.cursor = 'pointer';
+
+    faviconRow.appendChild(faviconPreviewHolder);
+    faviconRow.appendChild(faviconInput);
+    faviconRow.appendChild(autoFaviconBtn);
+
+    const faviconHelp = document.createElement('span');
+    faviconHelp.textContent = '留空时将自动根据网址生成 Google Favicon。';
+    faviconHelp.style.fontSize = '12px';
+    faviconHelp.style.color = 'var(--muted-text-color, #6b7280)';
+
+    faviconLabel.appendChild(faviconRow);
+    faviconLabel.appendChild(faviconHelp);
+    container.appendChild(faviconLabel);
+
+    let faviconManuallyEdited = false;
+    let nameInputRef = null;
+    const updateFaviconPreview = () => {
+        const currentFavicon = faviconInput.value.trim();
+        faviconPreviewHolder.innerHTML = '';
+        faviconPreviewHolder.appendChild(
+            createFaviconElement(
+                currentFavicon || generateDomainFavicon(domainInput.value.trim()),
+                (nameInputRef ? nameInputRef.value.trim() : '') || domainInput.value.trim() || '自动化',
+                '⚡'
+            )
+        );
+    };
+
+    // 备注名称（保持在 favicon 之后，名称字段会在 updateFaviconPreview 中访问）
     // 备注名称
     const nameLabel = document.createElement('label');
     nameLabel.textContent = '备注名称：';
@@ -5024,26 +5620,46 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     nameLabel.style.fontSize = '13px';
     nameLabel.style.fontWeight = '600';
     nameLabel.style.color = 'var(--text-color, #1f2937)';
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.style.width = '100%';
-    nameInput.style.height = '40px';
-    nameInput.style.padding = '0 12px';
-    nameInput.style.border = '1px solid var(--border-color, #d1d5db)';
-    nameInput.style.borderRadius = '6px';
-    nameInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
-    nameInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
-    nameInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
-    nameInput.style.outline = 'none';
-    nameInput.style.fontSize = '14px';
-    if(isEdit) {
-        nameInput.value = ruleData.name;
-    } else {
-        // 默认填充
-        nameInput.value = document.title || '新网址规则';
-    }
-    nameLabel.appendChild(nameInput);
+    nameInputRef = document.createElement('input');
+    nameInputRef.type = 'text';
+    nameInputRef.style.width = '100%';
+    nameInputRef.style.height = '40px';
+    nameInputRef.style.padding = '0 12px';
+    nameInputRef.style.border = '1px solid var(--border-color, #d1d5db)';
+    nameInputRef.style.borderRadius = '6px';
+    nameInputRef.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    nameInputRef.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    nameInputRef.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    nameInputRef.style.outline = 'none';
+    nameInputRef.style.fontSize = '14px';
+    nameInputRef.value = isEdit ? (ruleData.name || '') : (document.title || '新网址规则');
+    nameLabel.appendChild(nameInputRef);
     container.appendChild(nameLabel);
+
+    const getFallbackFavicon = () => generateDomainFavicon(domainInput.value.trim());
+
+    autoFaviconBtn.addEventListener('click', () => {
+        const autoUrl = getFallbackFavicon();
+        faviconInput.value = autoUrl;
+        faviconManuallyEdited = false;
+        updateFaviconPreview();
+    });
+
+    domainInput.addEventListener('input', () => {
+        if (!faviconManuallyEdited) {
+            faviconInput.value = getFallbackFavicon();
+        }
+        updateFaviconPreview();
+    });
+
+    faviconInput.addEventListener('input', () => {
+        faviconManuallyEdited = true;
+        updateFaviconPreview();
+    });
+
+    nameInputRef.addEventListener('input', updateFaviconPreview);
+
+    updateFaviconPreview();
 
     // 自动提交方式
     const methodLabel = document.createElement('label');
@@ -5114,10 +5730,12 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     confirmBtn.style.fontSize = '14px';
     confirmBtn.style.cursor = 'pointer';
     confirmBtn.addEventListener('click', () => {
+        const sanitizedDomain = domainInput.value.trim();
         const newData = {
-            domain: domainInput.value.trim(),
-            name: nameInput.value.trim(),
-            method: methodSelect.value
+            domain: sanitizedDomain,
+            name: nameInputRef.value.trim(),
+            method: methodSelect.value,
+            favicon: faviconInput.value.trim() || generateDomainFavicon(sanitizedDomain)
         };
         if(!newData.domain || !newData.name) {
             alert('请输入网址和备注名称！');
