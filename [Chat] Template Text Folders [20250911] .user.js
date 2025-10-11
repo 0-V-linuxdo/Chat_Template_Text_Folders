@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix5-6
+// @name         [Chat] Template Text Folders [20251011] +fix6.2
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251011]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -125,6 +125,37 @@
                     box-sizing: border-box;
                     font-family: inherit;
                 }
+                .cttf-dialog,
+                .cttf-dialog * {
+                    scrollbar-width: thin;
+                    scrollbar-color: var(--cttf-scrollbar-thumb, rgba(120, 120, 120, 0.6)) transparent;
+                }
+                .cttf-dialog::-webkit-scrollbar,
+                .cttf-dialog *::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                    background: transparent;
+                }
+                .cttf-dialog::-webkit-scrollbar-track,
+                .cttf-dialog *::-webkit-scrollbar-track {
+                    background: transparent;
+                    border: none;
+                    margin: 0;
+                }
+                .cttf-dialog::-webkit-scrollbar-thumb,
+                .cttf-dialog *::-webkit-scrollbar-thumb {
+                    background-color: var(--cttf-scrollbar-thumb, rgba(120, 120, 120, 0.6));
+                    border-radius: 999px;
+                    border: none;
+                }
+                .cttf-dialog::-webkit-scrollbar-corner,
+                .cttf-dialog *::-webkit-scrollbar-corner {
+                    background: transparent;
+                }
+                .cttf-dialog::-webkit-scrollbar-button,
+                .cttf-dialog *::-webkit-scrollbar-button {
+                    display: none;
+                }
                 .hide-scrollbar {
                     scrollbar-width: none;
                 }
@@ -241,7 +272,8 @@
             title = '弹窗标题',
             width = '400px',
             maxHeight = '80vh',
-            onClose = null // 关闭时的回调
+            onClose = null, // 关闭时的回调
+            closeOnOverlayClick = true
         } = options;
 
         // 创建overlay
@@ -262,6 +294,7 @@
 
         // 创建dialog
         const dialog = document.createElement('div');
+        dialog.classList.add('cttf-dialog');
         dialog.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
         dialog.style.color = 'var(--text-color, #333333)';
         dialog.style.borderRadius = '4px';
@@ -297,13 +330,21 @@
             dialog.style.transform = 'scale(1)';
         }, 10);
 
-        // 点击overlay关闭
-        overlay.addEventListener('click', (e) => {
-            if(e.target === overlay){
-                if(onClose) onClose();
-                overlay.remove();
-            }
-        });
+        if (closeOnOverlayClick) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    if (onClose) onClose();
+                    overlay.remove();
+                }
+            });
+        } else {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            });
+        }
 
         return { overlay, dialog };
     }
@@ -495,7 +536,7 @@
             img.referrerPolicy = 'no-referrer';
             img.loading = 'lazy';
             img.onerror = () => {
-                wrapper.innerHTML = '';
+                setTrustedHTML(wrapper, '');
                 const emoji = document.createElement('span');
                 emoji.textContent = fallbackEmoji;
                 emoji.style.fontSize = '16px';
@@ -3284,12 +3325,11 @@
             }, 100);
         });
 
-        // 点击外部关闭
+        // 点击外部忽略
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                closeExistingOverlay(overlay);
-                currentConfirmOverlay = null;
-                if (onCancel) onCancel();
+                e.stopPropagation();
+                e.preventDefault();
             }
         });
     }
@@ -4252,6 +4292,7 @@
 
         const dialog = document.createElement('div');
         dialog.classList.add('settings-dialog');
+        dialog.classList.add('cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
@@ -4592,7 +4633,8 @@ function showAutomationSettingsDialog() {
         width: '750px',  // 保留你想要的宽度
         onClose: () => {
             currentAutomationOverlay = null;
-        }
+        },
+        closeOnOverlayClick: false
     });
     currentAutomationOverlay = overlay;
 
@@ -4912,7 +4954,8 @@ function showStyleSettingsDialog() {
         width: '750px',
         onClose: () => {
             currentConfirmOverlay = null;
-        }
+        },
+        closeOnOverlayClick: false
     });
     currentConfirmOverlay = overlay;
 
@@ -5256,7 +5299,8 @@ function showEditDomainStyleDialog(index) {
         width: '480px',
         onClose: () => {
             currentAddDomainOverlay = null;
-        }
+        },
+        closeOnOverlayClick: false
     });
     currentAddDomainOverlay = overlay;
 
@@ -5423,7 +5467,7 @@ function showEditDomainStyleDialog(index) {
     let faviconManuallyEdited2 = false;
     const updateStyleFaviconPreview = () => {
         const imgUrl = faviconInput2.value.trim() || generateDomainFavicon(domainInput.value.trim());
-        faviconPreviewHolder2.innerHTML = '';
+        setTrustedHTML(faviconPreviewHolder2, '');
         faviconPreviewHolder2.appendChild(
             createFaviconElement(
                 imgUrl,
@@ -5586,7 +5630,8 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         width: '480px',
         onClose: () => {
             // 关闭时的回调可写在此
-        }
+        },
+        closeOnOverlayClick: false
     });
 
     // 创建表单容器
@@ -5731,7 +5776,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     let nameInputRef = null;
     const updateFaviconPreview = () => {
         const currentFavicon = faviconInput.value.trim();
-        faviconPreviewHolder.innerHTML = '';
+        setTrustedHTML(faviconPreviewHolder, '');
         faviconPreviewHolder.appendChild(
             createFaviconElement(
                 currentFavicon || generateDomainFavicon(domainInput.value.trim()),
