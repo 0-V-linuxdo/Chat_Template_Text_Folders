@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251013] +fix1.15
+// @name         [Chat] Template Text Folders [20251013] +fix2.1
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251013]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -50,7 +50,7 @@
 (function () {
     'use strict';
 
-    console.log("🎉 [Chat] Template Text Folders [20250211] V2.2");
+    console.log("🎉 [Chat] Template Text Folders [20251013] 🎉");
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {
@@ -1300,9 +1300,29 @@
         }
     };
 
+    const formatButtonDisplayLabel = (label) => {
+        if (typeof label !== 'string') {
+            return '';
+        }
+        const firstSpaceIndex = label.indexOf(' ');
+        if (firstSpaceIndex > 0 && firstSpaceIndex < label.length - 1) {
+            const leadingSegment = label.slice(0, firstSpaceIndex);
+            const remainingText = label.slice(firstSpaceIndex + 1);
+
+            // 如果前缀没有字母或数字（通常是emoji/符号），且长度不超过4，则将首个空格替换为不换行空格
+            const hasAlphaNumeric = /[0-9A-Za-z\u4E00-\u9FFF]/.test(leadingSegment);
+            if (!hasAlphaNumeric && leadingSegment.length <= 4 && remainingText.trim().length > 0) {
+                return `${leadingSegment}\u00A0${remainingText}`;
+            }
+        }
+        return label;
+    };
+
     const createCustomButtonElement = (name, config) => {
         const button = document.createElement('button');
-        button.innerText = name;
+        const displayLabel = formatButtonDisplayLabel(name);
+        button.textContent = displayLabel;
+        button.setAttribute('data-original-label', name);
         button.type = 'button';
         button.style.backgroundColor = config.color;
         button.style.color = config.textColor || '#333333';
@@ -4195,6 +4215,21 @@
         btnEl.style.marginBottom = '0px';
         btnEl.style.marginRight = '8px';
         btnEl.style.cursor = 'grab';
+        btnEl.style.flexShrink = '1';
+        btnEl.style.minWidth = '0';
+        btnEl.style.maxWidth = '100%';
+        btnEl.style.whiteSpace = 'normal';
+        btnEl.style.wordBreak = 'break-word';
+        btnEl.style.overflow = 'visible';
+        btnEl.style.lineHeight = '1.4';
+        btnEl.style.overflowWrap = 'anywhere';
+        btnEl.style.display = 'inline-flex';
+        btnEl.style.flexWrap = 'wrap';
+        btnEl.style.alignItems = 'center';
+        btnEl.style.justifyContent = 'flex-start';
+        btnEl.style.columnGap = '6px';
+        btnEl.style.rowGap = '2px';
+        btnEl.style.alignSelf = 'flex-start';
         return btnEl;
     };
 
@@ -4203,24 +4238,40 @@
         btnItem.style.cssText = `
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 8px;
             padding: 4px;
             border: 1px solid var(--border-color, #e5e7eb);
             border-radius: 4px;
             background-color: var(--button-bg, #f3f4f6);
             cursor: move;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: visible;
         `;
         btnItem.setAttribute('draggable', 'true');
         btnItem.setAttribute('data-button-name', btnName);
 
         const leftPart = document.createElement('div');
         leftPart.style.display = 'flex';
-        leftPart.style.alignItems = 'center';
+        leftPart.style.alignItems = 'flex-start';
         leftPart.style.gap = '8px';
+        leftPart.style.flex = '1';
+        leftPart.style.minWidth = '0';
+        leftPart.style.overflow = 'visible';
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.style.display = 'flex';
+        previewWrapper.style.alignItems = 'flex-start';
+        previewWrapper.style.flex = '1 1 auto';
+        previewWrapper.style.maxWidth = '100%';
+        previewWrapper.style.minWidth = '0';
+        previewWrapper.style.overflow = 'visible';
+        previewWrapper.style.alignSelf = 'flex-start';
 
         const btnPreview = createButtonPreview(btnName, cfg);
-        leftPart.appendChild(btnPreview);
+        previewWrapper.appendChild(btnPreview);
+        leftPart.appendChild(previewWrapper);
 
         const opsDiv = document.createElement('div');
         opsDiv.style.display = 'flex';
@@ -4229,6 +4280,7 @@
         opsDiv.style.width = '240px';
         opsDiv.style.paddingLeft = '8px';
         opsDiv.style.paddingRight = '12px';
+        opsDiv.style.flexShrink = '0';
 
         const variableInfoContainer = document.createElement('div');
         variableInfoContainer.style.display = 'flex';
