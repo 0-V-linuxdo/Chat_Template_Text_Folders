@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251011] +fix6.6
+// @name         [Chat] Template Text Folders [20251013] +fix1.2
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251011]
+// @version      [20251012]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -597,6 +597,7 @@
     };
 
     defaultConfig.buttonBarHeight = 40;
+    defaultConfig.buttonBarBottomSpacing = 0;
 
     let buttonConfig = JSON.parse(localStorage.getItem('chatGPTButtonFoldersConfig')) || JSON.parse(JSON.stringify(defaultConfig));
 
@@ -607,6 +608,11 @@
     if (typeof buttonConfig.buttonBarHeight !== 'number') {
         buttonConfig.buttonBarHeight = defaultConfig.buttonBarHeight;
     }
+
+    if (typeof buttonConfig.buttonBarBottomSpacing !== 'number') {
+        buttonConfig.buttonBarBottomSpacing = defaultConfig.buttonBarBottomSpacing;
+    }
+    buttonConfig.buttonBarBottomSpacing = Math.max(-200, Math.min(200, Number(buttonConfig.buttonBarBottomSpacing) || 0));
 
     // 若本地无此字段，则初始化
     if (!buttonConfig.domainAutoSubmitSettings) {
@@ -662,6 +668,16 @@
                 item.favicon = generateDomainFavicon(item.domain);
                 updated = true;
             }
+            if (typeof item.bottomSpacing !== 'number') {
+                item.bottomSpacing = buttonConfig.buttonBarBottomSpacing;
+                updated = true;
+            } else {
+                const clamped = Math.max(-200, Math.min(200, Number(item.bottomSpacing) || 0));
+                if (clamped !== item.bottomSpacing) {
+                    item.bottomSpacing = clamped;
+                    updated = true;
+                }
+            }
         });
         if (updated) {
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
@@ -698,6 +714,9 @@
 
     // 变量：防止重复提交
     let isSubmitting = false;
+    // 占位函数，避免在真正实现前调用报错
+    let applyDomainStyles = () => {};
+    let updateButtonBarLayout = () => {};
 
     const getAllTextareas = (root = document) => {
         let textareas = [];
@@ -1773,12 +1792,12 @@
         `;
 
         const dialog = document.createElement('div');
-        dialog.classList.add('confirm-dialog');
+        dialog.classList.add('confirm-dialog', 'cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
             border-radius: 4px;
-            padding: 24px;
+            padding: 20px 24px 16px 24px;
             box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
             border: 1px solid var(--border-color, #e5e7eb);
             transition: transform 0.3s ease, opacity 0.3s ease;
@@ -1904,12 +1923,12 @@
         `;
 
         const dialog = document.createElement('div');
-        dialog.classList.add('confirm-dialog');
+        dialog.classList.add('confirm-dialog', 'cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
             border-radius: 4px;
-            padding: 24px;
+            padding: 20px 24px 16px 24px;
             box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
             border: 1px solid var(--border-color, #e5e7eb);
             transition: transform 0.3s ease, opacity 0.3s ease;
@@ -2278,9 +2297,11 @@
             <div style="
                 display: flex;
                 justify-content: space-between;
-                margin-top: 30px;
+                align-items: center;
+                gap: 12px;
+                margin-top: 20px;
                 padding-top: 20px;
-                border-top:1px solid var(--border-color, #e5e7eb);
+                border-top: 1px solid var(--border-color, #e5e7eb);
             ">
                 <button id="cancelButtonEdit" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
@@ -2648,9 +2669,11 @@
             <div style="
                 display: flex;
                 justify-content: space-between;
-                margin-top: 30px;
+                align-items: center;
+                gap: 12px;
+                margin-top: 20px;
                 padding-top: 20px;
-                border-top:1px solid var(--border-color, #e5e7eb);
+                border-top: 1px solid var(--border-color, #e5e7eb);
             ">
                 <button id="cancelFolderEdit" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
@@ -3396,6 +3419,8 @@
 
                                     // 更新按钮栏
                                     updateButtonContainer();
+                                    // 应用新配置下的域名样式
+                                    try { applyDomainStyles(); } catch (_) {}
 
                                     // 立即更新所有计数器
                                     setTimeout(() => {
@@ -3616,6 +3641,8 @@
 
                 // 更新按钮栏
                 updateButtonContainer();
+                // 重置后应用默认/匹配样式
+                try { applyDomainStyles(); } catch (_) {}
 
                 // 立即更新计数器
                 setTimeout(() => {
@@ -4265,8 +4292,18 @@
         const container = queryUI('.folder-buttons-container');
         if (container) {
             container.style.height = clamped + 'px';
+            try {
+                updateButtonBarLayout(container, clamped);
+            } catch (err) {
+                console.warn('更新按钮栏布局失败:', err);
+            }
         }
         console.log("🔧 按钮栏高度已更新为", clamped, "px");
+        try {
+            applyDomainStyles();
+        } catch (err) {
+            console.warn('应用域名样式失败:', err);
+        }
     }
 
     const showUnifiedSettingsDialog = () => {
@@ -4482,11 +4519,10 @@
         folderPanel.style.display = 'flex';
         folderPanel.style.flexDirection = 'column';
         folderPanel.style.width = '280px';
-        folderPanel.style.borderRight = `1px solid var(--border-color, #e5e7eb)`;
         folderPanel.style.minWidth = '280px';
         folderPanel.style.marginRight = '12px';
         folderPanel.style.overflowY = 'auto';
-        folderPanel.style.padding = '2px 8px 8px 2px';
+        folderPanel.style.padding = '2px 8px 4px 2px';
 
         // 新增：创建文件夹列表标签栏
         const folderHeaderBar = document.createElement('div');
@@ -4560,7 +4596,6 @@
 
         const folderAddContainer = document.createElement('div');
         folderAddContainer.style.padding = '8px';
-        folderAddContainer.style.borderTop = `1px solid var(--border-color, #e5e7eb)`;
         folderAddContainer.style.display = 'flex';
         folderAddContainer.style.justifyContent = 'center';
 
@@ -4590,7 +4625,7 @@
         buttonListContainer.style.overflowY = 'auto';
         buttonListContainer.style.display = 'flex';
         buttonListContainer.style.flexDirection = 'column';
-        buttonListContainer.style.padding = '8px';
+        buttonListContainer.style.padding = '8px 8px 4px 8px';
         buttonListContainer.style.minWidth = '400px'; // 增加最小宽度以适应新布局
 
         renderFolderList();
@@ -4685,8 +4720,8 @@ function showAutomationSettingsDialog() {
     const listHeader = document.createElement('div');
     listHeader.style.cssText = `
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        gap: 12px;
         padding: 6px 12px;
         background-color: var(--button-bg, #f3f4f6);
         border-bottom: 1px solid var(--border-color, #e5e7eb);
@@ -4696,35 +4731,27 @@ function showAutomationSettingsDialog() {
         flex-shrink: 0;
     `;
 
-    const headerLeft = document.createElement('div');
-    headerLeft.textContent = '自动化规则';
-    headerLeft.style.flex = '1';
-    headerLeft.style.textAlign = 'left';
-    headerLeft.style.paddingLeft = '4px';
+    const headerColumns = [
+        { label: '图标', flex: '0 0 48px', justify: 'center' },
+        { label: '网站｜网址', flex: '1 1 0%', justify: 'flex-start', paddingLeft: '8px' },
+        { label: '提交方式', flex: '0 0 120px', justify: 'center' },
+        { label: '操作', flex: '0 0 120px', justify: 'center' }
+    ];
 
-    const headerRight = document.createElement('div');
-    headerRight.style.display = 'flex';
-    headerRight.style.alignItems = 'center';
-    headerRight.style.gap = '12px';
-    headerRight.style.width = '200px';
-    headerRight.style.justifyContent = 'flex-end';
-
-    const methodHeader = document.createElement('div');
-    methodHeader.textContent = '提交方式';
-    methodHeader.style.width = '90px';
-    methodHeader.style.textAlign = 'center';
-    methodHeader.style.fontSize = '12px';
-
-    const actionHeader = document.createElement('div');
-    actionHeader.textContent = '操作';
-    actionHeader.style.width = '80px';
-    actionHeader.style.textAlign = 'center';
-    actionHeader.style.fontSize = '12px';
-
-    headerRight.appendChild(methodHeader);
-    headerRight.appendChild(actionHeader);
-    listHeader.appendChild(headerLeft);
-    listHeader.appendChild(headerRight);
+    headerColumns.forEach(({ label, flex, justify, paddingLeft }) => {
+        const column = document.createElement('div');
+        column.textContent = label;
+        column.style.display = 'flex';
+        column.style.alignItems = 'center';
+        column.style.justifyContent = justify;
+        column.style.flex = flex;
+        column.style.fontSize = '12px';
+        column.style.fontWeight = '600';
+        if (paddingLeft) {
+            column.style.paddingLeft = paddingLeft;
+        }
+        listHeader.appendChild(column);
+    });
 
     const listBody = document.createElement('div');
     listBody.style.cssText = `
@@ -4738,8 +4765,129 @@ function showAutomationSettingsDialog() {
     listBody.classList.add('hide-scrollbar');
 
     listContainer.appendChild(listHeader);
-   listContainer.appendChild(listBody);
-   dialog.appendChild(listContainer);
+    listContainer.appendChild(listBody);
+    dialog.appendChild(listContainer);
+
+    const keyboardMethodPattern = /(enter|shift|caps|ctrl|control|cmd|meta|option|alt|space|tab|esc|escape|delete|backspace|home|end|page ?up|page ?down|arrow|up|down|left|right)/i;
+
+    const createKeyCapElement = (label) => {
+        const keyEl = document.createElement('span');
+        keyEl.textContent = label;
+        keyEl.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(148, 163, 184, 0.7);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(226,232,240,0.92));
+            box-shadow: inset 0 -1px 0 rgba(15,23,42,0.1), 0 1px 1px rgba(148,163,184,0.4);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-color, #1f2937);
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            line-height: 1.2;
+            white-space: nowrap;
+        `;
+        return keyEl;
+    };
+
+    const createMethodDisplay = (rawMethod) => {
+        const methodValue = (rawMethod || '').trim();
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        container.style.gap = '6px';
+        container.style.flexWrap = 'wrap';
+        container.style.maxWidth = '100%';
+        container.style.fontSize = '12px';
+        container.style.fontWeight = '600';
+
+        if (!methodValue) {
+            const placeholder = document.createElement('span');
+            placeholder.textContent = '-';
+            placeholder.style.color = 'var(--muted-text-color, #6b7280)';
+            placeholder.style.fontWeight = '500';
+            container.appendChild(placeholder);
+            return container;
+        }
+
+        if (methodValue === '模拟点击提交按钮') {
+            const clickBadge = document.createElement('span');
+            clickBadge.textContent = '模拟点击';
+            clickBadge.style.cssText = `
+                padding: 4px 12px;
+                border-radius: 20px;
+                background: linear-gradient(180deg, rgba(253,224,71,0.85), rgba(251,191,36,0.9));
+                border: 1px solid rgba(217,119,6,0.4);
+                box-shadow: inset 0 -1px 0 rgba(217,119,6,0.35), 0 1px 2px rgba(217,119,6,0.25);
+                color: rgba(120,53,15,0.95);
+                font-weight: 700;
+                font-size: 12px;
+                letter-spacing: 0.02em;
+                white-space: nowrap;
+            `;
+            container.appendChild(clickBadge);
+            return container;
+        }
+
+        const shouldUseKeyStyle = keyboardMethodPattern.test(methodValue) || methodValue.includes('+') || methodValue.includes('/');
+
+        if (!shouldUseKeyStyle) {
+            const pill = document.createElement('span');
+            pill.textContent = methodValue;
+            pill.style.cssText = `
+                padding: 4px 10px;
+                background-color: rgba(59,130,246,0.12);
+                color: var(--primary-color, #3B82F6);
+                border-radius: 999px;
+                white-space: nowrap;
+            `;
+            container.appendChild(pill);
+            return container;
+        }
+
+        const combos = methodValue.split('/').map(segment => segment.trim()).filter(Boolean);
+        combos.forEach((combo, comboIdx) => {
+            if (comboIdx > 0) {
+                const divider = document.createElement('span');
+                divider.textContent = '/';
+                divider.style.color = 'var(--muted-text-color, #6b7280)';
+                divider.style.fontSize = '11px';
+                divider.style.fontWeight = '600';
+                container.appendChild(divider);
+            }
+
+            const comboWrapper = document.createElement('div');
+            comboWrapper.style.display = 'flex';
+            comboWrapper.style.alignItems = 'center';
+            comboWrapper.style.justifyContent = 'center';
+            comboWrapper.style.gap = '4px';
+
+            const keys = combo.split('+').map(part => part.trim()).filter(Boolean);
+            if (!keys.length) {
+                keys.push(combo);
+            }
+
+            keys.forEach((keyLabel, keyIdx) => {
+                if (keyIdx > 0) {
+                    const plusSign = document.createElement('span');
+                    plusSign.textContent = '+';
+                    plusSign.style.color = 'var(--muted-text-color, #6b7280)';
+                    plusSign.style.fontSize = '11px';
+                    plusSign.style.fontWeight = '600';
+                    comboWrapper.appendChild(plusSign);
+                }
+                comboWrapper.appendChild(createKeyCapElement(keyLabel));
+            });
+
+            container.appendChild(comboWrapper);
+        });
+
+        return container;
+    };
 
     const showAutomationRuleDeleteConfirmDialog = (rule, onConfirm) => {
         if (!rule) {
@@ -4771,7 +4919,7 @@ function showAutomationSettingsDialog() {
         `;
 
         const dialog = document.createElement('div');
-        dialog.classList.add('confirm-dialog');
+        dialog.classList.add('confirm-dialog', 'cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
@@ -4893,10 +5041,10 @@ function showAutomationSettingsDialog() {
         }
 
         rules.forEach((rule, idx) => {
-            const item = document.createElement('div');
-            item.style.cssText = `
+        const item = document.createElement('div');
+        item.style.cssText = `
                 display: flex;
-                justify-content: space-between;
+                justify-content: flex-start;
                 align-items: center;
                 gap: 12px;
                 padding: 8px 10px;
@@ -4914,66 +5062,48 @@ function showAutomationSettingsDialog() {
                 item.style.boxShadow = 'none';
             });
 
-            const left = document.createElement('div');
-            left.style.display = 'flex';
-            left.style.alignItems = 'center';
-            left.style.gap = '12px';
-            left.style.flex = '1';
-            left.style.minWidth = '0';
+        const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
+        if (!rule.favicon && rule.domain) {
+            rule.favicon = faviconUrl;
+            metadataPatched = true;
+        }
+        const faviconBadge = createFaviconElement(faviconUrl, rule.name || rule.domain);
+        faviconBadge.title = rule.domain || '';
 
-            const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
-            if (!rule.favicon && rule.domain) {
-                rule.favicon = faviconUrl;
-                metadataPatched = true;
-            }
-            const faviconBadge = createFaviconElement(faviconUrl, rule.name || rule.domain);
-            faviconBadge.title = rule.domain || '';
+        const iconColumn = document.createElement('div');
+        iconColumn.style.display = 'flex';
+        iconColumn.style.alignItems = 'center';
+        iconColumn.style.justifyContent = 'center';
+        iconColumn.style.flex = '0 0 48px';
+        iconColumn.appendChild(faviconBadge);
 
-            const infoWrapper = document.createElement('div');
-            infoWrapper.style.display = 'flex';
-            infoWrapper.style.flexDirection = 'column';
-            infoWrapper.style.gap = '4px';
-            infoWrapper.style.minWidth = '0';
+        const infoColumn = document.createElement('div');
+        infoColumn.style.display = 'flex';
+        infoColumn.style.flexDirection = 'column';
+        infoColumn.style.gap = '4px';
+        infoColumn.style.minWidth = '0';
+        infoColumn.style.flex = '1 1 0%';
 
-            const nameEl = document.createElement('span');
-            nameEl.textContent = rule.name || rule.domain || '未命名规则';
-            nameEl.style.fontWeight = '600';
-            nameEl.style.fontSize = '14px';
-            nameEl.style.color = 'var(--text-color, #1f2937)';
+        const nameEl = document.createElement('span');
+        nameEl.textContent = rule.name || rule.domain || '未命名规则';
+        nameEl.style.fontWeight = '600';
+        nameEl.style.fontSize = '14px';
+        nameEl.style.color = 'var(--text-color, #1f2937)';
 
-            const domainEl = document.createElement('span');
-            domainEl.textContent = rule.domain || '';
-            domainEl.style.fontSize = '12px';
-            domainEl.style.color = 'var(--muted-text-color, #6b7280)';
-            domainEl.style.whiteSpace = 'nowrap';
-            domainEl.style.overflow = 'hidden';
-            domainEl.style.textOverflow = 'ellipsis';
-            domainEl.style.maxWidth = '260px';
-            domainEl.title = rule.domain || '';
+        const domainEl = document.createElement('span');
+        domainEl.textContent = rule.domain || '';
+        domainEl.style.fontSize = '12px';
+        domainEl.style.color = 'var(--muted-text-color, #6b7280)';
+        domainEl.style.whiteSpace = 'nowrap';
+        domainEl.style.overflow = 'hidden';
+        domainEl.style.textOverflow = 'ellipsis';
+        domainEl.style.maxWidth = '260px';
+        domainEl.title = rule.domain || '';
 
-            infoWrapper.appendChild(nameEl);
-            infoWrapper.appendChild(domainEl);
-            left.appendChild(faviconBadge);
-            left.appendChild(infoWrapper);
+        infoColumn.appendChild(nameEl);
+        infoColumn.appendChild(domainEl);
 
-            const right = document.createElement('div');
-            right.style.display = 'flex';
-            right.style.alignItems = 'center';
-            right.style.gap = '8px';
-            right.style.width = '200px';
-            right.style.justifyContent = 'flex-end';
-
-            const methodBadge = document.createElement('span');
-            methodBadge.textContent = rule.method || '-';
-            methodBadge.style.cssText = `
-                padding: 4px 10px;
-                background-color: rgba(59,130,246,0.12);
-                color: var(--primary-color, #3B82F6);
-                border-radius: 999px;
-                font-size: 12px;
-                font-weight: 600;
-                white-space: nowrap;
-            `;
+        const methodDisplay = createMethodDisplay(rule.method || '-');
 
             const editBtn = document.createElement('button');
             editBtn.textContent = '✏️';
@@ -5032,17 +5162,31 @@ function showAutomationSettingsDialog() {
                 showAutomationRuleDeleteConfirmDialog(ruleToDelete, () => {
                     buttonConfig.domainAutoSubmitSettings.splice(idx, 1);
                     localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                    renderDomainRules();
-                });
+                renderDomainRules();
             });
+        });
 
-            right.appendChild(methodBadge);
-            right.appendChild(editBtn);
-            right.appendChild(deleteBtn);
+        const methodColumn = document.createElement('div');
+        methodColumn.style.display = 'flex';
+        methodColumn.style.alignItems = 'center';
+        methodColumn.style.justifyContent = 'center';
+        methodColumn.style.flex = '0 0 120px';
+        methodColumn.appendChild(methodDisplay);
 
-            item.appendChild(left);
-            item.appendChild(right);
-            listBody.appendChild(item);
+        const actionsColumn = document.createElement('div');
+        actionsColumn.style.display = 'flex';
+        actionsColumn.style.alignItems = 'center';
+        actionsColumn.style.justifyContent = 'center';
+        actionsColumn.style.gap = '8px';
+        actionsColumn.style.flex = '0 0 120px';
+        actionsColumn.appendChild(editBtn);
+        actionsColumn.appendChild(deleteBtn);
+
+        item.appendChild(iconColumn);
+        item.appendChild(infoColumn);
+        item.appendChild(methodColumn);
+        item.appendChild(actionsColumn);
+        listBody.appendChild(item);
         });
         if (metadataPatched) {
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
@@ -5115,8 +5259,9 @@ function showStyleSettingsDialog() {
     const styleHeader = document.createElement('div');
     styleHeader.style.cssText = `
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-start;
         align-items: center;
+        gap: 12px;
         padding: 6px 12px;
         background-color: var(--button-bg, #f3f4f6);
         border-bottom: 1px solid var(--border-color, #e5e7eb);
@@ -5126,35 +5271,30 @@ function showStyleSettingsDialog() {
         flex-shrink: 0;
     `;
 
-    const styleHeaderLeft = document.createElement('div');
-    styleHeaderLeft.textContent = '自定义样式';
-    styleHeaderLeft.style.flex = '1';
-    styleHeaderLeft.style.textAlign = 'left';
-    styleHeaderLeft.style.paddingLeft = '4px';
-
-    const styleHeaderRight = document.createElement('div');
-    styleHeaderRight.style.display = 'flex';
-    styleHeaderRight.style.alignItems = 'center';
-    styleHeaderRight.style.gap = '12px';
-    styleHeaderRight.style.width = '220px';
-    styleHeaderRight.style.justifyContent = 'flex-end';
-
-    const heightHeader = document.createElement('div');
-    heightHeader.textContent = '高度(px)';
-    heightHeader.style.width = '90px';
-    heightHeader.style.textAlign = 'center';
-    heightHeader.style.fontSize = '12px';
-
-    const styleActionHeader = document.createElement('div');
-    styleActionHeader.textContent = '操作';
-    styleActionHeader.style.width = '80px';
-    styleActionHeader.style.textAlign = 'center';
-    styleActionHeader.style.fontSize = '12px';
-
-    styleHeaderRight.appendChild(heightHeader);
-    styleHeaderRight.appendChild(styleActionHeader);
-    styleHeader.appendChild(styleHeaderLeft);
-    styleHeader.appendChild(styleHeaderRight);
+    const headerColumns = [
+        { label: '图标', flex: '0 0 48px', textAlign: 'center' },
+        { label: '网站｜网址', flex: '0.7 1 0%', textAlign: 'left', paddingLeft: '4px' },
+        { label: '自定义css', flex: '3 1 0%', textAlign: 'center' },
+        { label: '高度｜底部', flex: '0 0 110px', textAlign: 'center' },
+        { label: '操作', flex: '0 0 90px', textAlign: 'center' }
+    ];
+    headerColumns.forEach((col) => {
+        const column = document.createElement('div');
+        column.textContent = col.label;
+        column.style.display = 'flex';
+        column.style.alignItems = 'center';
+        column.style.justifyContent = col.textAlign === 'right' ? 'flex-end'
+            : col.textAlign === 'center' ? 'center'
+                : 'flex-start';
+        column.style.textAlign = col.textAlign;
+        column.style.flex = col.flex;
+        column.style.fontSize = '12px';
+        column.style.fontWeight = '600';
+        if (col.paddingLeft) {
+            column.style.paddingLeft = col.paddingLeft;
+        }
+        styleHeader.appendChild(column);
+    });
 
     const styleListBody = document.createElement('div');
     styleListBody.style.cssText = `
@@ -5202,7 +5342,7 @@ function showStyleSettingsDialog() {
         `;
 
         const dialog = document.createElement('div');
-        dialog.classList.add('confirm-dialog');
+        dialog.classList.add('confirm-dialog', 'cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
@@ -5218,6 +5358,9 @@ function showStyleSettingsDialog() {
         const styleName = styleItem.name || styleItem.domain || '未命名样式';
         const styleDomain = styleItem.domain || '（未指定网址）';
         const styleHeight = styleItem.height ? `${styleItem.height}px` : '默认高度';
+        const rawStyleBottomSpacing = (typeof styleItem.bottomSpacing === 'number') ? styleItem.bottomSpacing : buttonConfig.buttonBarBottomSpacing;
+        const clampedStyleBottomSpacing = Math.max(-200, Math.min(200, Number(rawStyleBottomSpacing) || 0));
+        const styleBottomSpacing = `${clampedStyleBottomSpacing}px`;
         const faviconUrl = styleItem.favicon || generateDomainFavicon(styleItem.domain);
         const cssRaw = (styleItem.cssCode || '').trim();
         const cssContent = cssRaw || '（未配置自定义 CSS）';
@@ -5231,57 +5374,81 @@ function showStyleSettingsDialog() {
             .replace(/'/g, '&#39;');
 
         setTrustedHTML(dialog, `
-            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
-                🗑️ 确认删除样式 "${escapeHtml(styleName)}"？
-            </h3>
-            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！</p>
-            <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 16px; border-radius:6px; background-color: var(--button-bg, #f3f4f6); display:flex; flex-direction:column; gap:14px;">
-                <div style="display:flex; align-items:center; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:4px;">
+                <h3 style="margin:0; font-size:18px; font-weight:700; color: var(--danger-color, #ef4444); display:flex; align-items:center; gap:8px;">
+                    <span aria-hidden="true">🗑️</span>
+                    <span>确认删除样式 "${escapeHtml(styleName)}"？</span>
+                </h3>
+                <p style="margin:0; color: var(--text-color, #333333); font-size:13px;">❗️ 注意：此操作无法撤销！</p>
+            </div>
+            <div style="margin: 0 0 22px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 18px; border-radius:8px; background-color: var(--button-bg, #f3f4f6); display:flex; flex-direction:column; gap:16px;">
+                <div style="display:flex; align-items:flex-start; gap:12px;">
                     <div style="
-                        width:48px;
-                        height:48px;
-                        border-radius:14px;
+                        width:52px;
+                        height:52px;
+                        border-radius:16px;
                         display:flex;
                         align-items:center;
                         justify-content:center;
-                        background-color: var(--dialog-bg, #ffffff);
+                        background-color: rgba(255,255,255,0.85);
                         border: 1px solid var(--border-color, #e5e7eb);
                         overflow:hidden;
                         flex-shrink:0;
                     ">
-                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:26px; height:26px; object-fit:contain;" referrerpolicy="no-referrer">
+                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:28px; height:28px; object-fit:contain;" referrerpolicy="no-referrer">
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-                        <span style="font-size:15px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
-                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:6px;">
+                        <span style="font-size:16px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); letter-spacing:0.01em;">适用网址</span>
+                            <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                        <span style="
+                            padding:6px 12px;
+                            background-color: rgba(16,185,129,0.16);
+                            color: var(--success-color, #22c55e);
+                            border-radius:999px;
+                            font-size:12px;
+                            font-weight:600;
+                            white-space:nowrap;
+                        ">${escapeHtml(styleHeight)}</span>
+                        <span style="
+                            padding:6px 12px;
+                            background-color: rgba(59,130,246,0.16);
+                            color: var(--primary-color, #3B82F6);
+                            border-radius:999px;
+                            font-size:12px;
+                            font-weight:600;
+                            white-space:nowrap;
+                        " title="按钮栏距页面底部的间距">${escapeHtml(styleBottomSpacing)}</span>
                     </div>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <p style="margin:0; position:relative; padding-left:14px; color: var(--text-color, #333333); font-size:13px;">
-                        <span style="position:absolute; left:0; top:0.65em; transform:translateY(-50%); width:5px; height:5px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                        按钮栏高度：<strong>${escapeHtml(styleHeight)}</strong>
-                    </p>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <label style="font-size:13px; font-weight:600; color: var(--text-color, #333333); display:flex; align-items:center; gap:6px;">
+                        <span aria-hidden="true">🧶</span>
+                        <span>自定义 CSS</span>
+                    </label>
+                    <textarea readonly style="
+                        width:100%;
+                        min-height:${cssTextareaHeight}px;
+                        max-height:360px;
+                        background-color: rgba(255,255,255,0.92);
+                        color: var(--text-color, #1f2937);
+                        border:1px solid var(--border-color, #d1d5db);
+                        border-radius:6px;
+                        padding:12px;
+                        font-size:13px;
+                        line-height:1.6;
+                        resize:vertical;
+                        font-family: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+                        box-shadow: inset 0 1px 2px rgba(15,23,42,0.08);
+                        white-space:pre-wrap;
+                        word-break:break-word;
+                        overflow-wrap:break-word;
+                    ">${escapeHtml(cssContent)}</textarea>
                 </div>
-            </div>
-            <div style="margin: 16px 0 22px 0; display:flex; flex-direction:column; gap:8px;">
-                <label style="font-size:13px; font-weight:600; color: var(--text-color, #333333);">🧶 自定义 CSS：</label>
-                <textarea readonly style="
-                    width:100%;
-                    min-height:${cssTextareaHeight}px;
-                    background-color: var(--dialog-bg, #ffffff);
-                    color: var(--text-color, #1f2937);
-                    border:1px solid var(--border-color, #d1d5db);
-                    border-radius:6px;
-                    padding:12px;
-                    font-size:13px;
-                    line-height:1.5;
-                    resize:vertical;
-                    font-family: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
-                    white-space:pre-wrap;
-                    word-break:break-word;
-                    overflow-wrap:break-word;
-                ">${escapeHtml(cssContent)}</textarea>
             </div>
             <div style="
                 display:flex;
@@ -5289,6 +5456,7 @@ function showStyleSettingsDialog() {
                 gap: 12px;
                 border-top:1px solid var(--border-color, #e5e7eb);
                 padding-top:16px;
+                margin-top:4px;
             ">
                 <button id="cancelStyleRuleDelete" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
@@ -5354,8 +5522,8 @@ function showStyleSettingsDialog() {
             const row = document.createElement('div');
             row.style.cssText = `
                 display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
+                justify-content: flex-start;
+                align-items: center;
                 gap: 12px;
                 padding: 8px 10px;
                 border: 1px solid var(--border-color, #e5e7eb);
@@ -5372,13 +5540,6 @@ function showStyleSettingsDialog() {
                 row.style.boxShadow = 'none';
             });
 
-            const left = document.createElement('div');
-            left.style.display = 'flex';
-            left.style.alignItems = 'flex-start';
-            left.style.gap = '12px';
-            left.style.flex = '1';
-            left.style.minWidth = '0';
-
             const faviconUrl = item.favicon || generateDomainFavicon(item.domain);
             if (!item.favicon && item.domain) {
                 item.favicon = faviconUrl;
@@ -5387,11 +5548,19 @@ function showStyleSettingsDialog() {
             const faviconBadge = createFaviconElement(faviconUrl, item.name || item.domain, '🎨');
             faviconBadge.title = item.domain || '自定义样式';
 
-            const infoColumn = document.createElement('div');
-            infoColumn.style.display = 'flex';
-            infoColumn.style.flexDirection = 'column';
-            infoColumn.style.gap = '4px';
-            infoColumn.style.minWidth = '0';
+            const iconColumn = document.createElement('div');
+            iconColumn.style.display = 'flex';
+            iconColumn.style.alignItems = 'center';
+            iconColumn.style.justifyContent = 'center';
+            iconColumn.style.flex = '0 0 48px';
+            iconColumn.appendChild(faviconBadge);
+
+            const siteColumn = document.createElement('div');
+            siteColumn.style.display = 'flex';
+            siteColumn.style.flexDirection = 'column';
+            siteColumn.style.gap = '4px';
+            siteColumn.style.minWidth = '100px';
+            siteColumn.style.flex = '0.7 1 0%';
 
             const nameEl = document.createElement('span');
             nameEl.textContent = item.name || '未命名样式';
@@ -5406,7 +5575,7 @@ function showStyleSettingsDialog() {
             domainEl.style.whiteSpace = 'nowrap';
             domainEl.style.overflow = 'hidden';
             domainEl.style.textOverflow = 'ellipsis';
-            domainEl.style.maxWidth = '260px';
+            domainEl.style.maxWidth = '100%';
 
             const cssSnippet = (item.cssCode || '').replace(/\s+/g, ' ').trim();
             const snippetText = cssSnippet
@@ -5416,6 +5585,8 @@ function showStyleSettingsDialog() {
             const cssPreview = document.createElement('code');
             cssPreview.textContent = snippetText;
             cssPreview.style.cssText = `
+                display: block;
+                width: 100%;
                 font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
                 font-size: 12px;
                 color: var(--muted-text-color, #6b7280);
@@ -5425,34 +5596,58 @@ function showStyleSettingsDialog() {
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                max-width: 320px;
+                max-width: 100%;
             `;
             cssPreview.title = item.cssCode || '无自定义CSS';
 
-            infoColumn.appendChild(nameEl);
-            infoColumn.appendChild(domainEl);
-            infoColumn.appendChild(cssPreview);
-            left.appendChild(faviconBadge);
-            left.appendChild(infoColumn);
+            siteColumn.appendChild(nameEl);
+            siteColumn.appendChild(domainEl);
 
-            const right = document.createElement('div');
-            right.style.display = 'flex';
-            right.style.alignItems = 'center';
-            right.style.gap = '8px';
-            right.style.width = '220px';
-            right.style.justifyContent = 'flex-end';
-
-            const heightBadge = document.createElement('span');
-            heightBadge.textContent = item.height ? `${item.height}px` : '默认高度';
-            heightBadge.style.cssText = `
-                padding: 4px 10px;
-                background-color: rgba(16,185,129,0.12);
-                color: var(--success-color, #22c55e);
-                border-radius: 999px;
-                font-size: 12px;
-                font-weight: 600;
-                white-space: nowrap;
+            const cssColumn = document.createElement('div');
+            cssColumn.style.cssText = `
+                flex: 3 1 0%;
+                min-width: 0;
+                max-width: 100%;
+                display: flex;
+                align-items: center;
+                padding-right: 12px;
             `;
+            cssColumn.appendChild(cssPreview);
+
+        const heightColumn = document.createElement('div');
+        heightColumn.style.display = 'flex';
+        heightColumn.style.alignItems = 'center';
+        heightColumn.style.justifyContent = 'center';
+        heightColumn.style.flex = '0 0 110px';
+        heightColumn.style.gap = '6px';
+        heightColumn.style.flexWrap = 'wrap';
+
+        const heightBadge = document.createElement('span');
+        heightBadge.textContent = item.height ? `${item.height}px` : '默认高度';
+        heightBadge.style.cssText = `
+            padding: 4px 10px;
+            background-color: rgba(16,185,129,0.12);
+            color: var(--success-color, #22c55e);
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        `;
+
+        const bottomSpacingValue = (typeof item.bottomSpacing === 'number') ? item.bottomSpacing : buttonConfig.buttonBarBottomSpacing;
+        const clampedBottomSpacingValue = Math.max(-200, Math.min(200, Number(bottomSpacingValue) || 0));
+        const bottomBadge = document.createElement('span');
+        bottomBadge.textContent = `${clampedBottomSpacingValue}px`;
+        bottomBadge.title = '按钮栏距页面底部间距';
+        bottomBadge.style.cssText = `
+            padding: 4px 10px;
+            background-color: rgba(59,130,246,0.12);
+            color: var(--primary-color, #3B82F6);
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        `;
 
             const editBtn = document.createElement('button');
             editBtn.textContent = '✏️';
@@ -5508,15 +5703,28 @@ function showStyleSettingsDialog() {
                     buttonConfig.domainStyleSettings.splice(idx, 1);
                     localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
                     renderDomainStyles();
+                    // 删除后应用默认/其他匹配样式
+                    try { applyDomainStyles(); } catch (_) {}
                 });
             });
 
-            right.appendChild(heightBadge);
-            right.appendChild(editBtn);
-            right.appendChild(deleteBtn);
+        heightColumn.appendChild(heightBadge);
+        heightColumn.appendChild(bottomBadge);
 
-            row.appendChild(left);
-            row.appendChild(right);
+            const actionsColumn = document.createElement('div');
+            actionsColumn.style.display = 'flex';
+            actionsColumn.style.alignItems = 'center';
+            actionsColumn.style.justifyContent = 'center';
+            actionsColumn.style.gap = '8px';
+            actionsColumn.style.flex = '0 0 90px';
+            actionsColumn.appendChild(editBtn);
+            actionsColumn.appendChild(deleteBtn);
+
+            row.appendChild(iconColumn);
+            row.appendChild(siteColumn);
+            row.appendChild(cssColumn);
+            row.appendChild(heightColumn);
+            row.appendChild(actionsColumn);
             styleListBody.appendChild(row);
         });
         if (metadataPatched) {
@@ -5558,6 +5766,8 @@ function showStyleSettingsDialog() {
     `;
     closeSaveBtn.addEventListener('click', () => {
         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+        // 关闭前应用一次，确保当前页面即时生效
+        try { applyDomainStyles(); } catch (_) {}
         closeExistingOverlay(overlay);
         currentStyleOverlay = null;
     });
@@ -5582,12 +5792,16 @@ function showEditDomainStyleDialog(index) {
             domain: window.location.hostname,
             name: document.title || '新样式',
             height: 40,
+            bottomSpacing: buttonConfig.buttonBarBottomSpacing,
             cssCode: '',
             favicon: generateDomainFavicon(window.location.hostname)
         };
     const presetStyleDomain = styleItem.domain || '';
     if (!styleItem.favicon) {
         styleItem.favicon = generateDomainFavicon(presetStyleDomain);
+    }
+    if (typeof styleItem.bottomSpacing !== 'number') {
+        styleItem.bottomSpacing = buttonConfig.buttonBarBottomSpacing;
     }
 
     const { overlay, dialog } = createUnifiedDialog({
@@ -5828,6 +6042,33 @@ function showEditDomainStyleDialog(index) {
     heightLabel.appendChild(heightInput);
     container.appendChild(heightLabel);
 
+    const bottomSpacingLabel = document.createElement('label');
+    bottomSpacingLabel.textContent = '按钮距页面底部间距 (px)：';
+    bottomSpacingLabel.style.display = 'flex';
+    bottomSpacingLabel.style.flexDirection = 'column';
+    bottomSpacingLabel.style.gap = '6px';
+    bottomSpacingLabel.style.fontSize = '13px';
+    bottomSpacingLabel.style.fontWeight = '600';
+    bottomSpacingLabel.style.color = 'var(--text-color, #1f2937)';
+    const bottomSpacingInput = document.createElement('input');
+    bottomSpacingInput.type = 'number';
+    bottomSpacingInput.min = '-200';
+    bottomSpacingInput.max = '200';
+    bottomSpacingInput.step = '1';
+    bottomSpacingInput.value = styleItem.bottomSpacing ?? buttonConfig.buttonBarBottomSpacing ?? 0;
+    bottomSpacingInput.style.width = '100%';
+    bottomSpacingInput.style.height = '40px';
+    bottomSpacingInput.style.padding = '0 12px';
+    bottomSpacingInput.style.border = '1px solid var(--border-color, #d1d5db)';
+    bottomSpacingInput.style.borderRadius = '6px';
+    bottomSpacingInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    bottomSpacingInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    bottomSpacingInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    bottomSpacingInput.style.outline = 'none';
+    bottomSpacingInput.style.fontSize = '14px';
+    bottomSpacingLabel.appendChild(bottomSpacingInput);
+    container.appendChild(bottomSpacingLabel);
+
     const cssLabel = document.createElement('label');
     cssLabel.textContent = '自定义 CSS：';
     cssLabel.style.display = 'flex';
@@ -5894,6 +6135,13 @@ function showEditDomainStyleDialog(index) {
             domain: sanitizedDomain,
             name: nameInput.value.trim() || '未命名样式',
             height: parseInt(heightInput.value, 10) || 40,
+            bottomSpacing: (() => {
+                const parsed = Number(bottomSpacingInput.value);
+                if (Number.isFinite(parsed)) {
+                    return Math.max(-200, Math.min(200, parsed));
+                }
+                return buttonConfig.buttonBarBottomSpacing;
+            })(),
             cssCode: cssTextarea.value,
             favicon: faviconInput2.value.trim() || generateDomainFavicon(sanitizedDomain)
         };
@@ -5903,6 +6151,8 @@ function showEditDomainStyleDialog(index) {
             buttonConfig.domainStyleSettings.push(updatedItem);
         }
         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+        // 保存后立即生效
+        try { applyDomainStyles(); } catch (_) {}
         closeExistingOverlay(overlay);
         currentAddDomainOverlay = null;
         showStyleSettingsDialog(); // 刷新列表
@@ -6261,7 +6511,6 @@ function isValidDomainInput(str) {
 
         // 设置固定定位和位置
         buttonContainer.style.position = 'fixed';
-        buttonContainer.style.bottom = '0px';
         buttonContainer.style.right = '0px';
         buttonContainer.style.width = '100%';
         buttonContainer.style.zIndex = '1000'; // 确保按钮容器始终显示在顶层
@@ -6305,6 +6554,14 @@ function isValidDomainInput(str) {
         buttonContainer.appendChild(createSettingsButton());
         buttonContainer.appendChild(createClearButton());
 
+        // 初始记录 paddingY，确保偏移计算有默认值
+        buttonContainer.dataset.barPaddingY = '6';
+        applyBarBottomSpacing(
+            buttonContainer,
+            buttonConfig.buttonBarBottomSpacing,
+            buttonConfig.buttonBarBottomSpacing
+        );
+
         return buttonContainer;
     };
 
@@ -6336,6 +6593,11 @@ function isValidDomainInput(str) {
         } else {
             console.warn("⚠️ 未找到按钮容器，无法更新按钮栏。");
         }
+        try {
+            applyDomainStyles();
+        } catch (err) {
+            console.warn('应用域名样式失败:', err);
+        }
     };
 
     const attachButtonsToTextarea = (textarea) => {
@@ -6348,6 +6610,8 @@ function isValidDomainInput(str) {
             // textarea.parentElement.insertBefore(buttonContainer, textarea.nextSibling);
             // console.log("✅ 按钮容器已附加到 textarea 元素。");
             appendToMainLayer(buttonContainer);
+            // 创建后立即根据域名样式调整高度/注入CSS
+            try { applyDomainStyles(); } catch (_) {}
             console.log("✅ 按钮容器已固定到窗口底部。");
         } else {
             console.log("ℹ️ 按钮容器已存在，跳过附加。");
@@ -6385,6 +6649,135 @@ function isValidDomainInput(str) {
         }
     };
 
+    const clampBarSpacingValue = (value, fallback = 0) => {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return Math.max(-200, Math.min(200, parsed));
+        }
+        const fallbackParsed = Number(fallback);
+        if (Number.isFinite(fallbackParsed)) {
+            return Math.max(-200, Math.min(200, fallbackParsed));
+        }
+        return 0;
+    };
+
+    const applyBarBottomSpacing = (container, spacing, fallbackSpacing = 0) => {
+        if (!container) return 0;
+        const desiredSpacing = clampBarSpacingValue(spacing, fallbackSpacing);
+        const paddingY = Number(container.dataset.barPaddingY) || 0;
+        const adjustedBottom = desiredSpacing - paddingY;
+        container.style.transform = 'translateY(0)';
+        container.style.bottom = `${adjustedBottom}px`;
+        container.dataset.barBottomSpacing = String(desiredSpacing);
+        return desiredSpacing;
+    };
+
+    // 根据目标高度调整底部按钮栏的布局和内部按钮尺寸
+    updateButtonBarLayout = (container, targetHeight) => {
+        if (!container) return;
+        const numericHeight = Number(targetHeight);
+        if (!Number.isFinite(numericHeight) || numericHeight <= 0) return;
+
+        const barHeight = Math.max(32, Math.round(numericHeight));
+        const scale = Math.max(0.6, Math.min(2.5, barHeight / 40));
+
+        const paddingYBase = Math.round(6 * scale);
+        const paddingYMax = Math.max(4, Math.floor((barHeight - 24) / 2));
+        const paddingY = Math.min(Math.max(4, Math.min(20, paddingYBase)), paddingYMax);
+        const paddingX = Math.max(12, Math.min(48, Math.round(15 * scale)));
+        const gapSize = Math.max(6, Math.min(28, Math.round(10 * scale)));
+
+        container.style.padding = `${paddingY}px ${paddingX}px`;
+        container.style.gap = `${gapSize}px`;
+
+        const innerHeight = Math.max(20, barHeight - paddingY * 2);
+        const fontSize = Math.max(12, Math.min(22, Math.round(14 * scale)));
+        let verticalPadding = Math.max(4, Math.min(18, Math.round(6 * scale)));
+        const maxVerticalPadding = Math.max(4, Math.floor((innerHeight - fontSize) / 2));
+        if (verticalPadding > maxVerticalPadding) {
+            verticalPadding = Math.max(4, maxVerticalPadding);
+        }
+        const horizontalPadding = Math.max(12, Math.min(56, Math.round(12 * scale)));
+        const borderRadius = Math.max(4, Math.min(20, Math.round(4 * scale)));
+        const lineHeight = Math.max(fontSize + 2, innerHeight - verticalPadding * 2);
+
+        const buttons = Array.from(container.children).filter(node => node.tagName === 'BUTTON');
+        buttons.forEach(btn => {
+            btn.style.minHeight = `${innerHeight}px`;
+            btn.style.height = `${innerHeight}px`;
+            btn.style.padding = `${verticalPadding}px ${horizontalPadding}px`;
+            btn.style.fontSize = `${fontSize}px`;
+            btn.style.borderRadius = `${borderRadius}px`;
+            btn.style.lineHeight = `${lineHeight}px`;
+            if (!btn.style.display) btn.style.display = 'inline-flex';
+            if (!btn.style.alignItems) btn.style.alignItems = 'center';
+        });
+
+        container.dataset.barHeight = String(barHeight);
+        container.dataset.barPaddingY = String(verticalPadding);
+    };
+
+    // 应用当前域名样式（高度 + 自定义 CSS），可在多处复用
+    applyDomainStyles = () => {
+        try {
+            const container = queryUI('.folder-buttons-container');
+            const currentHost = window.location.hostname || '';
+            // 若容器未创建，先跳过
+            if (!container) return;
+
+            const fallbackSpacing = clampBarSpacingValue(
+                typeof buttonConfig.buttonBarBottomSpacing === 'number'
+                    ? buttonConfig.buttonBarBottomSpacing
+                    : (defaultConfig && typeof defaultConfig.buttonBarBottomSpacing === 'number'
+                        ? defaultConfig.buttonBarBottomSpacing
+                        : 0)
+            );
+
+            // 清理当前域名下已注入的旧样式，避免重复叠加
+            try {
+                document.querySelectorAll('style[data-domain-style]').forEach(el => {
+                    const d = el.getAttribute('data-domain-style') || '';
+                    if (d && currentHost.includes(d)) {
+                        el.remove();
+                    }
+                });
+            } catch (e) {
+                console.warn('清理旧样式失败:', e);
+            }
+
+            const matchedStyle = (buttonConfig.domainStyleSettings || []).find(s => s && currentHost.includes(s.domain));
+            if (matchedStyle) {
+                // 1) 按域名样式设置按钮栏高度
+                const clamped = Math.min(200, Math.max(20, matchedStyle.height || buttonConfig.buttonBarHeight || (defaultConfig && defaultConfig.buttonBarHeight) || 40));
+                container.style.height = clamped + 'px';
+                updateButtonBarLayout(container, clamped);
+                console.log(`✅ 已根据 ${matchedStyle.name} 设置按钮栏高度：${clamped}px`);
+                applyBarBottomSpacing(container, matchedStyle.bottomSpacing, fallbackSpacing);
+
+                // 2) 注入自定义 CSS（若有）
+                if (matchedStyle.cssCode) {
+                    const styleEl = document.createElement('style');
+                    styleEl.setAttribute('data-domain-style', matchedStyle.domain);
+                    styleEl.textContent = matchedStyle.cssCode;
+                    document.head.appendChild(styleEl);
+                    console.log(`✅ 已注入自定义CSS至 <head> 来自：${matchedStyle.name}`);
+                }
+            } else {
+                // 未匹配到样式时，回退到全局按钮栏高度
+                const fallback = (buttonConfig && typeof buttonConfig.buttonBarHeight === 'number')
+                    ? buttonConfig.buttonBarHeight
+                    : (defaultConfig && defaultConfig.buttonBarHeight) || 40;
+                const clampedDefault = Math.min(200, Math.max(20, fallback));
+                container.style.height = clampedDefault + 'px';
+                updateButtonBarLayout(container, clampedDefault);
+                console.log(`ℹ️ 未匹配到样式规则，使用默认按钮栏高度：${clampedDefault}px`);
+                applyBarBottomSpacing(container, fallbackSpacing, fallbackSpacing);
+            }
+        } catch (err) {
+            console.warn('应用域名样式时出现问题:', err);
+        }
+    };
+
     const initialize = () => {
         attachButtons();
         const observer = new MutationObserver((mutations) => {
@@ -6410,29 +6803,9 @@ function isValidDomainInput(str) {
         });
         console.log("🔔 MutationObserver 已启动，监听 DOM 变化。");
 
-        (function applyDomainStyles() {
-            const currentHost = window.location.hostname;
-            // 找到第一个匹配的 domainStyleSettings (如需多个匹配，逻辑可自行修改)
-            const matchedStyle = buttonConfig.domainStyleSettings.find(s => currentHost.includes(s.domain));
-            if (matchedStyle) {
-                // 1) 更新按钮栏高度
-                const container = queryUI('.folder-buttons-container');
-                if (container) {
-                    const clamped = Math.min(200, Math.max(20, matchedStyle.height || 40));
-                    container.style.height = clamped + 'px';
-                    console.log(`✅ 已根据 ${matchedStyle.name} 设置按钮栏高度：${clamped}px`);
-                }
-
-                // 2) 注入自定义CSS
-                if (matchedStyle.cssCode) {
-                    const styleEl = document.createElement('style');
-                    styleEl.setAttribute('data-domain-style', matchedStyle.domain);
-                    styleEl.textContent = matchedStyle.cssCode;
-                    document.head.appendChild(styleEl);
-                    console.log(`✅ 已注入自定义CSS至 <head> 来自：${matchedStyle.name}`);
-                }
-            }
-        })();
+        // 先尝试一次；再延迟一次，保证容器创建完成后也能生效
+        try { applyDomainStyles(); } catch (_) {}
+        setTimeout(() => { try { applyDomainStyles(); } catch (_) {} }, 350);
     };
 
     window.addEventListener('load', () => {
@@ -6445,6 +6818,8 @@ function isValidDomainInput(str) {
         // Since we're using CSS variables, the styles are updated automatically
         // Just update the button container to apply new styles
         updateButtonContainer();
+        // 重新应用一次域名样式，防止主题切换后高度或注入样式丢失
+        try { applyDomainStyles(); } catch (_) {}
     };
 
     // Initial setting of CSS variables
