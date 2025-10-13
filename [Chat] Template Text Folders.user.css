@@ -61,12 +61,7 @@ div[data-placement="top-start"] .w-sideBarWidth {
     padding-bottom: 0px !important;
 }
 }
-@-moz-document domain("poe.com") {
-/* Type 2️⃣: 为脚本按钮栏留出空间 */
-footer {
-    padding-bottom: 40px !important;
-}
-}
+
 @-moz-document url-prefix("https://poe.com/explore"), url("https://poe.com/chats"), url("https://poe.com/settings") {
 /* [Poe] 辅助 */
 /* 在特定页面隐藏 */
