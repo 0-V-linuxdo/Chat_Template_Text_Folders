@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251013] +fix1.2
+// @name         [Chat] Template Text Folders [20251013] +fix1.10
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251012]
+// @version      [20251013]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -1099,6 +1099,28 @@
     const SUBMIT_WAIT_MAX_ATTEMPTS = 10;
     const SUBMIT_WAIT_DELAY = 300; // 毫秒
 
+    const waitForElementBySelector = async (selector, maxAttempts = SUBMIT_WAIT_MAX_ATTEMPTS, delay = SUBMIT_WAIT_DELAY) => {
+        if (!selector) return null;
+        for (let i = 0; i < maxAttempts; i++) {
+            let element = null;
+            try {
+                element = document.querySelector(selector);
+            } catch (error) {
+                console.warn(`⚠️ 自定义选择器 "${selector}" 解析失败:`, error);
+                return null;
+            }
+
+            if (element) {
+                const isDisabled = typeof element.disabled === 'boolean' && element.disabled;
+                if (!isDisabled) {
+                    return element;
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        return null;
+    };
+
     function simulateEnterKey() {
         const eventInit = {
             bubbles: true,
@@ -1125,6 +1147,20 @@
         const keyboardEvent = new KeyboardEvent('keydown', eventInit);
         document.activeElement.dispatchEvent(keyboardEvent);
     }
+
+    function simulateCtrlEnterKey() {
+        const eventInit = {
+            bubbles: true,
+            cancelable: true,
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            ctrlKey: true
+        };
+        const keyboardEvent = new KeyboardEvent('keydown', eventInit);
+        document.activeElement.dispatchEvent(keyboardEvent);
+    }
     // 定义多种提交方式
     const submitForm = async () => {
         if (isSubmitting) {
@@ -1140,15 +1176,38 @@
               if (matchedRule) {
                   console.log("🔎 检测到本域名匹配的自动提交规则：", matchedRule);
                   switch (matchedRule.method) {
-                      case "Enter":
+                      case "Enter": {
                           simulateEnterKey();
                           isSubmitting = false;
                           return true;
-                      case "Cmd+Enter":
-                          simulateCmdEnterKey();
+                      }
+                      case "Cmd+Enter": {
+                          const variant = matchedRule.methodAdvanced && matchedRule.methodAdvanced.variant === 'ctrl'
+                              ? 'ctrl'
+                              : 'cmd';
+                          if (variant === 'ctrl') {
+                              simulateCtrlEnterKey();
+                              console.log("✅ 已根据自动化规则，触发 Ctrl + Enter 提交。");
+                          } else {
+                              simulateCmdEnterKey();
+                              console.log("✅ 已根据自动化规则，触发 Cmd + Enter 提交。");
+                          }
                           isSubmitting = false;
                           return true;
-                      case "模拟点击提交按钮":
+                      }
+                      case "模拟点击提交按钮": {
+                          const advanced = matchedRule.methodAdvanced || {};
+                          const selector = typeof advanced.selector === 'string' ? advanced.selector.trim() : '';
+                          if (advanced.variant === 'selector' && selector) {
+                              const customButton = await waitForElementBySelector(selector, SUBMIT_WAIT_MAX_ATTEMPTS, SUBMIT_WAIT_DELAY);
+                              if (customButton) {
+                                  customButton.click();
+                                  console.log(`✅ 已根据自动化规则，自定义选择器 "${selector}" 提交。`);
+                                  isSubmitting = false;
+                                  return true;
+                              }
+                              console.warn(`⚠️ 自定义选择器 "${selector}" 未匹配到提交按钮，尝试默认规则。`);
+                          }
                           const submitButton = await waitForSubmitButton(SUBMIT_WAIT_MAX_ATTEMPTS, SUBMIT_WAIT_DELAY);
                           if (submitButton) {
                               submitButton.click();
@@ -1159,6 +1218,7 @@
                               console.warn("⚠️ 未找到提交按钮，进入fallback...");
                           }
                           break;
+                      }
                       default:
                           console.warn("⚠️ 未知自动提交方式，进入fallback...");
                           break;
@@ -4780,12 +4840,12 @@ function showAutomationSettingsDialog() {
             min-width: 28px;
             padding: 3px 8px;
             border-radius: 6px;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(226,232,240,0.92));
-            box-shadow: inset 0 -1px 0 rgba(15,23,42,0.1), 0 1px 1px rgba(148,163,184,0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: linear-gradient(180deg, rgba(17,17,17,0.95), rgba(45,45,45,0.95));
+            box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12), 0 2px 4px rgba(0,0,0,0.45);
             font-size: 12px;
             font-weight: 600;
-            color: var(--text-color, #1f2937);
+            color: #ffffff;
             font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             line-height: 1.2;
             white-space: nowrap;
@@ -4934,7 +4994,6 @@ function showAutomationSettingsDialog() {
 
         const ruleName = rule.name || rule.domain || '未命名规则';
         const ruleDomain = rule.domain || '（未指定网址）';
-        const ruleMethod = rule.method || '-';
         const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
 
         setTrustedHTML(dialog, `
@@ -4962,9 +5021,9 @@ function showAutomationSettingsDialog() {
                         <span style="font-size:12px; color: var(--muted-text-color, #6b7280);">${ruleDomain}</span>
                     </div>
                 </div>
-                <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
+                <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    自动提交方式：<strong>${ruleMethod}</strong>
+                    自动提交方式：<span class="cttf-automation-method-container"></span>
                 </p>
             </div>
             <div style="
@@ -4988,6 +5047,13 @@ function showAutomationSettingsDialog() {
                 ">删除</button>
             </div>
         `);
+
+        const methodPlaceholder = dialog.querySelector('.cttf-automation-method-container');
+        if (methodPlaceholder) {
+            const methodDisplay = createMethodDisplay(rule.method);
+            methodDisplay.style.justifyContent = 'flex-start';
+            methodPlaceholder.replaceWith(methodDisplay);
+        }
 
         overlay.appendChild(dialog);
         overlay.style.pointerEvents = 'auto';
@@ -5382,29 +5448,29 @@ function showStyleSettingsDialog() {
                 <p style="margin:0; color: var(--text-color, #333333); font-size:13px;">❗️ 注意：此操作无法撤销！</p>
             </div>
             <div style="margin: 0 0 22px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 18px; border-radius:8px; background-color: var(--button-bg, #f3f4f6); display:flex; flex-direction:column; gap:16px;">
-                <div style="display:flex; align-items:flex-start; gap:12px;">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
                     <div style="
-                        width:52px;
-                        height:52px;
-                        border-radius:16px;
+                        width:44px;
+                        height:44px;
+                        border-radius:12px;
                         display:flex;
                         align-items:center;
                         justify-content:center;
-                        background-color: rgba(255,255,255,0.85);
+                        background-color: var(--dialog-bg, #ffffff);
                         border: 1px solid var(--border-color, #e5e7eb);
                         overflow:hidden;
                         flex-shrink:0;
                     ">
-                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:28px; height:28px; object-fit:contain;" referrerpolicy="no-referrer">
+                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:24px; height:24px; object-fit:contain;" referrerpolicy="no-referrer">
                     </div>
-                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:6px;">
-                        <span style="font-size:16px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); letter-spacing:0.01em;">适用网址</span>
-                            <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
-                        </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                        <span style="font-size:14px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
+                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">按钮栏高度</span>
                         <span style="
                             padding:6px 12px;
                             background-color: rgba(16,185,129,0.16);
@@ -5414,6 +5480,9 @@ function showStyleSettingsDialog() {
                             font-weight:600;
                             white-space:nowrap;
                         ">${escapeHtml(styleHeight)}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">距页面底部</span>
                         <span style="
                             padding:6px 12px;
                             background-color: rgba(59,130,246,0.16);
@@ -5817,12 +5886,73 @@ function showEditDomainStyleDialog(index) {
     const container = document.createElement('div');
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
-    container.style.gap = '12px';
+    container.style.gap = '16px';
     container.style.marginBottom = '16px';
     container.style.padding = '16px';
     container.style.borderRadius = '6px';
     container.style.border = '1px solid var(--border-color, #e5e7eb)';
     container.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
+
+    const tabsHeader = document.createElement('div');
+    tabsHeader.style.display = 'flex';
+    tabsHeader.style.gap = '8px';
+    tabsHeader.style.flexWrap = 'wrap';
+
+    const tabConfig = [
+        { id: 'basic', label: '基础信息' },
+        { id: 'layout', label: '布局设置' },
+        { id: 'css', label: '自定义 CSS' }
+    ];
+
+    const tabButtons = [];
+    const tabPanels = new Map();
+
+    const tabsBody = document.createElement('div');
+    tabsBody.style.position = 'relative';
+
+    tabConfig.forEach(({ id, label }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.tabId = id;
+        button.textContent = label;
+        button.style.padding = '8px 14px';
+        button.style.borderRadius = '20px';
+        button.style.border = '1px solid var(--border-color, #d1d5db)';
+        button.style.backgroundColor = 'transparent';
+        button.style.color = 'var(--muted-text-color, #6b7280)';
+        button.style.cursor = 'pointer';
+        button.style.fontSize = '13px';
+        button.style.fontWeight = '500';
+        button.addEventListener('click', () => setActiveTab(id));
+        tabButtons.push(button);
+        tabsHeader.appendChild(button);
+
+        const panel = document.createElement('div');
+        panel.dataset.tabId = id;
+        panel.style.display = 'none';
+        panel.style.flexDirection = 'column';
+        panel.style.gap = '12px';
+        tabPanels.set(id, panel);
+        tabsBody.appendChild(panel);
+    });
+
+    container.appendChild(tabsHeader);
+    container.appendChild(tabsBody);
+
+    function setActiveTab(targetId) {
+        tabButtons.forEach((button) => {
+            const isActive = button.dataset.tabId === targetId;
+            button.style.backgroundColor = isActive ? 'var(--dialog-bg, #ffffff)' : 'transparent';
+            button.style.color = isActive ? 'var(--text-color, #1f2937)' : 'var(--muted-text-color, #6b7280)';
+            button.style.fontWeight = isActive ? '600' : '500';
+            button.style.boxShadow = isActive ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none';
+        });
+        tabPanels.forEach((panel, panelId) => {
+            panel.style.display = panelId === targetId ? 'flex' : 'none';
+        });
+    }
+
+    setActiveTab('basic');
 
     const nameLabel = document.createElement('label');
     nameLabel.textContent = '备注名称：';
@@ -5846,7 +5976,7 @@ function showEditDomainStyleDialog(index) {
     nameInput.style.outline = 'none';
     nameInput.style.fontSize = '14px';
     nameLabel.appendChild(nameInput);
-    container.appendChild(nameLabel);
+    tabPanels.get('basic').appendChild(nameLabel);
 
     const domainLabel = document.createElement('label');
     domainLabel.textContent = '网址：';
@@ -5870,7 +6000,7 @@ function showEditDomainStyleDialog(index) {
     domainInput.style.outline = 'none';
     domainInput.style.fontSize = '14px';
     domainLabel.appendChild(domainInput);
-    container.appendChild(domainLabel);
+    tabPanels.get('basic').appendChild(domainLabel);
 
     const faviconLabel2 = document.createElement('label');
     faviconLabel2.textContent = '站点图标：';
@@ -5972,7 +6102,7 @@ function showEditDomainStyleDialog(index) {
     faviconFieldWrapper2.appendChild(faviconControls2);
 
     faviconLabel2.appendChild(faviconFieldWrapper2);
-    container.appendChild(faviconLabel2);
+    tabPanels.get('basic').appendChild(faviconLabel2);
 
     let faviconManuallyEdited2 = false;
     const updateStyleFaviconPreview = () => {
@@ -6040,7 +6170,7 @@ function showEditDomainStyleDialog(index) {
     heightInput.style.outline = 'none';
     heightInput.style.fontSize = '14px';
     heightLabel.appendChild(heightInput);
-    container.appendChild(heightLabel);
+    tabPanels.get('layout').appendChild(heightLabel);
 
     const bottomSpacingLabel = document.createElement('label');
     bottomSpacingLabel.textContent = '按钮距页面底部间距 (px)：';
@@ -6067,7 +6197,7 @@ function showEditDomainStyleDialog(index) {
     bottomSpacingInput.style.outline = 'none';
     bottomSpacingInput.style.fontSize = '14px';
     bottomSpacingLabel.appendChild(bottomSpacingInput);
-    container.appendChild(bottomSpacingLabel);
+    tabPanels.get('layout').appendChild(bottomSpacingLabel);
 
     const cssLabel = document.createElement('label');
     cssLabel.textContent = '自定义 CSS：';
@@ -6092,7 +6222,7 @@ function showEditDomainStyleDialog(index) {
     cssTextarea.style.fontSize = '13px';
     cssTextarea.style.lineHeight = '1.5';
     cssLabel.appendChild(cssTextarea);
-    container.appendChild(cssLabel);
+    tabPanels.get('css').appendChild(cssLabel);
 
     dialog.appendChild(container);
 
@@ -6180,6 +6310,375 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         closeOnOverlayClick: false
     });
 
+    function createAutoSubmitMethodConfigUI(initialMethod = 'Enter', initialAdvanced = null) {
+        const methodSection = document.createElement('div');
+        methodSection.style.display = 'flex';
+        methodSection.style.flexDirection = 'column';
+        methodSection.style.gap = '8px';
+
+        const titleRow = document.createElement('div');
+        titleRow.style.display = 'flex';
+        titleRow.style.alignItems = 'center';
+        titleRow.style.justifyContent = 'space-between';
+
+        const methodTitle = document.createElement('div');
+        methodTitle.textContent = '自动提交方式:';
+        methodTitle.style.fontSize = '13px';
+        methodTitle.style.fontWeight = '600';
+        methodTitle.style.color = 'var(--text-color, #1f2937)';
+        titleRow.appendChild(methodTitle);
+
+        const expandButton = document.createElement('button');
+        expandButton.type = 'button';
+        expandButton.title = '展开/折叠高级选项';
+        expandButton.textContent = '▼';
+        expandButton.style.width = '28px';
+        expandButton.style.height = '28px';
+        expandButton.style.padding = '0';
+        expandButton.style.display = 'flex';
+        expandButton.style.alignItems = 'center';
+        expandButton.style.justifyContent = 'center';
+        expandButton.style.border = '1px solid transparent';
+        expandButton.style.borderRadius = '4px';
+        expandButton.style.background = 'transparent';
+        expandButton.style.cursor = 'pointer';
+        expandButton.style.transition = 'background-color 0.2s ease, border-color 0.2s ease';
+        expandButton.addEventListener('mouseenter', () => {
+            expandButton.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
+            expandButton.style.borderColor = 'var(--border-color, #d1d5db)';
+        });
+        expandButton.addEventListener('mouseleave', () => {
+            expandButton.style.backgroundColor = 'transparent';
+            expandButton.style.borderColor = 'transparent';
+        });
+        titleRow.appendChild(expandButton);
+        methodSection.appendChild(titleRow);
+
+        const methodOptionsWrapper = document.createElement('div');
+        methodOptionsWrapper.style.display = 'flex';
+        methodOptionsWrapper.style.flexWrap = 'wrap';
+        methodOptionsWrapper.style.gap = '15px';
+        methodSection.appendChild(methodOptionsWrapper);
+
+        const advancedContainer = document.createElement('div');
+        advancedContainer.style.display = 'none';
+        advancedContainer.style.flexDirection = 'column';
+        advancedContainer.style.gap = '10px';
+        advancedContainer.style.marginTop = '8px';
+        advancedContainer.style.padding = '12px';
+        advancedContainer.style.borderRadius = '6px';
+        advancedContainer.style.border = '1px solid var(--border-color, #d1d5db)';
+        advancedContainer.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+        advancedContainer.style.boxShadow = 'inset 0 1px 2px rgba(15, 23, 42, 0.04)';
+        advancedContainer.style.transition = 'opacity 0.2s ease';
+        advancedContainer.style.opacity = '0';
+        methodSection.appendChild(advancedContainer);
+
+        const methodOptions = [
+            { value: 'Enter', text: 'Enter' },
+            { value: 'Cmd+Enter', text: 'Cmd+Enter' },
+            { value: '模拟点击提交按钮', text: '模拟点击提交按钮' }
+        ];
+
+        const methodRadioName = `autoSubmitMethod_${Math.random().toString(36).slice(2, 8)}`;
+        const uniqueSuffix = Math.random().toString(36).slice(2, 8);
+
+        const getDefaultAdvancedForMethod = (method) => {
+            if (method === 'Cmd+Enter') {
+                return { variant: 'cmd' };
+            }
+            if (method === '模拟点击提交按钮') {
+                return { variant: 'default', selector: '' };
+            }
+            return null;
+        };
+
+        const normalizeAdvancedForMethod = (method, advanced) => {
+            const defaults = getDefaultAdvancedForMethod(method);
+            if (!defaults) return null;
+            const normalized = { ...defaults };
+            if (advanced && typeof advanced === 'object') {
+                if (method === 'Cmd+Enter') {
+                    if (advanced.variant && ['cmd', 'ctrl'].includes(advanced.variant)) {
+                        normalized.variant = advanced.variant;
+                    }
+                } else if (method === '模拟点击提交按钮') {
+                    if (advanced.variant && ['default', 'selector'].includes(advanced.variant)) {
+                        normalized.variant = advanced.variant;
+                    }
+                    if (advanced.selector && typeof advanced.selector === 'string') {
+                        normalized.selector = advanced.selector;
+                    }
+                }
+            }
+            if (method === '模拟点击提交按钮' && normalized.variant !== 'selector') {
+                normalized.selector = '';
+            }
+            return normalized;
+        };
+
+        let selectedMethod = initialMethod || methodOptions[0].value;
+        if (!methodOptions.some(option => option.value === selectedMethod)) {
+            methodOptions.push({ value: selectedMethod, text: selectedMethod });
+        }
+
+        let advancedState = normalizeAdvancedForMethod(selectedMethod, initialAdvanced);
+
+        const shouldExpandInitially = () => {
+            if (!advancedState) return false;
+            if (selectedMethod === 'Cmd+Enter') {
+                return advancedState.variant === 'ctrl';
+            }
+            if (selectedMethod === '模拟点击提交按钮') {
+                return advancedState.variant === 'selector' && advancedState.selector;
+            }
+            return false;
+        };
+
+        let isExpanded = shouldExpandInitially();
+
+        const renderAdvancedContent = () => {
+            advancedContainer.innerHTML = '';
+            if (!isExpanded) {
+                advancedContainer.style.display = 'none';
+                advancedContainer.style.opacity = '0';
+                return;
+            }
+
+            advancedContainer.style.display = 'flex';
+            advancedContainer.style.opacity = '1';
+
+            const advancedTitle = document.createElement('div');
+            advancedTitle.textContent = '高级选项:';
+            advancedTitle.style.fontSize = '12px';
+            advancedTitle.style.fontWeight = '600';
+            advancedTitle.style.opacity = '0.75';
+            advancedContainer.appendChild(advancedTitle);
+
+            if (selectedMethod === 'Enter') {
+                const tip = document.createElement('div');
+                tip.textContent = 'Enter 提交方式没有额外配置。';
+                tip.style.fontSize = '12px';
+                tip.style.color = 'var(--muted-text-color, #6b7280)';
+                advancedContainer.appendChild(tip);
+                return;
+            }
+
+            if (selectedMethod === 'Cmd+Enter') {
+                const variants = [
+                    { value: 'cmd', label: 'Cmd + Enter', desc: '使用 macOS / Meta 键组合模拟提交' },
+                    { value: 'ctrl', label: 'Ctrl + Enter', desc: '使用 Windows / Linux 控制键组合模拟提交' }
+                ];
+                const variantGroup = document.createElement('div');
+                variantGroup.style.display = 'flex';
+                variantGroup.style.flexDirection = 'column';
+                variantGroup.style.gap = '8px';
+
+                const variantRadioName = `autoSubmitCmdVariant_${uniqueSuffix}`;
+                variants.forEach(variant => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'flex-start';
+                    label.style.gap = '8px';
+                    label.style.cursor = 'pointer';
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = variantRadioName;
+                    radio.value = variant.value;
+                    radio.checked = advancedState?.variant === variant.value;
+                    radio.style.marginTop = '2px';
+                    radio.style.cursor = 'pointer';
+                    radio.addEventListener('change', () => {
+                        if (radio.checked) {
+                            advancedState = { variant: variant.value };
+                        }
+                    });
+
+                    const textContainer = document.createElement('div');
+                    textContainer.style.display = 'flex';
+                    textContainer.style.flexDirection = 'column';
+                    textContainer.style.gap = '2px';
+
+                    const labelText = document.createElement('span');
+                    labelText.textContent = variant.label;
+                    labelText.style.fontSize = '13px';
+                    labelText.style.fontWeight = '600';
+
+                    const descText = document.createElement('span');
+                    descText.textContent = variant.desc;
+                    descText.style.fontSize = '12px';
+                    descText.style.opacity = '0.75';
+
+                    textContainer.appendChild(labelText);
+                    textContainer.appendChild(descText);
+                    label.appendChild(radio);
+                    label.appendChild(textContainer);
+                    variantGroup.appendChild(label);
+                });
+
+                advancedContainer.appendChild(variantGroup);
+                return;
+            }
+
+            if (selectedMethod === '模拟点击提交按钮') {
+                const variants = [
+                    { value: 'default', label: '默认方法', desc: '自动匹配常见的提交按钮进行点击。' },
+                    { value: 'selector', label: '自定义 CSS 选择器', desc: '使用自定义选择器定位需要点击的提交按钮。' }
+                ];
+
+                const variantGroup = document.createElement('div');
+                variantGroup.style.display = 'flex';
+                variantGroup.style.flexDirection = 'column';
+                variantGroup.style.gap = '8px';
+
+                const variantRadioName = `autoSubmitClickVariant_${uniqueSuffix}`;
+                variants.forEach(variant => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'flex-start';
+                    label.style.gap = '8px';
+                    label.style.cursor = 'pointer';
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = variantRadioName;
+                    radio.value = variant.value;
+                    radio.checked = advancedState?.variant === variant.value;
+                    radio.style.marginTop = '2px';
+                    radio.style.cursor = 'pointer';
+                    radio.addEventListener('change', () => {
+                        if (radio.checked) {
+                            advancedState = normalizeAdvancedForMethod(selectedMethod, { variant: variant.value, selector: advancedState?.selector || '' });
+                            renderAdvancedContent();
+                        }
+                    });
+
+                    const textContainer = document.createElement('div');
+                    textContainer.style.display = 'flex';
+                    textContainer.style.flexDirection = 'column';
+                    textContainer.style.gap = '2px';
+
+                    const labelText = document.createElement('span');
+                    labelText.textContent = variant.label;
+                    labelText.style.fontSize = '13px';
+                    labelText.style.fontWeight = '600';
+
+                    const descText = document.createElement('span');
+                    descText.textContent = variant.desc;
+                    descText.style.fontSize = '12px';
+                    descText.style.opacity = '0.75';
+
+                    textContainer.appendChild(labelText);
+                    textContainer.appendChild(descText);
+                    label.appendChild(radio);
+                    label.appendChild(textContainer);
+                    variantGroup.appendChild(label);
+                });
+
+                advancedContainer.appendChild(variantGroup);
+
+                if (advancedState?.variant === 'selector') {
+                    const selectorInput = document.createElement('input');
+                    selectorInput.type = 'text';
+                    selectorInput.placeholder = '如：button.send-btn 或 form button[type="submit"]';
+                    selectorInput.value = advancedState.selector || '';
+                    selectorInput.style.width = '100%';
+                    selectorInput.style.height = '40px';
+                    selectorInput.style.padding = '0 12px';
+                    selectorInput.style.border = '1px solid var(--border-color, #d1d5db)';
+                    selectorInput.style.borderRadius = '6px';
+                    selectorInput.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+                    selectorInput.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+                    selectorInput.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+                    selectorInput.style.outline = 'none';
+                    selectorInput.style.fontSize = '14px';
+                    selectorInput.addEventListener('input', () => {
+                        advancedState = normalizeAdvancedForMethod(selectedMethod, {
+                            variant: 'selector',
+                            selector: selectorInput.value
+                        });
+                    });
+                    advancedContainer.appendChild(selectorInput);
+
+                    const hint = document.createElement('div');
+                    hint.textContent = '请输入能唯一定位提交按钮的 CSS 选择器。';
+                    hint.style.fontSize = '12px';
+                    hint.style.color = 'var(--muted-text-color, #6b7280)';
+                    advancedContainer.appendChild(hint);
+                }
+                return;
+            }
+
+            const tip = document.createElement('div');
+            tip.textContent = '当前提交方式没有可配置的高级选项。';
+            tip.style.fontSize = '12px';
+            tip.style.color = 'var(--muted-text-color, #6b7280)';
+            advancedContainer.appendChild(tip);
+        };
+
+        methodOptions.forEach(option => {
+            const radioLabel = document.createElement('label');
+            radioLabel.style.display = 'inline-flex';
+            radioLabel.style.alignItems = 'center';
+            radioLabel.style.cursor = 'pointer';
+
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = methodRadioName;
+            radio.value = option.value;
+            radio.checked = selectedMethod === option.value;
+            radio.style.marginRight = '6px';
+            radio.style.cursor = 'pointer';
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    selectedMethod = option.value;
+                    advancedState = normalizeAdvancedForMethod(selectedMethod, null);
+                    renderAdvancedContent();
+                }
+            });
+
+            radioLabel.appendChild(radio);
+            radioLabel.appendChild(document.createTextNode(option.text));
+            methodOptionsWrapper.appendChild(radioLabel);
+        });
+
+        expandButton.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            expandButton.textContent = isExpanded ? '▲' : '▼';
+            expandButton.setAttribute('aria-expanded', String(isExpanded));
+            renderAdvancedContent();
+        });
+
+        expandButton.setAttribute('aria-expanded', String(isExpanded));
+        expandButton.textContent = isExpanded ? '▲' : '▼';
+        renderAdvancedContent();
+
+        return {
+            container: methodSection,
+            getConfig: () => {
+                const normalized = normalizeAdvancedForMethod(selectedMethod, advancedState);
+                let advancedForSave = null;
+                if (selectedMethod === 'Cmd+Enter' && normalized && normalized.variant && normalized.variant !== 'cmd') {
+                    advancedForSave = { variant: normalized.variant };
+                } else if (selectedMethod === '模拟点击提交按钮' && normalized) {
+                    if (normalized.variant === 'selector') {
+                        advancedForSave = {
+                            variant: 'selector',
+                            selector: typeof normalized.selector === 'string' ? normalized.selector : ''
+                        };
+                    } else if (normalized.variant !== 'default') {
+                        advancedForSave = { variant: normalized.variant };
+                    }
+                }
+                return {
+                    method: selectedMethod,
+                    advanced: advancedForSave
+                };
+            }
+        };
+    }
+
     // 创建表单容器
     const container = document.createElement('div');
     container.style.display = 'flex';
@@ -6215,6 +6714,33 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     domainInput.value = presetDomain;
     domainLabel.appendChild(domainInput);
     container.appendChild(domainLabel);
+
+    let nameInputRef = null;
+
+    // 备注名称
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = '备注名称：';
+    nameLabel.style.display = 'flex';
+    nameLabel.style.flexDirection = 'column';
+    nameLabel.style.gap = '6px';
+    nameLabel.style.fontSize = '13px';
+    nameLabel.style.fontWeight = '600';
+    nameLabel.style.color = 'var(--text-color, #1f2937)';
+    nameInputRef = document.createElement('input');
+    nameInputRef.type = 'text';
+    nameInputRef.style.width = '100%';
+    nameInputRef.style.height = '40px';
+    nameInputRef.style.padding = '0 12px';
+    nameInputRef.style.border = '1px solid var(--border-color, #d1d5db)';
+    nameInputRef.style.borderRadius = '6px';
+    nameInputRef.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
+    nameInputRef.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
+    nameInputRef.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
+    nameInputRef.style.outline = 'none';
+    nameInputRef.style.fontSize = '14px';
+    nameInputRef.value = isEdit ? (ruleData.name || '') : (document.title || '新网址规则');
+    nameLabel.appendChild(nameInputRef);
+    container.appendChild(nameLabel);
 
     // favicon
     const faviconLabel = document.createElement('label');
@@ -6319,7 +6845,6 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     container.appendChild(faviconLabel);
 
     let faviconManuallyEdited = false;
-    let nameInputRef = null;
     const updateFaviconPreview = () => {
         const currentFavicon = faviconInput.value.trim();
         setTrustedHTML(faviconPreviewHolder, '');
@@ -6331,32 +6856,6 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
             )
         );
     };
-
-    // 备注名称（保持在 favicon 之后，名称字段会在 updateFaviconPreview 中访问）
-    // 备注名称
-    const nameLabel = document.createElement('label');
-    nameLabel.textContent = '备注名称：';
-    nameLabel.style.display = 'flex';
-    nameLabel.style.flexDirection = 'column';
-    nameLabel.style.gap = '6px';
-    nameLabel.style.fontSize = '13px';
-    nameLabel.style.fontWeight = '600';
-    nameLabel.style.color = 'var(--text-color, #1f2937)';
-    nameInputRef = document.createElement('input');
-    nameInputRef.type = 'text';
-    nameInputRef.style.width = '100%';
-    nameInputRef.style.height = '40px';
-    nameInputRef.style.padding = '0 12px';
-    nameInputRef.style.border = '1px solid var(--border-color, #d1d5db)';
-    nameInputRef.style.borderRadius = '6px';
-    nameInputRef.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
-    nameInputRef.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
-    nameInputRef.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
-    nameInputRef.style.outline = 'none';
-    nameInputRef.style.fontSize = '14px';
-    nameInputRef.value = isEdit ? (ruleData.name || '') : (document.title || '新网址规则');
-    nameLabel.appendChild(nameInputRef);
-    container.appendChild(nameLabel);
 
     const getFallbackFavicon = () => generateDomainFavicon(domainInput.value.trim());
 
@@ -6388,41 +6887,11 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     resizeFaviconTextarea();
     requestAnimationFrame(resizeFaviconTextarea);
 
-    // 自动提交方式
-    const methodLabel = document.createElement('label');
-    methodLabel.textContent = '自动提交方式：';
-    methodLabel.style.display = 'flex';
-    methodLabel.style.flexDirection = 'column';
-    methodLabel.style.gap = '6px';
-    methodLabel.style.fontSize = '13px';
-    methodLabel.style.fontWeight = '600';
-    methodLabel.style.color = 'var(--text-color, #1f2937)';
-    const methodSelect = document.createElement('select');
-    methodSelect.style.width = '100%';
-    methodSelect.style.height = '40px';
-    methodSelect.style.padding = '0 12px';
-    methodSelect.style.border = '1px solid var(--border-color, #d1d5db)';
-    methodSelect.style.borderRadius = '6px';
-    methodSelect.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
-    methodSelect.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
-    methodSelect.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
-    methodSelect.style.outline = 'none';
-    methodSelect.style.fontSize = '14px';
-
-    ['Enter','Cmd+Enter','模拟点击提交按钮'].forEach(val => {
-        const opt = document.createElement('option');
-        opt.value = val;
-        opt.textContent = val;
-        methodSelect.appendChild(opt);
-    });
-
-    // 若编辑，设定默认选项
-    if(isEdit && ruleData.method) {
-        methodSelect.value = ruleData.method;
-    }
-
-    methodLabel.appendChild(methodSelect);
-    container.appendChild(methodLabel);
+    const methodConfigUI = createAutoSubmitMethodConfigUI(
+        (isEdit && ruleData.method) ? ruleData.method : 'Enter',
+        isEdit ? ruleData.methodAdvanced : null
+    );
+    container.appendChild(methodConfigUI.container);
 
     // 确认 & 取消 按钮
     const btnRow = document.createElement('div');
@@ -6458,16 +6927,40 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     confirmBtn.style.cursor = 'pointer';
     confirmBtn.addEventListener('click', () => {
         const sanitizedDomain = domainInput.value.trim();
+        const sanitizedName = nameInputRef.value.trim();
+        const methodConfig = methodConfigUI.getConfig();
+        const methodAdvanced = methodConfig.advanced;
         const newData = {
             domain: sanitizedDomain,
-            name: nameInputRef.value.trim(),
-            method: methodSelect.value,
+            name: sanitizedName,
+            method: methodConfig.method,
             favicon: faviconInput.value.trim() || generateDomainFavicon(sanitizedDomain)
         };
+
         if(!newData.domain || !newData.name) {
             alert('请输入网址和备注名称！');
             return;
         }
+
+        if (methodConfig.method === '模拟点击提交按钮' && methodAdvanced && methodAdvanced.variant === 'selector') {
+            const trimmedSelector = methodAdvanced.selector ? methodAdvanced.selector.trim() : '';
+            if (!trimmedSelector) {
+                alert('请输入有效的 CSS 选择器！');
+                return;
+            }
+            try {
+                document.querySelector(trimmedSelector);
+            } catch (err) {
+                alert('CSS 选择器语法错误，请检查后再试！');
+                return;
+            }
+            methodAdvanced.selector = trimmedSelector;
+        }
+
+        if (methodAdvanced) {
+            newData.methodAdvanced = methodAdvanced;
+        }
+
         // 回调保存
         if(onSave) onSave(newData);
         // 关闭
