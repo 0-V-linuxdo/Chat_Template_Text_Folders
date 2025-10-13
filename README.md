@@ -15,7 +15,7 @@
 
   <details>
   <summary>示例2：ChatHub网页</summary>
-  <img width="1447" height="1060" alt="image" src="https://github.com/user-attachments/assets/7be6b735-74bf-4d3e-bcee-d09d2441f5b2" />
+    <img width="1462" height="1060" alt="image" src="https://github.com/user-attachments/assets/7f370227-8864-4d31-bdeb-b57b2a56df98" />
   </details>
 
 </details>
