@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251013] +fix1.10
+// @name         [Chat] Template Text Folders [20251013] +fix1.15
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251013]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -1320,6 +1320,26 @@
         // 鼠标悬停显示按钮模板文本
         button.title = config.text || '';
         return button;
+    };
+
+    const extractTemplateVariables = (text = '') => {
+        if (typeof text !== 'string' || !text.includes('{')) {
+            return [];
+        }
+
+        const matches = new Set();
+        const fallbackMatches = text.match(/\{\{[A-Za-z0-9_-]+\}\|\{[A-Za-z0-9_-]+\}\}/g) || [];
+        fallbackMatches.forEach(match => matches.add(match));
+
+        let sanitized = text;
+        fallbackMatches.forEach(match => {
+            sanitized = sanitized.split(match).join(' ');
+        });
+
+        const singleMatches = sanitized.match(/\{[A-Za-z0-9_-]+\}/g) || [];
+        singleMatches.forEach(match => matches.add(match));
+
+        return Array.from(matches);
     };
 
     // 引入全局变量来跟踪当前打开的文件夹
@@ -4123,25 +4143,28 @@
 
     const rightButtonHeaderLabels = document.createElement('div');
     rightButtonHeaderLabels.style.display = 'flex';
-    rightButtonHeaderLabels.style.gap = '0px';
+    rightButtonHeaderLabels.style.gap = '4px';
     rightButtonHeaderLabels.style.alignItems = 'center';
-    rightButtonHeaderLabels.style.width = '180px';
+    rightButtonHeaderLabels.style.width = '240px';
     rightButtonHeaderLabels.style.paddingLeft = '8px';
     rightButtonHeaderLabels.style.paddingRight = '12px';
 
+    const variableLabel = document.createElement('div');
+    variableLabel.textContent = '变量';
+    variableLabel.style.width = '110px';
+    variableLabel.style.textAlign = 'center';
+    variableLabel.style.fontSize = '12px';
     const autoSubmitLabel = document.createElement('div');
     autoSubmitLabel.textContent = '自动提交';
-    autoSubmitLabel.style.width = '54px';
+    autoSubmitLabel.style.width = '64px';
     autoSubmitLabel.style.textAlign = 'center';
     autoSubmitLabel.style.fontSize = '12px';
-    autoSubmitLabel.style.marginRight = '4px';
 
     const editButtonLabel = document.createElement('div');
     editButtonLabel.textContent = '修改';
     editButtonLabel.style.width = '40px';
     editButtonLabel.style.textAlign = 'center';
     editButtonLabel.style.fontSize = '12px';
-    editButtonLabel.style.marginRight = '4px';
 
     const deleteButtonLabel = document.createElement('div');
     deleteButtonLabel.textContent = '删除';
@@ -4149,6 +4172,7 @@
     deleteButtonLabel.style.textAlign = 'center';
     deleteButtonLabel.style.fontSize = '12px';
 
+    rightButtonHeaderLabels.appendChild(variableLabel);
     rightButtonHeaderLabels.appendChild(autoSubmitLabel);
     rightButtonHeaderLabels.appendChild(editButtonLabel);
     rightButtonHeaderLabels.appendChild(deleteButtonLabel);
@@ -4200,11 +4224,38 @@
 
         const opsDiv = document.createElement('div');
         opsDiv.style.display = 'flex';
-        opsDiv.style.gap = '0px';
+        opsDiv.style.gap = '4px';
         opsDiv.style.alignItems = 'center';
-        opsDiv.style.width = '180px';
+        opsDiv.style.width = '240px';
         opsDiv.style.paddingLeft = '8px';
         opsDiv.style.paddingRight = '12px';
+
+        const variableInfoContainer = document.createElement('div');
+        variableInfoContainer.style.display = 'flex';
+        variableInfoContainer.style.alignItems = 'center';
+        variableInfoContainer.style.justifyContent = 'center';
+        variableInfoContainer.style.flexDirection = 'column';
+        variableInfoContainer.style.width = '110px';
+        variableInfoContainer.style.fontSize = '12px';
+        variableInfoContainer.style.lineHeight = '1.2';
+        variableInfoContainer.style.wordBreak = 'break-word';
+        variableInfoContainer.style.textAlign = 'center';
+        variableInfoContainer.style.color = 'var(--text-color, #333333)';
+
+        if (cfg.type === 'template') {
+            const variablesUsed = extractTemplateVariables(cfg.text || '');
+            if (variablesUsed.length > 0) {
+                const displayText = variablesUsed.join('、');
+                variableInfoContainer.textContent = displayText;
+                variableInfoContainer.title = `模板变量: ${displayText}`;
+            } else {
+                variableInfoContainer.textContent = '无';
+                variableInfoContainer.title = '未使用模板变量';
+            }
+        } else {
+            variableInfoContainer.textContent = '—';
+            variableInfoContainer.title = '工具按钮不使用模板变量';
+        }
 
         // 创建"自动提交"开关容器
         const autoSubmitContainer = document.createElement('div');
@@ -4212,7 +4263,6 @@
         autoSubmitContainer.style.alignItems = 'center';
         autoSubmitContainer.style.justifyContent = 'center';
         autoSubmitContainer.style.width = '60px';
-        autoSubmitContainer.style.marginRight = '4px';
 
         const autoSubmitCheckbox = document.createElement('input');
         autoSubmitCheckbox.type = 'checkbox';
@@ -4243,7 +4293,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 4px;
         `;
         editBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4274,6 +4323,7 @@
             });
         });
 
+        opsDiv.appendChild(variableInfoContainer);
         opsDiv.appendChild(autoSubmitContainer);
         opsDiv.appendChild(editBtn);
         opsDiv.appendChild(deleteBtn);
@@ -6438,7 +6488,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         let isExpanded = shouldExpandInitially();
 
         const renderAdvancedContent = () => {
-            advancedContainer.innerHTML = '';
+            setTrustedHTML(advancedContainer, '');
             if (!isExpanded) {
                 advancedContainer.style.display = 'none';
                 advancedContainer.style.opacity = '0';
