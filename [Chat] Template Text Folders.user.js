@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251015] +fix1.2
+// @name         [Chat] Template Text Folders [20251015] +fix1.4
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251015]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
@@ -44,7 +44,7 @@
 // @match        https://www.notion.so/*
 //
 // @grant        none
-// @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.config.js
+// @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20251015%5D.config.js?t=20231015
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
 // ==/UserScript==
 
@@ -137,34 +137,144 @@
     };
 
     const LOCALIZABLE_ATTRIBUTES = ['title', 'placeholder', 'aria-label', 'aria-description', 'aria-describedby', 'data-tooltip'];
+    const LANGUAGE_PREFERENCE_STORAGE_KEY = 'cttf-language-preference';
+
+    let translationsCache = null;
+    let reverseTranslationsCache = {};
+
+    const normalizeLocaleKey = (locale) => {
+        if (!locale) {
+            return 'en';
+        }
+        const lower = locale.toLowerCase();
+        if (lower.startsWith('zh')) {
+            return 'zh';
+        }
+        return 'en';
+    };
+
+    const getTranslationsCache = () => {
+        if (translationsCache) {
+            return translationsCache;
+        }
+        const localeConfig = getLocaleBridge();
+        if (!localeConfig || typeof localeConfig.getTranslations !== 'function') {
+            return null;
+        }
+        try {
+            translationsCache = localeConfig.getTranslations();
+            reverseTranslationsCache = {};
+            return translationsCache;
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders] Failed to obtain translations map:', error);
+            translationsCache = null;
+            return null;
+        }
+    };
+
+    const resolveI18nKey = (rawValue, locale) => {
+        if (!rawValue) {
+            return null;
+        }
+        const cache = getTranslationsCache();
+        if (!cache) {
+            return null;
+        }
+        const normalizedLocale = normalizeLocaleKey(locale);
+        const trimmedValue = rawValue.trim();
+        if (!trimmedValue) {
+            return null;
+        }
+
+        if (normalizedLocale === 'zh') {
+            const zhDict = cache.zh || {};
+            if (Object.prototype.hasOwnProperty.call(zhDict, trimmedValue)) {
+                return trimmedValue;
+            }
+        }
+
+        const ensureReverseIndex = (loc) => {
+            if (!reverseTranslationsCache[loc]) {
+                const dict = cache[loc] || {};
+                const reverseMap = {};
+                Object.entries(dict).forEach(([key, value]) => {
+                    if (typeof value === 'string' && value.trim()) {
+                        reverseMap[value] = key;
+                    }
+                });
+                reverseTranslationsCache[loc] = reverseMap;
+            }
+            return reverseTranslationsCache[loc];
+        };
+
+        const reverseForLocale = ensureReverseIndex(normalizedLocale);
+        if (reverseForLocale && reverseForLocale[trimmedValue]) {
+            return reverseForLocale[trimmedValue];
+        }
+
+        const zhDict = cache.zh || {};
+        if (Object.prototype.hasOwnProperty.call(zhDict, trimmedValue)) {
+            return trimmedValue;
+        }
+
+        return null;
+    };
 
     const localizeElement = (root) => {
-        if (!root || !isNonChineseLocale()) {
+        if (!root) {
             return root;
         }
+
+        const getCurrentLocale = () => {
+            const localeConfig = getLocaleBridge();
+            if (!localeConfig || typeof localeConfig.getLocale !== 'function') {
+                return null;
+            }
+            return localeConfig.getLocale();
+        };
+
+        const locale = getCurrentLocale();
+        const normalizedLocaleKey = normalizeLocaleKey(locale || '');
+        const isChineseLocale = normalizedLocaleKey === 'zh';
 
         const translateTextNode = (node) => {
             const original = node.nodeValue;
             if (!original) {
                 return;
             }
-            const trimmed = original.trim();
+            const storedOriginal = node.__cttfLocaleOriginal ?? original;
+            if (node.__cttfLocaleOriginal == null) {
+                node.__cttfLocaleOriginal = original;
+            }
+            const trimmed = storedOriginal.trim();
             if (!trimmed) {
                 return;
             }
-            const translated = t(trimmed);
-            if (translated === trimmed) {
+            let translationKey = node.__cttfLocaleKey || null;
+            if (!translationKey) {
+                translationKey = resolveI18nKey(trimmed, locale);
+                if (translationKey) {
+                    node.__cttfLocaleKey = translationKey;
+                }
+            }
+            const sourceText = translationKey || trimmed;
+            const startIdx = storedOriginal.indexOf(trimmed);
+            const prefix = startIdx >= 0 ? storedOriginal.slice(0, startIdx) : '';
+            const suffix = startIdx >= 0 ? storedOriginal.slice(startIdx + trimmed.length) : '';
+
+            if (isChineseLocale) {
+                const target = `${prefix}${sourceText}${suffix}`;
+                if (node.nodeValue !== target) {
+                    node.nodeValue = target;
+                }
                 return;
             }
-            if (original === trimmed) {
-                node.nodeValue = translated;
-                return;
-            }
-            const startIdx = original.indexOf(trimmed);
-            if (startIdx >= 0) {
-                node.nodeValue = `${original.slice(0, startIdx)}${translated}${original.slice(startIdx + trimmed.length)}`;
-            } else {
-                node.nodeValue = translated;
+
+            const translated = t(sourceText);
+            const targetContent = translated === sourceText ? sourceText : translated;
+            const target = `${prefix}${targetContent}${suffix}`;
+            if (node.nodeValue !== target) {
+                node.nodeValue = target;
             }
         };
 
@@ -185,6 +295,9 @@
             : root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
 
         elements.forEach((el) => {
+            if (!el.__cttfAttrOriginals) {
+                el.__cttfAttrOriginals = {};
+            }
             LOCALIZABLE_ATTRIBUTES.forEach((attr) => {
                 if (!el.hasAttribute(attr)) {
                     return;
@@ -193,9 +306,32 @@
                 if (!value) {
                     return;
                 }
-                const translated = t(value);
-                if (translated !== value) {
+                if (!el.__cttfAttrOriginals[attr]) {
+                    el.__cttfAttrOriginals[attr] = value;
+                }
+                if (!el.__cttfAttrKeys) {
+                    el.__cttfAttrKeys = {};
+                }
+                const originalValue = el.__cttfAttrOriginals[attr];
+                let attrKey = el.__cttfAttrKeys[attr] || null;
+                if (!attrKey) {
+                    attrKey = resolveI18nKey(originalValue, locale);
+                    if (attrKey) {
+                        el.__cttfAttrKeys[attr] = attrKey;
+                    }
+                }
+                const sourceValue = attrKey || originalValue;
+                if (isChineseLocale) {
+                    if (value !== sourceValue) {
+                        el.setAttribute(attr, sourceValue);
+                    }
+                    return;
+                }
+                const translated = t(sourceValue);
+                if (translated !== sourceValue) {
                     el.setAttribute(attr, translated);
+                } else if (value !== sourceValue) {
+                    el.setAttribute(attr, sourceValue);
                 }
             });
         });
@@ -206,9 +342,6 @@
     let localizationObserver = null;
     let localizationScheduled = false;
     const scheduleLocalization = () => {
-        if (!isNonChineseLocale()) {
-            return;
-        }
         if (localizationScheduled) {
             return;
         }
@@ -222,7 +355,7 @@
     };
 
     const ensureLocalizationObserver = () => {
-        if (!isNonChineseLocale() || !uiShadowRoot || localizationObserver) {
+        if (!uiShadowRoot || localizationObserver) {
             return;
         }
         localizationObserver = new MutationObserver(() => scheduleLocalization());
@@ -242,6 +375,90 @@
         }
         ensureLocalizationObserver();
     };
+
+    const readLanguagePreference = () => {
+        try {
+            const stored = localStorage.getItem(LANGUAGE_PREFERENCE_STORAGE_KEY);
+            if (stored === 'zh' || stored === 'en' || stored === 'auto') {
+                return stored;
+            }
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders] Failed to read language preference:', error);
+        }
+        return null;
+    };
+
+    const writeLanguagePreference = (preference) => {
+        try {
+            if (!preference) {
+                localStorage.removeItem(LANGUAGE_PREFERENCE_STORAGE_KEY);
+            } else {
+                localStorage.setItem(LANGUAGE_PREFERENCE_STORAGE_KEY, preference);
+            }
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders] Failed to persist language preference:', error);
+        }
+    };
+
+    const applyLanguagePreference = (preference, options = {}) => {
+        const localeConfig = getLocaleBridge();
+        if (!localeConfig || typeof localeConfig.setLocale !== 'function') {
+            console.warn('[Chat] Template Text Folders] Locale bridge unavailable, cannot apply language preference.');
+            return null;
+        }
+
+        const normalizedPreference = preference === 'zh' || preference === 'en' ? preference : 'auto';
+        let targetLocale = normalizedPreference;
+
+        if (normalizedPreference === 'auto') {
+            if (typeof localeConfig.detectBrowserLocale === 'function') {
+                targetLocale = localeConfig.detectBrowserLocale();
+            } else {
+                targetLocale = 'en';
+            }
+        }
+
+        if (!targetLocale) {
+            targetLocale = 'en';
+        }
+
+        const appliedLocale = localeConfig.setLocale(targetLocale);
+
+        if (!options.skipSave) {
+            writeLanguagePreference(normalizedPreference);
+        }
+
+        translationsCache = null;
+        reverseTranslationsCache = {};
+
+        scheduleLocalization();
+        ensureLocalizationObserver();
+        if (uiShadowRoot) {
+            localizeElement(uiShadowRoot);
+        }
+
+        if (typeof options.onApplied === 'function') {
+            try {
+                options.onApplied(normalizedPreference, appliedLocale);
+            } catch (_) {
+                // 忽略回调中的错误，避免影响主流程
+            }
+        }
+
+        return { preference: normalizedPreference, locale: appliedLocale };
+    };
+
+    const initializeLanguagePreference = () => {
+        const localeConfig = getLocaleBridge();
+        if (!localeConfig) {
+            setTimeout(initializeLanguagePreference, 200);
+            return;
+        }
+        const storedPreference = readLanguagePreference();
+        applyLanguagePreference(storedPreference || 'auto', { skipSave: true });
+    };
+
+    initializeLanguagePreference();
 
     const ensureUIRoot = () => {
         if (uiShadowRoot && uiShadowRoot.host && uiShadowRoot.host.isConnected) {
@@ -4000,6 +4217,35 @@
                 gap:20px;
                 margin-bottom:20px;
             ">
+                <!-- 语言选择 -->
+                <div style="
+                    display:flex;
+                    flex-direction:row;
+                    align-items:center;
+                    padding-bottom:16px;
+                    border-bottom:1px solid var(--border-color, #e5e7eb);
+                    gap:12px;
+                    flex-wrap:wrap;
+                ">
+                    <span style="color: var(--text-color, #333333);">${t('语言')}</span>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button class="config-lang-btn" data-lang="auto" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            border-radius: 999px;
+                            padding: 6px 14px;
+                        ">${t('自动')}</button>
+                        <button class="config-lang-btn" data-lang="zh" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            border-radius: 999px;
+                            padding: 6px 14px;
+                        ">${t('中文')}</button>
+                        <button class="config-lang-btn" data-lang="en" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            border-radius: 999px;
+                            padding: 6px 14px;
+                        ">${t('English')}</button>
+                    </div>
+                </div>
                 <!-- 重置按钮部分 -->
                 <div style="
                     display:flex;
@@ -4045,6 +4291,35 @@
         overlay.style.pointerEvents = 'auto';
         appendToOverlayLayer(overlay);
         currentConfigOverlay = overlay;
+
+        const langBtnStyle = document.createElement('style');
+        langBtnStyle.textContent = `
+            .config-lang-btn.active {
+                background-color: var(--primary-color, #3B82F6) !important;
+                color: #ffffff !important;
+                box-shadow: 0 0 0 1px var(--primary-color, #3B82F6) inset;
+            }
+        `;
+        dialog.appendChild(langBtnStyle);
+
+        const langButtons = Array.from(dialog.querySelectorAll('.config-lang-btn'));
+        const updateLanguageButtonState = (preference) => {
+            langButtons.forEach((btn) => {
+                const isActive = btn.dataset.lang === preference;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        };
+
+        updateLanguageButtonState(readLanguagePreference() || 'auto');
+
+        langButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const selectedPreference = btn.dataset.lang || 'auto';
+                const result = applyLanguagePreference(selectedPreference);
+                updateLanguageButtonState(result ? result.preference : selectedPreference);
+            });
+        });
 
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay) {
