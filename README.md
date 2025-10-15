@@ -10,7 +10,7 @@
 
   <details open>
   <summary>示例1：ChatGPT网页</summary>
-  <img width="1447" height="1061" alt="image" src="https://github.com/user-attachments/assets/a1367bff-c6aa-4344-a10b-3baa78be276a" />
+    <img width="1462" height="1083" alt="image" src="https://github.com/user-attachments/assets/b7d417c7-5235-42de-8e70-ed3edac3cb31" />
   </details>
 
   <details>
