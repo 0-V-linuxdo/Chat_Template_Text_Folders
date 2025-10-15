@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251014] +fix1.0
+// @name         [Chat] Template Text Folders [20251015] +fix1.2
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251014]
+// @version      [20251015]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -44,6 +44,7 @@
 // @match        https://www.notion.so/*
 //
 // @grant        none
+// @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.config.js
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
 // ==/UserScript==
 
@@ -91,6 +92,156 @@
     let uiShadowRoot = null;
     let uiMainLayer = null;
     let uiOverlayLayer = null;
+
+    const getLocaleBridge = () => {
+        if (typeof unsafeWindow !== 'undefined' && unsafeWindow.CTTFLocaleConfig) {
+            return unsafeWindow.CTTFLocaleConfig;
+        }
+        if (typeof window !== 'undefined' && window.CTTFLocaleConfig) {
+            return window.CTTFLocaleConfig;
+        }
+        return null;
+    };
+
+    const applyReplacementsFallback = (text, replacements) => {
+        if (!text || !replacements) {
+            return text;
+        }
+        let result = text;
+        Object.entries(replacements).forEach(([key, value]) => {
+            const safeValue = value == null ? '' : String(value);
+            result = result.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), safeValue);
+        });
+        return result;
+    };
+
+    const t = (sourceText, replacements, overrideLocale) => {
+        const localeConfig = getLocaleBridge();
+        if (localeConfig && typeof localeConfig.translate === 'function') {
+            try {
+                return localeConfig.translate(sourceText, replacements, overrideLocale);
+            } catch (error) {
+                console.warn('[Chat] Template Text Folders i18n translate error:', error);
+            }
+        }
+        return applyReplacementsFallback(sourceText, replacements);
+    };
+
+    const isNonChineseLocale = () => {
+        const localeConfig = getLocaleBridge();
+        if (!localeConfig || typeof localeConfig.getLocale !== 'function') {
+            return false;
+        }
+        const locale = localeConfig.getLocale();
+        return locale ? !/^zh(?:-|$)/i.test(locale) : false;
+    };
+
+    const LOCALIZABLE_ATTRIBUTES = ['title', 'placeholder', 'aria-label', 'aria-description', 'aria-describedby', 'data-tooltip'];
+
+    const localizeElement = (root) => {
+        if (!root || !isNonChineseLocale()) {
+            return root;
+        }
+
+        const translateTextNode = (node) => {
+            const original = node.nodeValue;
+            if (!original) {
+                return;
+            }
+            const trimmed = original.trim();
+            if (!trimmed) {
+                return;
+            }
+            const translated = t(trimmed);
+            if (translated === trimmed) {
+                return;
+            }
+            if (original === trimmed) {
+                node.nodeValue = translated;
+                return;
+            }
+            const startIdx = original.indexOf(trimmed);
+            if (startIdx >= 0) {
+                node.nodeValue = `${original.slice(0, startIdx)}${translated}${original.slice(startIdx + trimmed.length)}`;
+            } else {
+                node.nodeValue = translated;
+            }
+        };
+
+        if (root.nodeType === Node.TEXT_NODE) {
+            translateTextNode(root);
+            return root;
+        }
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+        let currentNode = walker.nextNode();
+        while (currentNode) {
+            translateTextNode(currentNode);
+            currentNode = walker.nextNode();
+        }
+
+        const elements = root.nodeType === Node.ELEMENT_NODE
+            ? [root, ...root.querySelectorAll('*')]
+            : root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+
+        elements.forEach((el) => {
+            LOCALIZABLE_ATTRIBUTES.forEach((attr) => {
+                if (!el.hasAttribute(attr)) {
+                    return;
+                }
+                const value = el.getAttribute(attr);
+                if (!value) {
+                    return;
+                }
+                const translated = t(value);
+                if (translated !== value) {
+                    el.setAttribute(attr, translated);
+                }
+            });
+        });
+
+        return root;
+    };
+
+    let localizationObserver = null;
+    let localizationScheduled = false;
+    const scheduleLocalization = () => {
+        if (!isNonChineseLocale()) {
+            return;
+        }
+        if (localizationScheduled) {
+            return;
+        }
+        localizationScheduled = true;
+        requestAnimationFrame(() => {
+            localizationScheduled = false;
+            if (uiShadowRoot) {
+                localizeElement(uiShadowRoot);
+            }
+        });
+    };
+
+    const ensureLocalizationObserver = () => {
+        if (!isNonChineseLocale() || !uiShadowRoot || localizationObserver) {
+            return;
+        }
+        localizationObserver = new MutationObserver(() => scheduleLocalization());
+        localizationObserver.observe(uiShadowRoot, { childList: true, subtree: true, attributes: true, characterData: true });
+        scheduleLocalization();
+    };
+
+    let localizationRetryCount = 0;
+    const trySetupLocalizationLater = () => {
+        if (localizationObserver || localizationRetryCount > 10) {
+            return;
+        }
+        if (!getLocaleBridge()) {
+            localizationRetryCount += 1;
+            setTimeout(trySetupLocalizationLater, 600);
+            return;
+        }
+        ensureLocalizationObserver();
+    };
 
     const ensureUIRoot = () => {
         if (uiShadowRoot && uiShadowRoot.host && uiShadowRoot.host.isConnected) {
@@ -197,6 +348,9 @@
             });
         }
 
+        ensureLocalizationObserver();
+        trySetupLocalizationLater();
+
         return uiShadowRoot;
     };
 
@@ -214,17 +368,18 @@
 
     const appendToMainLayer = (node) => {
         const container = getMainLayer();
-        return container ? container.appendChild(node) : document.body.appendChild(node);
+        const appended = container ? container.appendChild(node) : document.body.appendChild(node);
+        localizeElement(appended);
+        scheduleLocalization();
+        return appended;
     };
 
     const appendToOverlayLayer = (node) => {
         const container = getOverlayLayer();
-        if (container) {
-            container.appendChild(node);
-        } else {
-            document.body.appendChild(node);
-        }
-        return node;
+        const appended = container ? container.appendChild(node) : document.body.appendChild(node);
+        localizeElement(appended);
+        scheduleLocalization();
+        return appended;
     };
 
     const queryUI = (selector) => {
@@ -302,7 +457,7 @@
     // 复用时只需传入自定义的内容与回调，外观也可统一
     function createUnifiedDialog(options) {
         const {
-            title = '弹窗标题',
+            title = t('弹窗标题'),
             width = '400px',
             maxHeight = '80vh',
             onClose = null, // 关闭时的回调
@@ -343,7 +498,7 @@
 
         // 标题
         const titleEl = document.createElement('h2');
-        titleEl.textContent = title;
+        titleEl.textContent = t(title);
         titleEl.style.margin = '0';
         titleEl.style.marginBottom = '12px';
         titleEl.style.fontSize = '18px';
@@ -700,7 +855,7 @@
         });
         if (updated) {
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-            console.log("✅ 已确保所有按钮具有'type'、'autoSubmit'、'favicon'配置，以及文件夹具有'hidden'字段。");
+            console.log(t("✅ 已确保所有按钮具有'type'、'autoSubmit'、'favicon'配置，以及文件夹具有'hidden'字段。"));
         }
     };
 
@@ -730,7 +885,7 @@
         });
         if (updated) {
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-            console.log("✅ 已为自动化与样式配置补全 favicon 信息。");
+            console.log(t('✅ 已为自动化与样式配置补全 favicon 信息。'));
         }
     };
 
@@ -748,13 +903,16 @@
             };
             buttonConfig.folderOrder.push(toolFolderName);
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-            console.log(`✅ 工具文件夹 "${toolFolderName}" 已添加到配置中。`);
+            console.log(t('✅ 工具文件夹 "{{folderName}}" 已添加到配置中。', { folderName: toolFolderName }));
         } else {
             // 确保工具按钮存在
             Object.entries(defaultToolButtons).forEach(([btnName, btnCfg]) => {
                 if (!buttonConfig.folders[toolFolderName].buttons[btnName]) {
                     buttonConfig.folders[toolFolderName].buttons[btnName] = btnCfg;
-                    console.log(`✅ 工具按钮 "${btnName}" 已添加到文件夹 "${toolFolderName}"。`);
+                    console.log(t('✅ 工具按钮 "{{buttonName}}" 已添加到文件夹 "{{folderName}}"。', {
+                        buttonName: btnName,
+                        folderName: toolFolderName
+                    }));
                 }
             });
         }
@@ -1155,7 +1313,7 @@
             try {
                 element = document.querySelector(selector);
             } catch (error) {
-                console.warn(`⚠️ 自定义选择器 "${selector}" 解析失败:`, error);
+                console.warn(t('⚠️ 自定义选择器 "{{selector}}" 解析失败:', { selector }), error);
                 return null;
             }
 
@@ -1213,7 +1371,7 @@
     // 定义多种提交方式
     const submitForm = async () => {
         if (isSubmitting) {
-            console.warn("⚠️ 提交正在进行中，跳过重复提交。");
+            console.warn(t('⚠️ 提交正在进行中，跳过重复提交。'));
             return false;
         }
         isSubmitting = true;
@@ -1223,7 +1381,7 @@
               const matchedRule = domainRules.find(rule => currentURL.includes(rule.domain));
 
               if (matchedRule) {
-                  console.log("🔎 检测到本域名匹配的自动提交规则：", matchedRule);
+                  console.log(t('🔎 检测到本域名匹配的自动提交规则：'), matchedRule);
                   switch (matchedRule.method) {
                       case "Enter": {
                           simulateEnterKey();
@@ -1236,10 +1394,10 @@
                               : 'cmd';
                           if (variant === 'ctrl') {
                               simulateCtrlEnterKey();
-                              console.log("✅ 已根据自动化规则，触发 Ctrl + Enter 提交。");
+                              console.log(t('✅ 已根据自动化规则，触发 Ctrl + Enter 提交。'));
                           } else {
                               simulateCmdEnterKey();
-                              console.log("✅ 已根据自动化规则，触发 Cmd + Enter 提交。");
+                              console.log(t('✅ 已根据自动化规则，触发 Cmd + Enter 提交。'));
                           }
                           isSubmitting = false;
                           return true;
@@ -1251,25 +1409,25 @@
                               const customButton = await waitForElementBySelector(selector, SUBMIT_WAIT_MAX_ATTEMPTS, SUBMIT_WAIT_DELAY);
                               if (customButton) {
                                   customButton.click();
-                                  console.log(`✅ 已根据自动化规则，自定义选择器 "${selector}" 提交。`);
+                                  console.log(t('✅ 已根据自动化规则，自定义选择器 "{{selector}}" 提交。', { selector }));
                                   isSubmitting = false;
                                   return true;
                               }
-                              console.warn(`⚠️ 自定义选择器 "${selector}" 未匹配到提交按钮，尝试默认规则。`);
+                              console.warn(t('⚠️ 自定义选择器 "{{selector}}" 未匹配到提交按钮，尝试默认规则。', { selector }));
                           }
                           const submitButton = await waitForSubmitButton(SUBMIT_WAIT_MAX_ATTEMPTS, SUBMIT_WAIT_DELAY);
                           if (submitButton) {
                               submitButton.click();
-                              console.log("✅ 已根据自动化规则，模拟点击提交按钮。");
+                              console.log(t('✅ 已根据自动化规则，模拟点击提交按钮。'));
                               isSubmitting = false;
                               return true;
                           } else {
-                              console.warn("⚠️ 未找到提交按钮，进入fallback...");
+                              console.warn(t('⚠️ 未找到提交按钮，进入fallback...'));
                           }
                           break;
                       }
                       default:
-                          console.warn("⚠️ 未知自动提交方式，进入fallback...");
+                          console.warn(t('⚠️ 未知自动提交方式，进入fallback...'));
                           break;
                   }
             }
@@ -1290,7 +1448,7 @@
                 if (modifier === 'Control') eventInit.ctrlKey = true;
                 const keyboardEvent = new KeyboardEvent('keydown', eventInit);
                 document.activeElement.dispatchEvent(keyboardEvent);
-                console.log(`尝试通过键盘快捷键提交表单：${keyCombo}`);
+                console.log(t('尝试通过键盘快捷键提交表单：{{combo}}', { combo: keyCombo }));
                 // 等待短暂时间，查看是否提交成功
                 await new Promise(resolve => setTimeout(resolve, 500));
                 // 检查是否页面已提交（可以通过某种标识来确认）
@@ -1302,10 +1460,10 @@
             const submitButton = await waitForSubmitButton(SUBMIT_WAIT_MAX_ATTEMPTS, SUBMIT_WAIT_DELAY);
             if (submitButton) {
                 submitButton.click();
-                console.log("✅ 自动提交已通过点击提交按钮触发。");
+                console.log(t('✅ 自动提交已通过点击提交按钮触发。'));
                 return true;
             } else {
-                console.warn("⚠️ 未找到提交按钮，尝试其他提交方式。");
+                console.warn(t('⚠️ 未找到提交按钮，尝试其他提交方式。'));
             }
 
             // 3. 尝试调用JavaScript提交函数
@@ -1314,10 +1472,10 @@
             try {
                 if (typeof submitForm === 'function') {
                     submitForm();
-                    console.log("✅ 自动提交已通过调用JavaScript函数触发。");
+                    console.log(t('✅ 自动提交已通过调用JavaScript函数触发。'));
                     return true;
                 } else {
-                    console.warn("⚠️ 未找到名为 'submitForm' 的提交函数。");
+                    console.warn(t("⚠️ 未找到名为 'submitForm' 的提交函数。"));
                 }
             } catch (error) {
                 console.error("调用JavaScript提交函数失败:", error);
@@ -1333,16 +1491,16 @@
                         cancelable: true
                     });
                     form.dispatchEvent(submitEvent);
-                    console.log("✅ 自动提交已通过触发 'submit' 事件触发。");
+                    console.log(t("✅ 自动提交已通过触发 'submit' 事件触发。"));
                     return true;
                 } else {
-                    console.warn("⚠️ 未找到表单元素，无法触发 'submit' 事件。");
+                    console.warn(t("⚠️ 未找到表单元素，无法触发 'submit' 事件。"));
                 }
             } catch (error) {
                 console.error("触发 'submit' 事件失败:", error);
             }
 
-            console.warn("⚠️ 所有自动提交方式均未成功。");
+            console.warn(t('⚠️ 所有自动提交方式均未成功。'));
             return false;
         } finally {
             isSubmitting = false;
@@ -1564,7 +1722,7 @@
             if (config.type === "template") {
                 const focusedElement = document.activeElement;
                 if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                    console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                     return;
                 }
 
@@ -1577,7 +1735,7 @@
                         clipboardText = await navigator.clipboard.readText();
                     } catch (err) {
                         console.error("无法访问剪贴板内容:", err);
-                        alert("无法访问剪贴板内容。请检查浏览器权限。");
+                        alert(t('无法访问剪贴板内容。请检查浏览器权限。'));
                         return;
                     }
                 }
@@ -1668,10 +1826,10 @@
 
                 if (containsInputboard) {
                     insertTextSmart(focusedElement, finalText, true);
-                    console.log(`✅ 使用 {inputboard} 变量，输入框内容已被替换。`);
+                    console.log(t('✅ 使用 {inputboard} 变量，输入框内容已被替换。'));
                 } else {
                     insertTextSmart(focusedElement, finalText, false);
-                    console.log(`✅ 插入了预设文本。`);
+                    console.log(t('✅ 插入了预设文本。'));
                 }
 
                 // 若开启autoSubmit，则先检测是否完成替换，再延时后提交
@@ -1686,9 +1844,9 @@
                         // 3. 调用自动提交
                         const success = await submitForm();
                         if (success) {
-                            console.log("✅ 自动提交成功（已确认内容替换完成）。");
+                            console.log(t('✅ 自动提交成功（已确认内容替换完成）。'));
                         } else {
-                            console.warn("⚠️ 自动提交失败。");
+                    console.warn(t('⚠️ 自动提交失败。'));
                         }
                     } catch (error) {
                         console.error("自动提交前检测文本匹配超时或错误:", error);
@@ -1698,7 +1856,7 @@
             } else if (config.type === "tool") {
                 const focusedElement = document.activeElement;
                 if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                    console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                     return;
                 }
                 switch (config.action) {
@@ -1715,7 +1873,7 @@
                         handleClear(focusedElement);
                         break;
                     default:
-                        console.warn(`未知的工具按钮动作: ${config.action}`);
+                        console.warn(t('未知的工具按钮动作: {{action}}', { action: config.action }));
                 }
             }
 
@@ -1724,9 +1882,9 @@
                 currentlyOpenFolder.element.style.display = 'none';
                 currentlyOpenFolder.name = null;
                 currentlyOpenFolder.element = null;
-                console.log(`✅ 弹窗 "${folderName}" 已立即关闭。`);
+                console.log(t('✅ 弹窗 "{{folderName}}" 已立即关闭。', { folderName }));
             } else {
-                console.warn(`⚠️ 弹窗 "${folderName}" 未被识别为当前打开的弹窗。`);
+                console.warn(t('⚠️ 弹窗 "{{folderName}}" 未被识别为当前打开的弹窗。', { folderName }));
             }
         });
 
@@ -1757,11 +1915,11 @@
         }
         if (text) {
             navigator.clipboard.writeText(text).then(() => {
-                console.log("✅ 已剪切输入框内容到剪贴板。");
+                console.log(t('✅ 已剪切输入框内容到剪贴板。'));
                 showTemporaryFeedback(element, '剪切成功');
             }).catch(err => {
                 console.error("剪切失败:", err);
-                alert("剪切失败，请检查浏览器权限。");
+                alert(t('剪切失败，请检查浏览器权限。'));
             });
         }
     };
@@ -1787,11 +1945,11 @@
         }
         if (text) {
             navigator.clipboard.writeText(text).then(() => {
-                console.log("✅ 已复制输入框内容到剪贴板。");
+                console.log(t('✅ 已复制输入框内容到剪贴板。'));
                 showTemporaryFeedback(element, '复制成功');
             }).catch(err => {
                 console.error("复制失败:", err);
-                alert("复制失败，请检查浏览器权限。");
+                alert(t('复制失败，请检查浏览器权限。'));
             });
         }
     };
@@ -1800,17 +1958,17 @@
         try {
             const clipboardText = await navigator.clipboard.readText();
             insertTextSmart(element, clipboardText);
-            console.log("✅ 已粘贴剪贴板内容到输入框。");
+            console.log(t('✅ 已粘贴剪贴板内容到输入框。'));
             showTemporaryFeedback(element, '粘贴成功');
         } catch (err) {
             console.error("粘贴失败:", err);
-            alert("粘贴失败，请检查浏览器权限。");
+            alert(t('粘贴失败，请检查浏览器权限。'));
         }
     };
 
     const handleClear = (element) => {
         insertTextSmart(element, '', true);
-        console.log("✅ 输入框内容已清空。");
+        console.log(t('✅ 输入框内容已清空。'));
         showTemporaryFeedback(element, '清空成功');
     };
 
@@ -1893,23 +2051,25 @@
                 buttonListContainer.style.display = 'none';
                 currentlyOpenFolder.name = null;
                 currentlyOpenFolder.element = null;
-                console.log(`🔒 弹窗 "${folderName}" 已关闭。`);
+                console.log(t('🔒 弹窗 "{{folderName}}" 已关闭。', { folderName }));
             } else {
                 // 关闭其他文件夹的弹窗
                 if (currentlyOpenFolder.element) {
                     currentlyOpenFolder.element.style.display = 'none';
-                    console.log(`🔒 弹窗 "${currentlyOpenFolder.name}" 已关闭。`);
+                    console.log(t('🔒 弹窗 "{{folderName}}" 已关闭。', { folderName: currentlyOpenFolder.name }));
                 }
                 // 打开当前文件夹的弹窗
                 buttonListContainer.style.display = 'flex';
                 currentlyOpenFolder.name = folderName;
                 currentlyOpenFolder.element = buttonListContainer;
-                console.log(`🔓 弹窗 "${folderName}" 已打开。`);
+                console.log(t('🔓 弹窗 "{{folderName}}" 已打开。', { folderName }));
                 // 动态定位弹窗位置
                 const rect = folderButton.getBoundingClientRect();
                 buttonListContainer.style.bottom = `40px`;
                 buttonListContainer.style.left = `${rect.left + window.scrollX - 20}px`;
-                console.log(`📍 弹窗位置设置为 Bottom: 40px, Left: ${rect.left + window.scrollX - 20}px`);
+                console.log(t('📍 弹窗位置设置为 Bottom: 40px, Left: {{left}}px', {
+                    left: Math.round(rect.left + window.scrollX - 20)
+                }));
             }
         });
 
@@ -1924,7 +2084,7 @@
                     if (currentlyOpenFolder.name === folderName) {
                         currentlyOpenFolder.name = null;
                         currentlyOpenFolder.element = null;
-                        console.log(`🔒 弹窗 "${folderName}" 已关闭（点击外部区域）。`);
+                        console.log(t('🔒 弹窗 "{{folderName}}" 已关闭（点击外部区域）。', { folderName }));
                     }
                 }
             }
@@ -1937,7 +2097,7 @@
     const toggleFolder = (folderName, state) => {
         const buttonList = queryUI(`.button-list[data-folder-list="${folderName}"]`);
         if (!buttonList) {
-            console.warn(`⚠️ 未找到与文件夹 "${folderName}" 关联的弹窗。`);
+            console.warn(t('⚠️ 未找到与文件夹 "{{folderName}}" 关联的弹窗。', { folderName }));
             return;
         }
         if (state) {
@@ -1945,14 +2105,14 @@
             buttonList.style.display = 'flex';
             currentlyOpenFolder.name = folderName;
             currentlyOpenFolder.element = buttonList;
-            console.log(`🔓 弹窗 "${folderName}" 已打开（toggleFolder）。`);
+            console.log(t('🔓 弹窗 "{{folderName}}" 已打开（toggleFolder）。', { folderName }));
         } else {
             // 关闭当前文件夹的弹窗
             buttonList.style.display = 'none';
             if (currentlyOpenFolder.name === folderName) {
                 currentlyOpenFolder.name = null;
                 currentlyOpenFolder.element = null;
-                console.log(`🔒 弹窗 "${folderName}" 已关闭（toggleFolder）。`);
+                console.log(t('🔒 弹窗 "{{folderName}}" 已关闭（toggleFolder）。', { folderName }));
             }
         }
         // 关闭其他文件夹的弹窗
@@ -1965,7 +2125,7 @@
                 if (currentlyOpenFolder.name === fname) {
                     currentlyOpenFolder.name = null;
                     currentlyOpenFolder.element = null;
-                    console.log(`🔒 弹窗 "${fname}" 已关闭（toggleFolder 关闭其他弹窗）。`);
+                    console.log(t('🔒 弹窗 "{{folderName}}" 已关闭（toggleFolder 关闭其他弹窗）。', { folderName: fname }));
                 }
             }
         });
@@ -1983,11 +2143,11 @@
             setTimeout(() => {
                 if (overlay.parentElement && overlay.getAttribute('data-closing') === 'true') {
                     overlay.parentElement.removeChild(overlay);
-                    console.log("🔒 弹窗已关闭并从DOM中移除");
+                    console.log(t('🔒 弹窗已关闭并从DOM中移除'));
                 }
             }, 300);
         } else {
-            console.warn("⚠️ 尝试关闭不存在的弹窗");
+            console.warn(t('⚠️ 尝试关闭不存在的弹窗'));
         }
     };
 
@@ -2004,7 +2164,7 @@
         }
         const folderConfig = buttonConfig.folders[folderName];
         if (!folderConfig) {
-            alert(`文件夹 "${folderName}" 不存在。`);
+            alert(t('文件夹 "{{folderName}}" 不存在。', { folderName }));
             return;
         }
         // 构建文件夹内自定义按钮的垂直预览列表
@@ -2059,15 +2219,18 @@
             width: 400px;
             max-width: 90vw;
         `;
+        const deleteFolderTitle = t('🗑️ 确认删除文件夹 "{{folderName}}"？', { folderName });
+        const irreversibleNotice = t('❗️ 注意：此操作无法撤销！');
+        const deleteFolderWarning = t('（删除文件夹将同时删除其中的所有自定义按钮！）');
         setTrustedHTML(dialog, `
             <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
-                🗑️ 确认删除文件夹 "${folderName}"？
+                ${deleteFolderTitle}
             </h3>
-            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！<br/>（删除文件夹将同时删除其中的所有自定义按钮！）</p>
+            <p style="margin: 8px 0; color: var(--text-color, #333333);">${irreversibleNotice}<br/>${deleteFolderWarning}</p>
             <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 8px; border-radius:4px;">
                 <!-- 将文件夹按钮预览和文字标签放在一行 -->
                 <p style="margin:4px 0; display: flex; align-items: center; gap: 8px; color: var(--text-color, #333333);">
-                    <strong>1️⃣ 文件夹按钮外观：</strong>
+                    <strong>${t('1️⃣ 文件夹按钮外观：')}</strong>
                     <button style="
                         background-color: ${folderConfig.color};
                         color: ${folderConfig.textColor};
@@ -2082,18 +2245,18 @@
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    按钮名称： ${folderName}
+                    ${t('按钮名称：')} ${folderName}
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    背景颜色： <span style="display:inline-block;width:16px;height:16px;background:${folderConfig.color};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${folderConfig.color}
+                    ${t('背景颜色：')} <span style="display:inline-block;width:16px;height:16px;background:${folderConfig.color};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${folderConfig.color}
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    文字颜色： <span style="display:inline-block;width:16px;height:16px;background:${folderConfig.textColor};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${folderConfig.textColor}
+                    ${t('文字颜色：')} <span style="display:inline-block;width:16px;height:16px;background:${folderConfig.textColor};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${folderConfig.textColor}
                 </p>
                 <hr style="margin: 8px 0; border: none; border-top: 1px solid var(--border-color, #e5e7eb);">
-                <p style="margin:4px 0; color: var(--text-color, #333333);"><strong>2️⃣ 文件夹内，全部自定义按钮：</strong></p>
+                <p style="margin:4px 0; color: var(--text-color, #333333);"><strong>${t('2️⃣ 文件夹内，全部自定义按钮：')}</strong></p>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     ${buttonsPreviewHTML}
                 </div>
@@ -2110,13 +2273,13 @@
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius: 4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="confirmDeleteFolder" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--danger-color, #ef4444);
                     color: white;
                     border-radius: 4px;
-                ">删除</button>
+                ">${t('删除')}</button>
             </div>
         `);
         overlay.appendChild(dialog);
@@ -2143,7 +2306,7 @@
             closeExistingOverlay(overlay);
             currentConfirmOverlay = null;
             if (rerenderFn) rerenderFn();
-            console.log(`🗑️ 文件夹 "${folderName}" 已删除。`);
+            console.log(t('🗑️ 文件夹 "{{folderName}}" 已删除。', { folderName }));
             // 更新按钮栏
             updateButtonContainer();
         });
@@ -2156,7 +2319,10 @@
         }
         const btnCfg = buttonConfig.folders[folderName].buttons[btnName];
         if (!btnCfg) {
-            alert(`按钮 "${btnName}" 不存在于文件夹 "${folderName}" 中。`);
+            alert(t('按钮 "{{buttonName}}" 不存在于文件夹 "{{folderName}}" 中。', {
+                buttonName: btnName,
+                folderName
+            }));
             return;
         }
         const overlay = document.createElement('div');
@@ -2190,14 +2356,16 @@
             width: 400px;
             max-width: 90vw;
         `;
+        const deleteButtonTitle = t('🗑️ 确认删除按钮 "{{buttonName}}"？', { buttonName: btnName });
+        const irreversibleShort = t('❗️ 注意：此操作无法撤销！');
         setTrustedHTML(dialog, `
             <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
-                🗑️ 确认删除按钮 "${btnName}"？
+                ${deleteButtonTitle}
             </h3>
-            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！</p>
+            <p style="margin: 8px 0; color: var(--text-color, #333333);">${irreversibleShort}</p>
             <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 8px; border-radius:4px;">
                 <p style="margin:4px 0; display: flex; align-items: center; gap: 8px; color: var(--text-color, #333333);">
-                    <strong>1️⃣ 自定义按钮外观：</strong>
+                    <strong>${t('1️⃣ 自定义按钮外观：')}</strong>
                     <button style="
                         background-color: ${btnCfg.color};
                         color: ${btnCfg.textColor};
@@ -2211,18 +2379,18 @@
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    按钮名称： ${btnName}
+                    ${t('按钮名称：')} ${btnName}
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    按钮背景颜色： <span style="display:inline-block;width:16px;height:16px;background:${btnCfg.color};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${btnCfg.color}
+                    ${t('按钮背景颜色：')} <span style="display:inline-block;width:16px;height:16px;background:${btnCfg.color};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${btnCfg.color}
                 </p>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333);">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    按钮文字颜色： <span style="display:inline-block;width:16px;height:16px;background:${btnCfg.textColor};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${btnCfg.textColor}
+                    ${t('按钮文字颜色：')} <span style="display:inline-block;width:16px;height:16px;background:${btnCfg.textColor};border:1px solid #333;vertical-align:middle;margin-right:4px;"></span>${btnCfg.textColor}
                 </p>
                 <hr style="margin: 8px 0; border: none; border-top: 1px solid var(--border-color, #e5e7eb);">
-                <p style="margin:4px 0; color: var(--text-color, #333333);"><strong>2️⃣ 按钮对应的文本模板：</strong></p>
+                <p style="margin:4px 0; color: var(--text-color, #333333);"><strong>${t('2️⃣ 按钮对应的文本模板：')}</strong></p>
                 <textarea readonly style="
                     width:100%;
                     height:150px;
@@ -2245,13 +2413,13 @@
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius:4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="confirmDeleteButton" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--danger-color, #ef4444);
                     color: white;
                     border-radius:4px;
-                ">删除</button>
+                ">${t('删除')}</button>
             </div>
         `);
         overlay.appendChild(dialog);
@@ -2276,7 +2444,7 @@
             closeExistingOverlay(overlay);
             currentConfirmOverlay = null;
             if (rerenderFn) rerenderFn();
-            console.log(`🗑️ 按钮 "${btnName}" 已删除。`);
+            console.log(t('🗑️ 按钮 "{{buttonName}}" 已删除。', { buttonName: btnName }));
             // 更新按钮栏
             updateButtonContainer();
             updateCounters(); // 更新所有计数器
@@ -2289,7 +2457,7 @@
         }
         // 禁止编辑/删除工具文件夹中的工具按钮
         if (folderName === "🖱️" && btnConfig.type === "tool") {
-            alert('工具文件夹中的工具按钮无法编辑或删除。');
+            alert(t('工具文件夹中的工具按钮无法编辑或删除。'));
             return;
         }
         const isEdit = btnName !== '';
@@ -2334,6 +2502,7 @@
         const initialFavicon = typeof btnConfig.favicon === 'string' ? btnConfig.favicon : '';
 
         // 预览部分
+        const buttonHeaderText = isEdit ? t('✏️ 编辑按钮：') : t('🆕 新建按钮：');
         const previewSection = `
             <div style="
                 margin: -24px -24px 20px -24px;
@@ -2353,7 +2522,7 @@
                     align-items: center;
                     gap: 8px;
                 ">
-                    ${isEdit ? '✏️ 编辑按钮：' : '🆕 新建按钮：'}
+                    ${buttonHeaderText}
                 </div>
                 <div id="buttonPreview" style="
                     display: inline-flex;
@@ -2370,7 +2539,7 @@
                         cursor: default;
                         font-size: 14px;
                         transition: all 0.2s ease;
-                    ">${initialName || '预览按钮'}</button>
+                    ">${initialName || t('预览按钮')}</button>
                 </div>
             </div>
         `;
@@ -2396,7 +2565,7 @@
                         font-weight: 500;
                         color: var(--text-color, #333333);
                         white-space: nowrap;
-                    ">插入变量：</label>
+                    ">${t('插入变量：')}</label>
                     <div id="quickInsertButtons" style="
                         display: flex;
                         gap: 8px;
@@ -2411,7 +2580,7 @@
                             padding: 4px 8px;
                             transition: all 0.2s ease;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        ">📝 输入框</button>
+                        ">📝 ${t('输入框')}</button>
                         <button type="button" data-insert="{clipboard}" style="
                             ${Object.entries(styles.button).map(([k,v]) => `${k}:${v}`).join(';')};
                             background-color: var(--primary-color, #3B82F6);
@@ -2421,7 +2590,7 @@
                             padding: 4px 8px;
                             transition: all 0.2s ease;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        ">📋 剪贴板</button>
+                        ">${t('📋 剪贴板')}</button>
                         <button type="button" data-insert="{selection}" style="
                             ${Object.entries(styles.button).map(([k,v]) => `${k}:${v}`).join(';')};
                             background-color: var(--primary-color, #3B82F6);
@@ -2431,7 +2600,7 @@
                             padding: 4px 8px;
                             transition: all 0.2s ease;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        ">🔍 选中</button>
+                        ">${t('🔍 选中')}</button>
                         <button type="button" data-insert="{{inputboard}|{clipboard}}" style="
                             ${Object.entries(styles.button).map(([k,v]) => `${k}:${v}`).join(';')};
                             background-color: var(--primary-color, #3B82F6);
@@ -2441,7 +2610,7 @@
                             padding: 4px 8px;
                             transition: all 0.2s ease;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        ">🔄 输入框/剪贴板</button>
+                        ">${t('🔄 输入框/剪贴板')}</button>
                     </div>
                 </div>
                 <textarea id="buttonText" style="
@@ -2461,7 +2630,7 @@
         const styleSettingsTab = `
             <div id="styleSettingsTab" class="tab-content" style="display: none;">
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">按钮名称：</label>
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">${t('按钮名称：')}</label>
                     <input type="text" id="buttonName" value="${btnName}" style="
                         width: 100%;
                         padding: 8px;
@@ -2472,7 +2641,7 @@
                     ">
                 </div>
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">按钮图标：</label>
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">${t('按钮图标：')}</label>
                     <div style="display: flex; align-items: flex-start; gap: 12px;">
                         <div id="buttonFaviconPreview" style="
                             width: 40px;
@@ -2498,17 +2667,17 @@
                                 line-height: 1.5;
                                 resize: vertical;
                                 overflow-y: hidden;
-                            " placeholder="支持 https:// 链接或 data: URL">${initialFavicon}</textarea>
+                            " placeholder="${t('支持 https:// 链接或 data: URL')}">${initialFavicon}</textarea>
                             <div style="
                                 margin-top: 6px;
                                 font-size: 12px;
                                 color: var(--muted-text-color, #6b7280);
-                            ">留空时将根据按钮名称中的符号展示默认图标。</div>
+                            ">${t('留空时将根据按钮名称中的符号展示默认图标。')}</div>
                         </div>
                     </div>
                 </div>
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">按钮背景颜色：</label>
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">${t('按钮背景颜色：')}</label>
                     <input type="color" id="buttonColor" value="${btnConfig.color || '#FFC1CC'}" style="
                         width: 100px;
                         height: 40px;
@@ -2519,7 +2688,7 @@
                     ">
                 </div>
                 <div style="margin-bottom: 0px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">按钮文字颜色：</label>
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-color, #333333);">${t('按钮文字颜色：')}</label>
                     <input type="color" id="buttonTextColor" value="${btnConfig.textColor || '#333333'}" style="
                         width: 100px;
                         height: 40px;
@@ -2546,7 +2715,7 @@
                         gap: 6px;
                     ">
                         <input type="checkbox" id="autoSubmitCheckbox" style="cursor: pointer;" ${initialAutoSubmit ? 'checked' : ''}>
-                        自动提交 (在填充后自动提交内容)
+                        ${t('自动提交 (在填充后自动提交内容)')}
                     </label>
                 </div>
             </div>
@@ -2566,21 +2735,21 @@
                     color: white;
                     border-radius: 4px 4px 0 0;
                     border-bottom: 2px solid transparent;
-                ">文本模板</button>
+                ">${t('文本模板')}</button>
                 <button class="tab-button" data-tab="styleSettingsTab" style="
                     ${Object.entries(styles.button).map(([k,v]) => `${k}:${v}`).join(';')};
                     background-color: var(--button-bg, #f3f4f6);
                     color: var(--text-color, #333333);
                     border-radius: 4px 4px 0 0;
                     border-bottom: 2px solid transparent;
-                ">样式设置</button>
+                ">${t('样式设置')}</button>
                 <button class="tab-button" data-tab="submitSettingsTab" style="
                     ${Object.entries(styles.button).map(([k,v]) => `${k}:${v}`).join(';')};
                     background-color: var(--button-bg, #f3f4f6);
                     color: var(--text-color, #333333);
                     border-radius: 4px 4px 0 0;
                     border-bottom: 2px solid transparent;
-                ">提交设置</button>
+                ">${t('提交设置')}</button>
             </div>
         `;
 
@@ -2600,13 +2769,13 @@
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius: 4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="saveButtonEdit" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--success-color, #22c55e);
                     color: white;
                     border-radius: 4px;
-                ">确认</button>
+                ">${t('确认')}</button>
             </div>
         `;
 
@@ -2683,7 +2852,7 @@
             };
 
             buttonNameInput?.addEventListener('input', (e) => {
-                previewButton.textContent = e.target.value || '预览按钮';
+                previewButton.textContent = e.target.value || t('预览按钮');
                 updateFaviconPreview();
             });
 
@@ -2697,7 +2866,7 @@
 
             // 监听“自动提交”开关变化
             autoSubmitCheckbox?.addEventListener('change', (e) => {
-                console.log(`✅ 自动提交开关已设置为 ${e.target.checked}`);
+                console.log(t('✅ 自动提交开关已设置为 {{state}}', { state: e.target.checked }));
             });
 
             if (buttonFaviconInput) {
@@ -2758,17 +2927,17 @@
             const newBtnFavicon = (dialog.querySelector('#buttonFaviconInput')?.value || '').trim();
 
             if (!newBtnName) {
-                alert('请输入按钮名称！');
+                alert(t('请输入按钮名称！'));
                 return;
             }
 
             if (!isValidColor(newBtnColor) || !isValidColor(newBtnTextColor)) {
-                alert('请选择有效的颜色！');
+                alert(t('请选择有效的颜色！'));
                 return;
             }
 
             if (newBtnName !== btnName && buttonConfig.folders[folderName].buttons[newBtnName]) {
-                alert('按钮名称已存在！');
+                alert(t('按钮名称已存在！'));
                 return;
             }
 
@@ -2832,7 +3001,7 @@
             closeExistingOverlay(overlay);
             currentConfirmOverlay = null;
             if (rerenderFn) rerenderFn();
-            console.log(`✅ 按钮 "${newBtnName}" 已保存。`);
+            console.log(t('✅ 按钮 "{{buttonName}}" 已保存。', { buttonName: newBtnName }));
             updateButtonContainer();
             updateCounters(); // 更新所有计数器
         });
@@ -2886,6 +3055,7 @@
         const initialTextColor = folderConfig.textColor || '#ffffff';
 
         // 预览部分
+        const folderHeaderText = isNew ? t('🆕 新建文件夹：') : t('✏️ 编辑文件夹：');
         const previewSection = `
             <div style="
                 margin: -24px -24px 20px -24px;
@@ -2905,7 +3075,7 @@
                     align-items: center;
                     gap: 8px;
                 ">
-                    ${isNew ? '🆕 新建文件夹：' : '✏️ 编辑文件夹：'}
+                    ${folderHeaderText}
                 </div>
                 <div id="folderPreview" style="
                     display: inline-flex;
@@ -2922,7 +3092,7 @@
                         cursor: default;
                         font-size: 14px;
                         transition: all 0.2s ease;
-                    ">${initialName || '预览文件夹'}</button>
+                    ">${initialName || t('预览文件夹')}</button>
                 </div>
             </div>
         `;
@@ -2942,7 +3112,7 @@
                         font-size: 14px;
                         font-weight: 500;
                         color: var(--text-color, #333333);
-                    ">文件夹名称：</label>
+                    ">${t('文件夹名称：')}</label>
                     <input type="text" id="folderNameInput" value="${initialName}" style="
                         width: 100%;
                         padding: 8px;
@@ -2959,7 +3129,7 @@
                         font-size: 14px;
                         font-weight: 500;
                         color: var(--text-color, #333333);
-                    ">按钮背景颜色：</label>
+                    ">${t('按钮背景颜色：')}</label>
                     <input type="color" id="folderColorInput" value="${initialColor}" style="
                         width: 100px;
                         height: 40px;
@@ -2976,7 +3146,7 @@
                         font-size: 14px;
                         font-weight: 500;
                         color: var(--text-color, #333333);
-                    ">按钮文字颜色：</label>
+                    ">${t('按钮文字颜色：')}</label>
                     <input type="color" id="folderTextColorInput" value="${initialTextColor}" style="
                         width: 100px;
                         height: 40px;
@@ -3005,13 +3175,13 @@
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius: 4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="saveFolderEdit" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--success-color, #22c55e);
                     color: white;
                     border-radius: 4px;
-                ">确认</button>
+                ">${t('确认')}</button>
             </div>
         `;
 
@@ -3030,7 +3200,7 @@
             const folderTextColorInput = dialog.querySelector('#folderTextColorInput');
 
             folderNameInput?.addEventListener('input', (e) => {
-                previewButton.textContent = e.target.value || '预览文件夹';
+                previewButton.textContent = e.target.value || t('预览文件夹');
             });
 
             folderColorInput?.addEventListener('input', (e) => {
@@ -3067,17 +3237,17 @@
             const newTextColor = dialog.querySelector('#folderTextColorInput').value;
 
             if (!newFolderName) {
-                alert('请输入文件夹名称');
+                alert(t('请输入文件夹名称'));
                 return;
             }
 
             if (isNew && buttonConfig.folders[newFolderName]) {
-                alert("该文件夹已存在！");
+                alert(t('该文件夹已存在！'));
                 return;
             }
 
             if (!isNew && newFolderName !== folderName && buttonConfig.folders[newFolderName]) {
-                alert("该文件夹已存在！");
+                alert(t('该文件夹已存在！'));
                 return;
             }
 
@@ -3130,7 +3300,7 @@
             closeExistingOverlay(overlay);
             currentConfirmOverlay = null;
             if (rerenderFn) rerenderFn(newFolderName);
-            console.log(`✅ 文件夹 "${newFolderName}" 已保存。`);
+            console.log(t('✅ 文件夹 "{{folderName}}" 已保存。', { folderName: newFolderName }));
             updateButtonContainer();
             updateCounters(); // 更新所有计数器
         });
@@ -3164,7 +3334,7 @@
         button.style.cursor = 'pointer';
         button.style.fontSize = '14px';
         button.style.marginLeft = '10px';
-        button.title = '剪切输入框内容';
+        button.title = t('剪切输入框内容');
         // 阻止mousedown默认行为以维持输入框焦点
         button.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -3174,7 +3344,7 @@
             e.stopPropagation();
             const focusedElement = document.activeElement;
             if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
             let text = '';
@@ -3209,11 +3379,11 @@
             }
             if (text) {
                 navigator.clipboard.writeText(text).then(() => {
-                    console.log("✅ 已剪切输入框内容到剪贴板。");
+                    console.log(t('✅ 已剪切输入框内容到剪贴板。'));
                     showTemporaryFeedback(focusedElement, '剪切成功');
                 }).catch(err => {
                     console.error("剪切失败:", err);
-                    alert("剪切失败，请检查浏览器权限。");
+                    alert(t('剪切失败，请检查浏览器权限。'));
                 });
             }
             // 确保输入框保持焦点
@@ -3222,7 +3392,7 @@
             if (focusedElement.tagName.toLowerCase() === 'textarea') {
                 focusedElement.selectionStart = focusedElement.selectionEnd = 0;
             }
-            console.log("✅ 输入框内容已清空。");
+            console.log(t('✅ 输入框内容已清空。'));
             showTemporaryFeedback(focusedElement, '清空成功');
         });
         return button;
@@ -3240,7 +3410,7 @@
         button.style.cursor = 'pointer';
         button.style.fontSize = '14px';
         button.style.marginLeft = '10px';
-        button.title = '复制输入框内容';
+        button.title = t('复制输入框内容');
         // 阻止mousedown默认行为以维持输入框焦点
         button.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -3250,7 +3420,7 @@
             e.stopPropagation();
             const focusedElement = document.activeElement;
             if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
             let text = '';
@@ -3273,11 +3443,11 @@
             }
             if (text) {
                 navigator.clipboard.writeText(text).then(() => {
-                    console.log("✅ 已复制输入框内容到剪贴板。");
+                    console.log(t('✅ 已复制输入框内容到剪贴板。'));
                     showTemporaryFeedback(focusedElement, '复制成功');
                 }).catch(err => {
                     console.error("复制失败:", err);
-                    alert("复制失败，请检查浏览器权限。");
+                    alert(t('复制失败，请检查浏览器权限。'));
                 });
             }
             // 确保输入框保持焦点
@@ -3298,7 +3468,7 @@
         button.style.cursor = 'pointer';
         button.style.fontSize = '14px';
         button.style.marginLeft = '10px';
-        button.title = '粘贴剪切板内容';
+        button.title = t('粘贴剪切板内容');
         // 阻止mousedown默认行为以维持输入框焦点
         button.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -3308,7 +3478,7 @@
             e.stopPropagation();
             const focusedElement = document.activeElement;
             if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
             try {
@@ -3325,10 +3495,10 @@
                     button.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
                     button.style.color = 'var(--text-color, #333333)';
                 }, 1000);
-                console.log("✅ 已粘贴剪贴板内容到输入框。");
+                    console.log(t('✅ 已粘贴剪贴板内容到输入框。'));
             } catch (err) {
                 console.error("访问剪切板失败:", err);
-                alert("粘贴失败，请检查浏览器权限。");
+                alert(t('粘贴失败，请检查浏览器权限。'));
             }
             // 确保输入框保持焦点
             focusedElement.focus();
@@ -3348,7 +3518,7 @@
         button.style.cursor = 'pointer';
         button.style.fontSize = '14px';
         button.style.marginLeft = '10px';
-        button.title = '清空输入框';
+        button.title = t('清空输入框');
         // 添加mousedown事件处理器来阻止焦点切换
         button.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -3358,7 +3528,7 @@
             e.stopPropagation(); // 阻止事件冒泡
             const focusedElement = document.activeElement;
             if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                console.warn("当前未聚焦到有效的 textarea 或 contenteditable 元素。");
+                console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
             // 使用现有的insertTextSmart函数清空内容
@@ -3369,7 +3539,7 @@
             if (focusedElement.tagName.toLowerCase() === 'textarea') {
                 focusedElement.selectionStart = focusedElement.selectionEnd = 0;
             }
-            console.log("✅ 输入框内容已清空。");
+            console.log(t('✅ 输入框内容已清空。'));
             showTemporaryFeedback(focusedElement, '清空成功');
         });
         return button;
@@ -3378,7 +3548,7 @@
     // 新增的配置设置按钮和弹窗
     const createConfigSettingsButton = () => {
         const button = document.createElement('button');
-        button.innerText = '🛠️ 配置管理';
+        button.innerText = t('🛠️ 配置管理');
         button.type = 'button';
         button.style.backgroundColor = 'var(--info-color, #4F46E5)';
         button.style.color = 'white';
@@ -3408,7 +3578,7 @@
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
-        console.log("📤 配置已导出。");
+        console.log(t('📤 配置已导出。'));
     }
 
     // 新增：显示导入配置预览确认对话框
@@ -3480,7 +3650,7 @@
                     align-items: center;
                     gap: 8px;
                 ">
-                    📥 确认导入配置
+                    ${t('📥 确认导入配置')}
                 </h3>
             </div>
 
@@ -3496,7 +3666,7 @@
                     font-size: 14px;
                     font-weight: 600;
                     color: var(--text-color, #333333);
-                ">📊 配置对比</h4>
+                ">${t('📊 配置对比')}</h4>
 
                 <div style="
                     display: grid;
@@ -3515,7 +3685,7 @@
                             color: var(--text-color, #666);
                             margin-bottom: 8px;
                             font-weight: 500;
-                        ">当前配置</div>
+                        ">${t('当前配置')}</div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                             <span style="
                                 background-color: var(--primary-color, #3B82F6);
@@ -3529,7 +3699,7 @@
                                 align-items: center;
                                 justify-content: center;
                             ">${currentFolderCount}</span>
-                            <span style="font-size: 13px; color: var(--text-color, #333);">个文件夹</span>
+                            <span style="font-size: 13px; color: var(--text-color, #333);">${t('个文件夹')}</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="
@@ -3544,7 +3714,7 @@
                                 align-items: center;
                                 justify-content: center;
                             ">${currentButtonCount}</span>
-                            <span style="font-size: 13px; color: var(--text-color, #333);">个按钮</span>
+                            <span style="font-size: 13px; color: var(--text-color, #333);">${t('个按钮')}</span>
                         </div>
                     </div>
 
@@ -3560,7 +3730,7 @@
                             color: var(--info-color, #4F46E5);
                             margin-bottom: 8px;
                             font-weight: 600;
-                        ">导入配置</div>
+                        ">${t('导入配置')}</div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                             <span style="
                                 background-color: var(--primary-color, #3B82F6);
@@ -3574,7 +3744,7 @@
                                 align-items: center;
                                 justify-content: center;
                             ">${importFolderCount}</span>
-                            <span style="font-size: 13px; color: var(--text-color, #333);">个文件夹</span>
+                            <span style="font-size: 13px; color: var(--text-color, #333);">${t('个文件夹')}</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="
@@ -3589,7 +3759,7 @@
                                 align-items: center;
                                 justify-content: center;
                             ">${importButtonCount}</span>
-                            <span style="font-size: 13px; color: var(--text-color, #333);">个按钮</span>
+                            <span style="font-size: 13px; color: var(--text-color, #333);">${t('个按钮')}</span>
                         </div>
                     </div>
                 </div>
@@ -3610,7 +3780,7 @@
                     font-size: 13px;
                 ">
                     <span style="font-size: 16px;">⚠️</span>
-                    <strong>注意：导入配置将完全替换当前配置，此操作无法撤销！</strong>
+                    <strong>${t('注意：导入配置将完全替换当前配置，此操作无法撤销！')}</strong>
                 </div>
             </div>
 
@@ -3629,7 +3799,7 @@
                     font-size: 14px;
                     font-weight: 500;
                     transition: all 0.2s ease;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="confirmImport" style="
                     background-color: var(--info-color, #4F46E5);
                     color: white;
@@ -3640,7 +3810,7 @@
                     font-size: 14px;
                     font-weight: 500;
                     transition: all 0.2s ease;
-                ">确认导入</button>
+                ">${t('确认导入')}</button>
             </div>
         `);
 
@@ -3696,7 +3866,7 @@
                     const importedConfig = JSON.parse(evt.target.result);
                     if (importedConfig && typeof importedConfig === 'object') {
                         if (!importedConfig.folders || !importedConfig.folderOrder) {
-                            alert('导入的配置文件无效！缺少必要字段。');
+                            alert(t('导入的配置文件无效！缺少必要字段。'));
                             return;
                         }
 
@@ -3740,7 +3910,7 @@
                                         rerenderFn();
                                     }
 
-                                    console.log("📥 配置已成功导入。");
+                                    console.log(t('📥 配置已成功导入。'));
 
                                     // 更新按钮栏
                                     updateButtonContainer();
@@ -3750,7 +3920,7 @@
                                     // 立即更新所有计数器
                                     setTimeout(() => {
                                         updateCounters();
-                                        console.log("📊 导入后计数器已更新。");
+                                        console.log(t('📊 导入后计数器已更新。'));
 
                                         // 延时执行回调函数，确保所有渲染完成
                                         setTimeout(() => {
@@ -3762,21 +3932,21 @@
 
                                 } catch (error) {
                                     console.error('导入配置时发生错误:', error);
-                                    alert('导入配置时发生错误，请检查文件格式。');
+                                    alert(t('导入配置时发生错误，请检查文件格式。'));
                                 }
                             },
                             () => {
                                 // 用户取消导入
-                                console.log("❌ 用户取消了配置导入。");
+                                console.log(t('❌ 用户取消了配置导入。'));
                             }
                         );
 
                     } else {
-                        alert('导入的配置文件内容无效！');
+                        alert(t('导入的配置文件内容无效！'));
                     }
                 } catch (error) {
                     console.error('解析配置文件失败:', error);
-                    alert('导入的配置文件解析失败！请确认文件格式正确。');
+                    alert(t('导入的配置文件解析失败！请确认文件格式正确。'));
                 }
             };
             reader.readAsText(file);
@@ -3821,8 +3991,9 @@
             max-width: 90vw;
         `;
 
+        const configTitle = t('🛠️ 配置管理');
         setTrustedHTML(dialog, `
-            <h3 style="margin:0 0 20px 0;font-size:18px;font-weight:600; color: var(--text-color, #333333);">🛠️ 配置管理</h3>
+            <h3 style="margin:0 0 20px 0;font-size:18px;font-weight:600; color: var(--text-color, #333333);">${configTitle}</h3>
             <div style="
                 display:flex;
                 flex-direction:column;
@@ -3837,13 +4008,13 @@
                     padding-bottom:16px;
                     border-bottom:1px solid var(--border-color, #e5e7eb);
                 ">
-                    <span style="margin-right:12px;color: var(--text-color, #333333);">恢复默认设置：</span>
+                    <span style="margin-right:12px;color: var(--text-color, #333333);">${t('恢复默认设置：')}</span>
                     <button id="resetSettingsBtn" style="
                         ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                         background-color: var(--cancel-color, #6B7280);
                         color: white;
                         border-radius:4px;
-                    ">↩️ 重置</button>
+                    ">${t('↩️ 重置')}</button>
                 </div>
                 <!-- 导入导出部分 -->
                 <div style="
@@ -3851,20 +4022,20 @@
                     flex-direction:row;
                     align-items:center;
                 ">
-                    <span style="margin-right:12px;color: var(--text-color, #333333);">配置导入导出：</span>
+                    <span style="margin-right:12px;color: var(--text-color, #333333);">${t('配置导入导出：')}</span>
                     <div style="display:flex;gap:8px;">
                         <button id="importConfigBtn" style="
                             ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                             background-color: var(--add-color, #fd7e14);
                             color: white;
                             border-radius:4px;
-                        ">📥 导入</button>
+                        ">${t('📥 导入')}</button>
                         <button id="exportConfigBtn" style="
                             ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                             background-color: var(--success-color, #22c55e);
                             color: white;
                             border-radius:4px;
-                        ">📤 导出</button>
+                        ">${t('📤 导出')}</button>
                     </div>
                 </div>
             </div>
@@ -3881,7 +4052,7 @@
                 if (currentConfigOverlay === overlay) {
                     currentConfigOverlay = null;
                 }
-                console.log("✅ 配置管理弹窗已通过点击外部关闭");
+                console.log(t('✅ 配置管理弹窗已通过点击外部关闭'));
             }
         });
 
@@ -3908,7 +4079,7 @@
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log("✅ 配置管理弹窗已自动关闭");
+                    console.log(t('✅ 配置管理弹窗已自动关闭'));
                 }
             });
         });
@@ -3920,18 +4091,18 @@
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log("✅ 配置管理弹窗已在导出后关闭");
+                    console.log(t('✅ 配置管理弹窗已在导出后关闭'));
                 }
             }, 500); // 给导出操作一些时间完成
         });
 
         dialog.querySelector('#resetSettingsBtn').addEventListener('click', () => {
-            if (confirm('确认重置所有配置为默认设置吗？')) {
+        if (confirm(t('确认重置所有配置为默认设置吗？'))) {
                 // 先关闭配置管理弹窗，提升用户体验
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log("✅ 配置管理弹窗已在重置前关闭");
+                    console.log(t('✅ 配置管理弹窗已在重置前关闭'));
                 }
 
                 // 执行配置重置
@@ -3962,7 +4133,7 @@
                     renderButtonList();
                 }
 
-                console.log("🔄 配置已重置为默认设置。");
+                console.log(t('🔄 配置已重置为默认设置。'));
 
                 // 更新按钮栏
                 updateButtonContainer();
@@ -3972,11 +4143,11 @@
                 // 立即更新计数器
                 setTimeout(() => {
                     updateCounters();
-                    console.log("📊 重置后计数器已更新。");
+                    console.log(t('📊 重置后计数器已更新。'));
 
                     // 在所有更新完成后显示成功提示
                     setTimeout(() => {
-                        alert('已重置为默认配置');
+                        alert(t('已重置为默认配置'));
                     }, 50);
                 }, 100);
             }
@@ -4054,7 +4225,7 @@
             hiddenCheckboxContainer.style.padding = '2px';
             hiddenCheckboxContainer.style.borderRadius = '3px';
             hiddenCheckboxContainer.style.cursor = 'pointer';
-            hiddenCheckboxContainer.title = '勾选后该文件夹将在主界面显示';
+            hiddenCheckboxContainer.title = t('勾选后该文件夹将在主界面显示');
 
             const hiddenCheckbox = document.createElement('input');
             hiddenCheckbox.type = 'checkbox';
@@ -4073,7 +4244,10 @@
                 const newHiddenState = !hiddenCheckbox.checked;
                 fconfig.hidden = newHiddenState;
                 localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                console.log(`✅ 文件夹 "${fname}" 的隐藏状态已设置为 ${fconfig.hidden}`);
+                console.log(t('✅ 文件夹 "{{folderName}}" 的隐藏状态已设置为 {{state}}', {
+                    folderName: fname,
+                    state: fconfig.hidden
+                }));
                 updateButtonContainer();
             });
 
@@ -4198,7 +4372,10 @@
                         localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
                         renderFolderList();
                         renderButtonList();
-                        console.log(`🔄 文件夹顺序已更新：${draggedFolder} 移动到 ${fname} 前。`);
+                        console.log(t('🔄 文件夹顺序已更新：{{draggedFolder}} 移动到 {{targetFolder}} 前。', {
+                            draggedFolder,
+                            targetFolder: fname
+                        }));
                         // 更新按钮栏
                         updateButtonContainer();
                     }
@@ -4219,7 +4396,11 @@
                                 localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
                                 renderFolderList();
                                 renderButtonList();
-                                console.log(`🔄 按钮 "${draggedBtnName}" 已从 "${sourceFolder}" 移动到 "${fname}"。`);
+                                console.log(t('🔄 按钮 "{{buttonName}}" 已从 "{{sourceFolder}}" 移动到 "{{targetFolder}}"。', {
+                                    buttonName: draggedBtnName,
+                                    sourceFolder,
+                                    targetFolder: fname
+                                }));
                                 // Update button container
                                 updateButtonContainer();
                             }
@@ -4235,8 +4416,11 @@
                 folderItem.style.opacity = '1';
             });
 
-            folderListContainer.appendChild(folderItem);
-        });
+        folderListContainer.appendChild(folderItem);
+    });
+
+    localizeElement(folderListContainer);
+    scheduleLocalization();
     };
 
     // 升级：更新所有计数显示的函数
@@ -4251,14 +4435,14 @@
         const folderCountBadge = queryUI('#folderCountBadge');
         if (folderCountBadge) {
             folderCountBadge.textContent = totalFolders.toString();
-            folderCountBadge.title = `共有 ${totalFolders} 个文件夹`;
+            folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
         }
 
         // 更新按钮总数计数
         const totalButtonCountBadge = queryUI('#totalButtonCountBadge');
         if (totalButtonCountBadge) {
             totalButtonCountBadge.textContent = totalButtons.toString();
-            totalButtonCountBadge.title = `所有文件夹共有 ${totalButtons} 个按钮`;
+            totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
         }
 
         // 更新当前文件夹按钮数计数
@@ -4267,11 +4451,17 @@
             const currentFolderBadge = queryUI('#currentFolderButtonCount');
             if (currentFolderBadge) {
                 currentFolderBadge.textContent = currentFolderButtonCount.toString();
-                currentFolderBadge.title = `"${selectedFolderName}" 文件夹有 ${currentFolderButtonCount} 个按钮`;
+                currentFolderBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
+                    folderName: selectedFolderName,
+                    count: currentFolderButtonCount
+                });
             }
         }
 
-        console.log(`📊 计数器已更新: ${totalFolders}个文件夹, ${totalButtons}个按钮总数`);
+        console.log(t('📊 计数器已更新: {{folderCount}}个文件夹, {{buttonCount}}个按钮总数', {
+            folderCount: totalFolders,
+            buttonCount: totalButtons
+        }));
     };
 
     const renderButtonList = () => {
@@ -4317,7 +4507,10 @@
     // 计算当前文件夹的按钮数量
     const buttonCount = Object.keys(currentFolderConfig.buttons).length;
     buttonCountBadge.textContent = buttonCount.toString();
-    buttonCountBadge.title = `"${selectedFolderName}" 文件夹有 ${buttonCount} 个按钮`;
+    buttonCountBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
+        folderName: selectedFolderName,
+        count: buttonCount
+    });
 
     // 添加hover效果
     buttonCountBadge.addEventListener('mouseenter', () => {
@@ -4338,7 +4531,7 @@
         color: 'white',
         borderRadius: '4px'
     });
-    addNewButtonBtn.textContent = '+ 新建按钮';
+    addNewButtonBtn.textContent = t('+ 新建按钮');
     addNewButtonBtn.addEventListener('click', () => {
         showButtonEditDialog(selectedFolderName, '', {}, () => {
             renderButtonList();
@@ -4381,7 +4574,7 @@
     `;
 
     const leftButtonHeaderLabel = document.createElement('div');
-    leftButtonHeaderLabel.textContent = '按钮预览';
+    leftButtonHeaderLabel.textContent = t('按钮预览');
     leftButtonHeaderLabel.style.flex = '1';
     leftButtonHeaderLabel.style.textAlign = 'left';
     leftButtonHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
@@ -4395,26 +4588,26 @@
     rightButtonHeaderLabels.style.paddingRight = '12px';
 
     const variableLabel = document.createElement('div');
-    variableLabel.textContent = '变量';
+    variableLabel.textContent = t('变量');
     variableLabel.style.width = '110px';
     variableLabel.style.textAlign = 'center';
     variableLabel.style.fontSize = '12px';
     variableLabel.style.marginLeft = '-1em';
     const autoSubmitLabel = document.createElement('div');
-    autoSubmitLabel.textContent = '自动提交';
+    autoSubmitLabel.textContent = t('自动提交');
     autoSubmitLabel.style.width = '64px';
     autoSubmitLabel.style.textAlign = 'center';
     autoSubmitLabel.style.fontSize = '12px';
     autoSubmitLabel.style.marginLeft = 'calc(-0.5em)';
 
     const editButtonLabel = document.createElement('div');
-    editButtonLabel.textContent = '修改';
+    editButtonLabel.textContent = t('修改');
     editButtonLabel.style.width = '40px';
     editButtonLabel.style.textAlign = 'center';
     editButtonLabel.style.fontSize = '12px';
 
     const deleteButtonLabel = document.createElement('div');
-    deleteButtonLabel.textContent = '删除';
+    deleteButtonLabel.textContent = t('删除');
     deleteButtonLabel.style.width = '36px';
     deleteButtonLabel.style.textAlign = 'center';
     deleteButtonLabel.style.fontSize = '12px';
@@ -4524,16 +4717,16 @@
         if (cfg.type === 'template') {
             const variablesUsed = extractTemplateVariables(cfg.text || '');
             if (variablesUsed.length > 0) {
-                const displayText = variablesUsed.join('、');
+                const displayText = variablesUsed.join(isNonChineseLocale() ? ', ' : '、');
                 variableInfoContainer.textContent = displayText;
-                variableInfoContainer.title = `模板变量: ${displayText}`;
+                variableInfoContainer.title = t('模板变量: {{variable}}', { variable: displayText });
             } else {
-                variableInfoContainer.textContent = '无';
-                variableInfoContainer.title = '未使用模板变量';
+                variableInfoContainer.textContent = t('无');
+                variableInfoContainer.title = t('未使用模板变量');
             }
         } else {
             variableInfoContainer.textContent = '—';
-            variableInfoContainer.title = '工具按钮不使用模板变量';
+            variableInfoContainer.title = t('工具按钮不使用模板变量');
         }
 
         // 创建"自动提交"开关容器
@@ -4553,7 +4746,10 @@
         autoSubmitCheckbox.addEventListener('change', () => {
             cfg.autoSubmit = autoSubmitCheckbox.checked;
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-            console.log(`✅ 按钮 "${btnName}" 的自动提交已设置为 ${autoSubmitCheckbox.checked}`);
+            console.log(t('✅ 按钮 "{{buttonName}}" 的自动提交已设置为 {{state}}', {
+                buttonName: btnName,
+                state: autoSubmitCheckbox.checked
+            }));
         });
 
         autoSubmitContainer.appendChild(autoSubmitCheckbox);
@@ -4649,7 +4845,10 @@
                     buttonConfig.folders[selectedFolderName].buttons = newOrderedMap;
                     localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
                     renderButtonList();
-                    console.log(`🔄 按钮顺序已更新：${draggedBtnName} 移动到 ${btnName} 前。`);
+                    console.log(t('🔄 按钮顺序已更新：{{buttonName}} 移动到 {{targetName}} 前。', {
+                        buttonName: draggedBtnName,
+                        targetName: btnName
+                    }));
                     // 更新按钮栏
                     updateButtonContainer();
                 }
@@ -4670,6 +4869,9 @@
 
     // 修改：将新容器添加到主容器中
     buttonListContainer.appendChild(contentWithHeaderContainer);
+
+    localizeElement(buttonListContainer);
+    scheduleLocalization();
 };
 
     function updateButtonBarHeight(newHeight) {
@@ -4687,11 +4889,11 @@
                 console.warn('更新按钮栏布局失败:', err);
             }
         }
-        console.log("🔧 按钮栏高度已更新为", clamped, "px");
+        console.log(`${t('🔧 按钮栏高度已更新为')} ${clamped} px`);
         try {
             applyDomainStyles();
         } catch (err) {
-            console.warn('应用域名样式失败:', err);
+            console.warn(t('应用域名样式失败:'), err);
         }
     }
 
@@ -4756,7 +4958,7 @@
         title.style.fontWeight = '600';
 
         const titleText = document.createElement('span');
-        titleText.textContent = "⚙️ 设置面板";
+        titleText.textContent = t('⚙️ 设置面板');
 
         const collapseToggleBtn = document.createElement('button');
         collapseToggleBtn.type = 'button';
@@ -4773,7 +4975,7 @@
             justify-content: center;
             cursor: pointer;
         `;
-        collapseToggleBtn.title = '折叠左侧设置区域';
+        collapseToggleBtn.title = t('折叠左侧设置区域');
         collapseToggleBtn.setAttribute('aria-label', collapseToggleBtn.title);
         const collapseToggleSVG = `<svg fill="currentColor" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M 7.7148 49.5742 L 48.2852 49.5742 C 53.1836 49.5742 55.6446 47.1367 55.6446 42.3086 L 55.6446 13.6914 C 55.6446 8.8633 53.1836 6.4258 48.2852 6.4258 L 7.7148 6.4258 C 2.8398 6.4258 .3554 8.8398 .3554 13.6914 L .3554 42.3086 C .3554 47.1602 2.8398 49.5742 7.7148 49.5742 Z M 7.7851 45.8008 C 5.4413 45.8008 4.1288 44.5586 4.1288 42.1211 L 4.1288 13.8789 C 4.1288 11.4414 5.4413 10.1992 7.7851 10.1992 L 18.2148 10.1992 L 18.2148 45.8008 Z M 48.2147 10.1992 C 50.5350 10.1992 51.8708 11.4414 51.8708 13.8789 L 51.8708 42.1211 C 51.8708 44.5586 50.5350 45.8008 48.2147 45.8008 L 21.8944 45.8008 L 21.8944 10.1992 Z M 13.7148 18.8945 C 14.4179 18.8945 15.0507 18.2617 15.0507 17.5820 C 15.0507 16.8789 14.4179 16.2696 13.7148 16.2696 L 8.6757 16.2696 C 7.9726 16.2696 7.3632 16.8789 7.3632 17.5820 C 7.3632 18.2617 7.9726 18.8945 8.6757 18.8945 Z M 13.7148 24.9649 C 14.4179 24.9649 15.0507 24.3320 15.0507 23.6289 C 15.0507 22.9258 14.4179 22.3398 13.7148 22.3398 L 8.6757 22.3398 C 7.9726 22.3398 7.3632 22.9258 7.3632 23.6289 C 7.3632 24.3320 7.9726 24.9649 8.6757 24.9649 Z M 13.7148 31.0118 C 14.4179 31.0118 15.0507 30.4258 15.0507 29.7227 C 15.0507 29.0196 14.4179 28.4102 13.7148 28.4102 L 8.6757 28.4102 C 7.9726 28.4102 7.3632 29.0196 7.3632 29.7227 C 7.3632 30.4258 7.9726 31.0118 8.6757 31.0118 Z"></path></g></svg>`;
         setTrustedHTML(collapseToggleBtn, collapseToggleSVG);
@@ -4849,10 +5051,10 @@
 
         // 设置计数和提示
         folderCountBadge.textContent = totalFolders.toString();
-        folderCountBadge.title = `共有 ${totalFolders} 个文件夹`;
+        folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
 
         totalButtonCountBadge.textContent = totalButtons.toString();
-        totalButtonCountBadge.title = `所有文件夹共有 ${totalButtons} 个按钮`;
+        totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
 
         // 添加hover效果
         [folderCountBadge, totalButtonCountBadge].forEach(badge => {
@@ -4879,7 +5081,7 @@
 
         // 新建自动化按钮
         const automationBtn = document.createElement('button');
-        automationBtn.innerText = '⚡ 自动化';
+        automationBtn.innerText = t('⚡ 自动化');
         automationBtn.type = 'button';
         automationBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
         automationBtn.style.color = 'white';
@@ -4895,7 +5097,7 @@
 
         // 样式管理按钮
         const styleMgmtBtn = document.createElement('button');
-        styleMgmtBtn.innerText = '🎨 样式管理';
+        styleMgmtBtn.innerText = t('🎨 样式管理');
         styleMgmtBtn.type = 'button';
         styleMgmtBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
         styleMgmtBtn.style.color = 'white';
@@ -4920,7 +5122,7 @@
             color: 'white',
             borderRadius: '4px'
         });
-        saveSettingsBtn.textContent = '💾 关闭并保存';
+        saveSettingsBtn.textContent = t('💾 关闭并保存');
         saveSettingsBtn.addEventListener('click', () => {
             localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
 
@@ -4938,7 +5140,7 @@
             closeExistingOverlay(overlay);
             currentSettingsOverlay = null;
             attachButtons();
-            console.log("✅ 设置已保存并关闭设置面板。");
+        console.log(t('✅ 设置已保存并关闭设置面板。'));
             updateButtonContainer();
         });
         headerBtnsWrapper.appendChild(saveSettingsBtn);
@@ -4985,7 +5187,7 @@
         `;
 
         const leftHeaderLabel = document.createElement('div');
-        leftHeaderLabel.textContent = '文件夹名称';
+        leftHeaderLabel.textContent = t('文件夹名称');
         leftHeaderLabel.style.flex = '1';
         leftHeaderLabel.style.textAlign = 'left';
         leftHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
@@ -4999,21 +5201,21 @@
         rightHeaderLabels.style.paddingRight = '12px'; // 增加右侧间距
 
         const showLabel = document.createElement('div');
-        showLabel.textContent = '显示';
+        showLabel.textContent = t('显示');
         showLabel.style.width = '36px'; // 稍微减小宽度
         showLabel.style.textAlign = 'center';
         showLabel.style.fontSize = '12px';
         showLabel.style.marginRight = '4px'; // 添加右边距
 
         const editLabel = document.createElement('div');
-        editLabel.textContent = '修改';
+        editLabel.textContent = t('修改');
         editLabel.style.width = '36px'; // 稍微减小宽度
         editLabel.style.textAlign = 'center';
         editLabel.style.fontSize = '12px';
         editLabel.style.marginRight = '4px'; // 添加右边距
 
         const deleteLabel = document.createElement('div');
-        deleteLabel.textContent = '删除';
+        deleteLabel.textContent = t('删除');
         deleteLabel.style.width = '36px'; // 稍微减小宽度
         deleteLabel.style.textAlign = 'center';
         deleteLabel.style.fontSize = '12px';
@@ -5045,13 +5247,13 @@
             color: 'white',
             borderRadius: '4px'
         });
-        addNewFolderBtn.textContent = '+ 新建文件夹';
+        addNewFolderBtn.textContent = t('+ 新建文件夹');
         addNewFolderBtn.addEventListener('click', () => {
             showFolderEditDialog('', {}, (newFolderName) => {
                 selectedFolderName = newFolderName;
                 renderFolderList();
                 renderButtonList();
-                console.log(`🆕 新建文件夹 "${newFolderName}" 已添加。`);
+                console.log(t('🆕 新建文件夹 "{{folderName}}" 已添加。', { folderName: newFolderName }));
             });
         });
         folderAddContainer.appendChild(addNewFolderBtn);
@@ -5088,12 +5290,12 @@
                     }
                 }
                 folderPanel.style.display = 'none';
-                collapseToggleBtn.title = '展开左侧设置区域';
-                collapseToggleBtn.setAttribute('aria-label', '展开左侧设置区域');
+                collapseToggleBtn.title = t('展开左侧设置区域');
+                collapseToggleBtn.setAttribute('aria-label', t('展开左侧设置区域'));
             } else {
                 folderPanel.style.display = 'flex';
-                collapseToggleBtn.title = '折叠左侧设置区域';
-                collapseToggleBtn.setAttribute('aria-label', '折叠左侧设置区域');
+                collapseToggleBtn.title = t('折叠左侧设置区域');
+                collapseToggleBtn.setAttribute('aria-label', t('折叠左侧设置区域'));
                 if (container) {
                     container.style.minHeight = '';
                 }
@@ -5144,7 +5346,7 @@ function showAutomationSettingsDialog() {
 
     // 使用 createUnifiedDialog 统一创建 overlay + dialog
     const { overlay, dialog } = createUnifiedDialog({
-        title: '⚡ 自动化设置',
+        title: t('⚡ 自动化设置'),
         width: '750px',  // 保留你想要的宽度
         onClose: () => {
             currentAutomationOverlay = null;
@@ -5164,7 +5366,7 @@ function showAutomationSettingsDialog() {
     // 原先的 "关闭并保存" 按钮
     const closeAutomationBtn = document.createElement('button');
     closeAutomationBtn.id = 'closeAutomationBtn';
-    closeAutomationBtn.textContent = '💾 关闭并保存';
+    closeAutomationBtn.textContent = t('💾 关闭并保存');
     closeAutomationBtn.style.cssText = `
         background-color: var(--success-color, #22c55e);
         color: #fff;
@@ -5296,7 +5498,7 @@ function showAutomationSettingsDialog() {
 
         if (methodValue === '模拟点击提交按钮') {
             const clickBadge = document.createElement('span');
-            clickBadge.textContent = '模拟点击';
+            clickBadge.textContent = t('模拟点击');
             clickBadge.style.cssText = `
                 padding: 4px 12px;
                 border-radius: 20px;
@@ -5412,15 +5614,17 @@ function showAutomationSettingsDialog() {
             max-width: 90vw;
         `;
 
-        const ruleName = rule.name || rule.domain || '未命名规则';
-        const ruleDomain = rule.domain || '（未指定网址）';
+        const ruleName = rule.name || rule.domain || t('未命名规则');
+        const ruleDomain = rule.domain || t('（未指定网址）');
         const faviconUrl = rule.favicon || generateDomainFavicon(rule.domain);
+        const deleteAutomationTitle = t('🗑️ 确认删除自动化规则 "{{ruleName}}"？', { ruleName });
+        const irreversibleNoticeAutomation = t('❗️ 注意：此操作无法撤销！');
 
         setTrustedHTML(dialog, `
             <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: var(--danger-color, #ef4444);">
-                🗑️ 确认删除自动化规则 "${ruleName}"？
+                ${deleteAutomationTitle}
             </h3>
-            <p style="margin: 8px 0; color: var(--text-color, #333333);">❗️ 注意：此操作无法撤销！</p>
+            <p style="margin: 8px 0; color: var(--text-color, #333333);">${irreversibleNoticeAutomation}</p>
             <div style="margin: 16px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 12px; border-radius:6px; background-color: var(--button-bg, #f3f4f6);">
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
                     <div style="
@@ -5442,7 +5646,7 @@ function showAutomationSettingsDialog() {
                 </div>
                 <p style="margin:4px 0; position:relative; padding-left:12px; color: var(--text-color, #333333); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:4px; height:4px; background-color: var(--text-color, #333333); border-radius:50%;"></span>
-                    自动提交方式：<span class="cttf-automation-method-container"></span>
+                    ${t('自动提交方式：')}<span class="cttf-automation-method-container"></span>
                 </p>
             </div>
             <div style="
@@ -5457,13 +5661,13 @@ function showAutomationSettingsDialog() {
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius:4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="confirmAutomationRuleDelete" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--danger-color, #ef4444);
                     color: white;
                     border-radius:4px;
-                ">删除</button>
+                ">${t('删除')}</button>
             </div>
         `);
 
@@ -5511,7 +5715,7 @@ function showAutomationSettingsDialog() {
 
         if (!rules.length) {
             const emptyState = document.createElement('div');
-            emptyState.textContent = '暂无自动化规则，点击下方“+ 新建”开始配置。';
+            emptyState.textContent = t('暂无自动化规则，点击下方“+ 新建”开始配置。');
             emptyState.style.cssText = `
                 padding: 18px;
                 border-radius: 6px;
@@ -5570,7 +5774,7 @@ function showAutomationSettingsDialog() {
             infoColumn.style.flex = '1 1 0%';
 
             const nameEl = document.createElement('span');
-            nameEl.textContent = rule.name || rule.domain || '未命名规则';
+            nameEl.textContent = rule.name || rule.domain || t('未命名规则');
             nameEl.style.fontWeight = '600';
             nameEl.style.fontSize = '14px';
             nameEl.style.color = 'var(--text-color, #1f2937)';
@@ -5691,7 +5895,7 @@ function showAutomationSettingsDialog() {
     addDiv.style.textAlign = 'left';
 
     const addBtn = document.createElement('button');
-    addBtn.textContent = '+ 新建';
+    addBtn.textContent = t('+ 新建');
     addBtn.style.cssText = `
         background-color: var(--add-color, #fd7e14);
         color: #fff;
@@ -5731,7 +5935,7 @@ function showStyleSettingsDialog() {
 
     // 说明文字
     const desc = document.createElement('p');
-    desc.textContent = '您可根据不同网址，自定义按钮栏高度和注入CSS样式。';
+    desc.textContent = t('您可根据不同网址，自定义按钮栏高度和注入CSS样式。');
     dialog.appendChild(desc);
 
     // 列表容器
@@ -5847,15 +6051,15 @@ function showStyleSettingsDialog() {
             max-width: 90vw;
         `;
 
-        const styleName = styleItem.name || styleItem.domain || '未命名样式';
-        const styleDomain = styleItem.domain || '（未指定网址）';
-        const styleHeight = styleItem.height ? `${styleItem.height}px` : '默认高度';
+        const resolvedStyleName = styleItem.name || styleItem.domain || t('未命名样式');
+        const resolvedStyleDomain = styleItem.domain || t('（未指定网址）');
+        const styleHeight = styleItem.height ? `${styleItem.height}px` : t('默认高度');
         const rawStyleBottomSpacing = (typeof styleItem.bottomSpacing === 'number') ? styleItem.bottomSpacing : buttonConfig.buttonBarBottomSpacing;
         const clampedStyleBottomSpacing = Math.max(-200, Math.min(200, Number(rawStyleBottomSpacing) || 0));
         const styleBottomSpacing = `${clampedStyleBottomSpacing}px`;
         const faviconUrl = styleItem.favicon || generateDomainFavicon(styleItem.domain);
         const cssRaw = (styleItem.cssCode || '').trim();
-        const cssContent = cssRaw || '（未配置自定义 CSS）';
+        const cssContent = cssRaw || t('（未配置自定义 CSS）');
         const cssLineCount = cssContent.split('\n').length;
         const cssTextareaHeight = Math.min(Math.max(cssLineCount, 6), 24) * 18;
         const escapeHtml = (str = '') => String(str)
@@ -5864,14 +6068,19 @@ function showStyleSettingsDialog() {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+        const safeStyleName = escapeHtml(resolvedStyleName);
+        const safeStyleDomain = escapeHtml(resolvedStyleDomain);
+        const styleDeleteTitle = escapeHtml(t('确认删除样式 "{{styleName}}"？', { styleName: resolvedStyleName }));
+        const irreversibleNoticeStyle = t('❗️ 注意：此操作无法撤销！');
+        const spacingTitle = escapeHtml(t('按钮栏距页面底部的间距'));
 
         setTrustedHTML(dialog, `
             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:4px;">
                 <h3 style="margin:0; font-size:18px; font-weight:700; color: var(--danger-color, #ef4444); display:flex; align-items:center; gap:8px;">
                     <span aria-hidden="true">🗑️</span>
-                    <span>确认删除样式 "${escapeHtml(styleName)}"？</span>
+                    <span>${styleDeleteTitle}</span>
                 </h3>
-                <p style="margin:0; color: var(--text-color, #333333); font-size:13px;">❗️ 注意：此操作无法撤销！</p>
+                <p style="margin:0; color: var(--text-color, #333333); font-size:13px;">${irreversibleNoticeStyle}</p>
             </div>
             <div style="margin: 0 0 22px 0; border: 1px solid var(--border-color, #e5e7eb); padding: 18px; border-radius:8px; background-color: var(--button-bg, #f3f4f6); display:flex; flex-direction:column; gap:16px;">
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
@@ -5885,16 +6094,16 @@ function showStyleSettingsDialog() {
                         overflow:hidden;
                         flex-shrink:0;
                     ">
-                        <img src="${faviconUrl}" alt="${escapeHtml(styleName)}" style="width:24px; height:24px; object-fit:contain;" referrerpolicy="no-referrer">
+                        <img src="${faviconUrl}" alt="${safeStyleName}" style="width:24px; height:24px; object-fit:contain;" referrerpolicy="no-referrer">
                     </div>
                     <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-                        <span style="font-size:14px; font-weight:600; color: var(--text-color, #333333);">${escapeHtml(styleName)}</span>
-                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;" title="${escapeHtml(styleDomain)}">${escapeHtml(styleDomain)}</span>
+                        <span style="font-size:14px; font-weight:600; color: var(--text-color, #333333);">${safeStyleName}</span>
+                        <span style="font-size:12px; color: var(--muted-text-color, #6b7280); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;" title="${safeStyleDomain}">${safeStyleDomain}</span>
                     </div>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">按钮栏高度</span>
+                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">${t('按钮栏高度')}</span>
                         <span style="
                             padding:6px 12px;
                             background-color: rgba(16,185,129,0.16);
@@ -5906,7 +6115,7 @@ function showStyleSettingsDialog() {
                         ">${escapeHtml(styleHeight)}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">距页面底部</span>
+                        <span style="font-size:12px; font-weight:600; color: var(--muted-text-color, #6b7280); white-space:nowrap;">${t('距页面底部')}</span>
                         <span style="
                             padding:6px 12px;
                             background-color: rgba(59,130,246,0.16);
@@ -5915,14 +6124,14 @@ function showStyleSettingsDialog() {
                             font-size:12px;
                             font-weight:600;
                             white-space:nowrap;
-                        " title="按钮栏距页面底部的间距">${escapeHtml(styleBottomSpacing)}</span>
+                        " title="${spacingTitle}">${escapeHtml(styleBottomSpacing)}</span>
                     </div>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    <label style="font-size:13px; font-weight:600; color: var(--text-color, #333333); display:flex; align-items:center; gap:6px;">
-                        <span aria-hidden="true">🧶</span>
-                        <span>自定义 CSS</span>
-                    </label>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <label style="font-size:13px; font-weight:600; color: var(--text-color, #333333); display:flex; align-items:center; gap:6px;">
+                            <span aria-hidden="true">🧶</span>
+                        <span>${t('自定义 CSS')}</span>
+                        </label>
                     <textarea readonly style="
                         width:100%;
                         min-height:${cssTextareaHeight}px;
@@ -5956,13 +6165,13 @@ function showStyleSettingsDialog() {
                     background-color: var(--cancel-color, #6B7280);
                     color: white;
                     border-radius:4px;
-                ">取消</button>
+                ">${t('取消')}</button>
                 <button id="confirmStyleRuleDelete" style="
                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                     background-color: var(--danger-color, #ef4444);
                     color: white;
                     border-radius:4px;
-                ">删除</button>
+                ">${t('删除')}</button>
             </div>
         `);
 
@@ -5997,7 +6206,7 @@ function showStyleSettingsDialog() {
 
         if (!styles.length) {
             const emptyState = document.createElement('div');
-            emptyState.textContent = '尚未配置任何样式，点击下方“+ 新建”添加。';
+            emptyState.textContent = t('尚未配置任何样式，点击下方“+ 新建”添加。');
             emptyState.style.cssText = `
                 padding: 18px;
                 border-radius: 6px;
@@ -6039,7 +6248,7 @@ function showStyleSettingsDialog() {
                 metadataPatched = true;
             }
             const faviconBadge = createFaviconElement(faviconUrl, item.name || item.domain, '🎨', { withBackground: false, size: 26 });
-            faviconBadge.title = item.domain || '自定义样式';
+            faviconBadge.title = item.domain || t('自定义样式');
 
             const iconColumn = document.createElement('div');
             iconColumn.style.display = 'flex';
@@ -6056,13 +6265,13 @@ function showStyleSettingsDialog() {
             siteColumn.style.flex = '0.7 1 0%';
 
             const nameEl = document.createElement('span');
-            nameEl.textContent = item.name || '未命名样式';
+            nameEl.textContent = item.name || t('未命名样式');
             nameEl.style.fontWeight = '600';
             nameEl.style.fontSize = '14px';
             nameEl.style.color = 'var(--text-color, #1f2937)';
 
             const domainEl = document.createElement('span');
-            domainEl.textContent = item.domain || '未设置域名';
+            domainEl.textContent = item.domain || t('未设置域名');
             domainEl.style.fontSize = '12px';
             domainEl.style.color = 'var(--muted-text-color, #6b7280)';
             domainEl.style.whiteSpace = 'nowrap';
@@ -6073,7 +6282,7 @@ function showStyleSettingsDialog() {
             const cssSnippet = (item.cssCode || '').replace(/\s+/g, ' ').trim();
             const snippetText = cssSnippet
                 ? (cssSnippet.length > 80 ? `${cssSnippet.slice(0, 80)}…` : cssSnippet)
-                : '无自定义CSS';
+                : t('无自定义CSS');
 
             const cssPreview = document.createElement('code');
             cssPreview.textContent = snippetText;
@@ -6116,7 +6325,7 @@ function showStyleSettingsDialog() {
         heightColumn.style.flexWrap = 'wrap';
 
         const heightBadge = document.createElement('span');
-        heightBadge.textContent = item.height ? `${item.height}px` : '默认高度';
+        heightBadge.textContent = item.height ? `${item.height}px` : t('默认高度');
         heightBadge.style.cssText = `
             padding: 4px 10px;
             background-color: rgba(16,185,129,0.12);
@@ -6131,7 +6340,7 @@ function showStyleSettingsDialog() {
         const clampedBottomSpacingValue = Math.max(-200, Math.min(200, Number(bottomSpacingValue) || 0));
         const bottomBadge = document.createElement('span');
         bottomBadge.textContent = `${clampedBottomSpacingValue}px`;
-        bottomBadge.title = '按钮栏距页面底部间距';
+        bottomBadge.title = t('按钮栏距页面底部间距');
         bottomBadge.style.cssText = `
             padding: 4px 10px;
             background-color: rgba(59,130,246,0.12);
@@ -6234,7 +6443,7 @@ function showStyleSettingsDialog() {
 
     // 新建
     const addStyleBtn = document.createElement('button');
-    addStyleBtn.textContent = '+ 新建';
+    addStyleBtn.textContent = t('+ 新建');
     addStyleBtn.style.cssText = `
         background-color: var(--add-color, #fd7e14);
         color: #fff;
@@ -6251,7 +6460,7 @@ function showStyleSettingsDialog() {
 
     // 右上角关闭并保存
     const closeSaveBtn = document.createElement('button');
-    closeSaveBtn.textContent = '💾 关闭并保存';
+    closeSaveBtn.textContent = t('💾 关闭并保存');
     closeSaveBtn.style.cssText = `
         background-color: var(--success-color, #22c55e);
         color: white;
@@ -6289,7 +6498,7 @@ function showEditDomainStyleDialog(index) {
         ? { ...buttonConfig.domainStyleSettings[index] }
         : {
             domain: window.location.hostname,
-            name: document.title || '新样式',
+            name: document.title || t('新样式'),
             height: 40,
             bottomSpacing: buttonConfig.buttonBarBottomSpacing,
             cssCode: '',
@@ -6304,7 +6513,7 @@ function showEditDomainStyleDialog(index) {
     }
 
     const { overlay, dialog } = createUnifiedDialog({
-        title: isEdit ? '✏️ 编辑自定义样式' : '🆕 新建自定义样式',
+        title: isEdit ? t('✏️ 编辑自定义样式') : t('🆕 新建自定义样式'),
         width: '480px',
         onClose: () => {
             currentAddDomainOverlay = null;
@@ -6385,7 +6594,7 @@ function showEditDomainStyleDialog(index) {
     setActiveTab('basic');
 
     const nameLabel = document.createElement('label');
-    nameLabel.textContent = '备注名称：';
+    nameLabel.textContent = t('备注名称：');
     nameLabel.style.display = 'flex';
     nameLabel.style.flexDirection = 'column';
     nameLabel.style.gap = '6px';
@@ -6409,7 +6618,7 @@ function showEditDomainStyleDialog(index) {
     tabPanels.get('basic').appendChild(nameLabel);
 
     const domainLabel = document.createElement('label');
-    domainLabel.textContent = '网址：';
+    domainLabel.textContent = t('网址：');
     domainLabel.style.display = 'flex';
     domainLabel.style.flexDirection = 'column';
     domainLabel.style.gap = '6px';
@@ -6433,7 +6642,7 @@ function showEditDomainStyleDialog(index) {
     tabPanels.get('basic').appendChild(domainLabel);
 
     const faviconLabel2 = document.createElement('label');
-    faviconLabel2.textContent = '站点图标：';
+    faviconLabel2.textContent = t('站点图标：');
     faviconLabel2.style.display = 'flex';
     faviconLabel2.style.flexDirection = 'column';
     faviconLabel2.style.gap = '6px';
@@ -6476,7 +6685,7 @@ function showEditDomainStyleDialog(index) {
     faviconInput2.style.lineHeight = '1.5';
     faviconInput2.style.resize = 'vertical';
     faviconInput2.style.overflowY = 'hidden';
-    faviconInput2.placeholder = '可填写自定义图标地址';
+    faviconInput2.placeholder = t('可填写自定义图标地址');
     faviconInput2.value = styleItem.favicon || '';
     const resizeFaviconTextarea2 = () => autoResizeTextarea(faviconInput2, { minRows: 1, maxRows: 4 });
 
@@ -6490,15 +6699,15 @@ function showEditDomainStyleDialog(index) {
     faviconActionsRow2.style.justifyContent = 'flex-start';
 
     const faviconHelp2 = document.createElement('span');
-    faviconHelp2.textContent = '留空时系统将使用该网址的默认 Favicon。';
+    faviconHelp2.textContent = t('留空时系统将使用该网址的默认 Favicon。');
     faviconHelp2.style.flex = '1';
     faviconHelp2.style.minWidth = '0';
     faviconHelp2.style.marginRight = '12px';
 
     const autoFaviconBtn2 = document.createElement('button');
     autoFaviconBtn2.type = 'button';
-    autoFaviconBtn2.setAttribute('aria-label', '自动获取站点图标');
-    autoFaviconBtn2.title = '自动获取站点图标';
+    autoFaviconBtn2.setAttribute('aria-label', t('自动获取站点图标'));
+    autoFaviconBtn2.title = t('自动获取站点图标');
     autoFaviconBtn2.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
     autoFaviconBtn2.style.color = '#fff';
     autoFaviconBtn2.style.border = '1px solid var(--border-color, #d1d5db)';
@@ -6571,7 +6780,7 @@ function showEditDomainStyleDialog(index) {
     nameInput.addEventListener('input', updateStyleFaviconPreview);
 
     const heightLabel = document.createElement('label');
-    heightLabel.textContent = '按钮栏高度 (px)：';
+    heightLabel.textContent = t('按钮栏高度 (px)：');
     heightLabel.style.display = 'flex';
     heightLabel.style.flexDirection = 'column';
     heightLabel.style.gap = '6px';
@@ -6598,7 +6807,7 @@ function showEditDomainStyleDialog(index) {
     tabPanels.get('layout').appendChild(heightLabel);
 
     const bottomSpacingLabel = document.createElement('label');
-    bottomSpacingLabel.textContent = '按钮距页面底部间距 (px)：';
+    bottomSpacingLabel.textContent = t('按钮距页面底部间距 (px)：');
     bottomSpacingLabel.style.display = 'flex';
     bottomSpacingLabel.style.flexDirection = 'column';
     bottomSpacingLabel.style.gap = '6px';
@@ -6625,7 +6834,7 @@ function showEditDomainStyleDialog(index) {
     tabPanels.get('layout').appendChild(bottomSpacingLabel);
 
     const cssLabel = document.createElement('label');
-    cssLabel.textContent = '自定义 CSS：';
+    cssLabel.textContent = t('自定义 CSS：');
     cssLabel.style.display = 'flex';
     cssLabel.style.flexDirection = 'column';
     cssLabel.style.gap = '6px';
@@ -6661,7 +6870,7 @@ function showEditDomainStyleDialog(index) {
     footer2.style.borderTop = '1px solid var(--border-color, #e5e7eb)';
 
     const cancelBtn2 = document.createElement('button');
-    cancelBtn2.textContent = '取消';
+    cancelBtn2.textContent = t('取消');
     cancelBtn2.style.backgroundColor = 'var(--cancel-color, #6B7280)';
     cancelBtn2.style.color = '#fff';
     cancelBtn2.style.border = 'none';
@@ -6676,7 +6885,7 @@ function showEditDomainStyleDialog(index) {
     footer2.appendChild(cancelBtn2);
 
     const saveBtn2 = document.createElement('button');
-    saveBtn2.textContent = isEdit ? '保存' : '创建';
+    saveBtn2.textContent = isEdit ? t('保存') : t('创建');
     saveBtn2.style.backgroundColor = 'var(--success-color,#22c55e)';
     saveBtn2.style.color = '#fff';
     saveBtn2.style.border = 'none';
@@ -6727,7 +6936,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     const presetFavicon = (isEdit && ruleData.favicon) ? ruleData.favicon : generateDomainFavicon(presetDomain);
 
     const { overlay, dialog } = createUnifiedDialog({
-        title: isEdit ? '✏️ 编辑自动化规则' : '🆕 新建新网址规则',
+        title: isEdit ? t('✏️ 编辑自动化规则') : t('🆕 新建新网址规则'),
         width: '480px',
         onClose: () => {
             // 关闭时的回调可写在此
@@ -6747,7 +6956,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         titleRow.style.justifyContent = 'space-between';
 
         const methodTitle = document.createElement('div');
-        methodTitle.textContent = '自动提交方式:';
+        methodTitle.textContent = t('自动提交方式:');
         methodTitle.style.fontSize = '13px';
         methodTitle.style.fontWeight = '600';
         methodTitle.style.color = 'var(--text-color, #1f2937)';
@@ -6755,7 +6964,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
 
         const expandButton = document.createElement('button');
         expandButton.type = 'button';
-        expandButton.title = '展开/折叠高级选项';
+        expandButton.title = t('展开/折叠高级选项');
         expandButton.textContent = '▼';
         expandButton.style.width = '28px';
         expandButton.style.height = '28px';
@@ -6874,7 +7083,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
             advancedContainer.style.opacity = '1';
 
             const advancedTitle = document.createElement('div');
-            advancedTitle.textContent = '高级选项:';
+            advancedTitle.textContent = t('高级选项:');
             advancedTitle.style.fontSize = '12px';
             advancedTitle.style.fontWeight = '600';
             advancedTitle.style.opacity = '0.75';
@@ -6882,7 +7091,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
 
             if (selectedMethod === 'Enter') {
                 const tip = document.createElement('div');
-                tip.textContent = 'Enter 提交方式没有额外配置。';
+                tip.textContent = t('Enter 提交方式没有额外配置。');
                 tip.style.fontSize = '12px';
                 tip.style.color = 'var(--muted-text-color, #6b7280)';
                 advancedContainer.appendChild(tip);
@@ -7006,7 +7215,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
                 if (advancedState?.variant === 'selector') {
                     const selectorInput = document.createElement('input');
                     selectorInput.type = 'text';
-                    selectorInput.placeholder = '如：button.send-btn 或 form button[type="submit"]';
+                    selectorInput.placeholder = t('如：button.send-btn 或 form button[type="submit"]');
                     selectorInput.value = advancedState.selector || '';
                     selectorInput.style.width = '100%';
                     selectorInput.style.height = '40px';
@@ -7027,7 +7236,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
                     advancedContainer.appendChild(selectorInput);
 
                     const hint = document.createElement('div');
-                    hint.textContent = '请输入能唯一定位提交按钮的 CSS 选择器。';
+                    hint.textContent = t('请输入能唯一定位提交按钮的 CSS 选择器。');
                     hint.style.fontSize = '12px';
                     hint.style.color = 'var(--muted-text-color, #6b7280)';
                     advancedContainer.appendChild(hint);
@@ -7036,7 +7245,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
             }
 
             const tip = document.createElement('div');
-            tip.textContent = '当前提交方式没有可配置的高级选项。';
+            tip.textContent = t('当前提交方式没有可配置的高级选项。');
             tip.style.fontSize = '12px';
             tip.style.color = 'var(--muted-text-color, #6b7280)';
             advancedContainer.appendChild(tip);
@@ -7117,7 +7326,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
 
     // 网址
     const domainLabel = document.createElement('label');
-    domainLabel.textContent = '网址：';
+    domainLabel.textContent = t('网址：');
     domainLabel.style.display = 'flex';
     domainLabel.style.flexDirection = 'column';
     domainLabel.style.gap = '6px';
@@ -7144,7 +7353,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
 
     // 备注名称
     const nameLabel = document.createElement('label');
-    nameLabel.textContent = '备注名称：';
+    nameLabel.textContent = t('备注名称：');
     nameLabel.style.display = 'flex';
     nameLabel.style.flexDirection = 'column';
     nameLabel.style.gap = '6px';
@@ -7163,13 +7372,13 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     nameInputRef.style.transition = 'border-color 0.2s ease, box-shadow 0.2s ease';
     nameInputRef.style.outline = 'none';
     nameInputRef.style.fontSize = '14px';
-    nameInputRef.value = isEdit ? (ruleData.name || '') : (document.title || '新网址规则');
+    nameInputRef.value = isEdit ? (ruleData.name || '') : (document.title || t('新网址规则'));
     nameLabel.appendChild(nameInputRef);
     container.appendChild(nameLabel);
 
     // favicon
     const faviconLabel = document.createElement('label');
-    faviconLabel.textContent = '站点图标：';
+    faviconLabel.textContent = t('站点图标：');
     faviconLabel.style.display = 'flex';
     faviconLabel.style.flexDirection = 'column';
     faviconLabel.style.gap = '6px';
@@ -7212,7 +7421,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     faviconInput.style.lineHeight = '1.5';
     faviconInput.style.resize = 'vertical';
     faviconInput.style.overflowY = 'hidden';
-    faviconInput.placeholder = 'https:// 或 data:image/svg+xml;base64...';
+    faviconInput.placeholder = t('支持 https:// 链接或 data: URL');
     faviconInput.value = presetFavicon || '';
     const resizeFaviconTextarea = () => autoResizeTextarea(faviconInput, { minRows: 1, maxRows: 4 });
 
@@ -7226,15 +7435,15 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     faviconActionsRow.style.justifyContent = 'flex-start';
 
     const faviconHelp = document.createElement('span');
-    faviconHelp.textContent = '留空时将自动根据网址生成 Google Favicon。';
+    faviconHelp.textContent = t('留空时将自动根据网址生成 Google Favicon。');
     faviconHelp.style.flex = '1';
     faviconHelp.style.minWidth = '0';
     faviconHelp.style.marginRight = '12px';
 
     const autoFaviconBtn = document.createElement('button');
     autoFaviconBtn.type = 'button';
-    autoFaviconBtn.setAttribute('aria-label', '自动获取站点图标');
-    autoFaviconBtn.title = '自动获取站点图标';
+    autoFaviconBtn.setAttribute('aria-label', t('自动获取站点图标'));
+    autoFaviconBtn.title = t('自动获取站点图标');
     autoFaviconBtn.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
     autoFaviconBtn.style.border = '1px solid var(--border-color, #d1d5db)';
     autoFaviconBtn.style.borderRadius = '50%';
@@ -7270,7 +7479,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         faviconPreviewHolder.appendChild(
             createFaviconElement(
                 currentFavicon || generateDomainFavicon(domainInput.value.trim()),
-                (nameInputRef ? nameInputRef.value.trim() : '') || domainInput.value.trim() || '自动化',
+                (nameInputRef ? nameInputRef.value.trim() : '') || domainInput.value.trim() || t('自动化'),
                 '⚡',
                 { withBackground: false }
             )
@@ -7324,7 +7533,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     btnRow.style.borderTop = '1px solid var(--border-color, #e5e7eb)';
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '取消';
+    cancelBtn.textContent = t('取消');
     cancelBtn.style.backgroundColor = 'var(--cancel-color,#6B7280)';
     cancelBtn.style.color = '#fff';
     cancelBtn.style.border = 'none';
@@ -7337,7 +7546,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     });
 
     const confirmBtn = document.createElement('button');
-    confirmBtn.textContent = '确认';
+    confirmBtn.textContent = t('确认');
     confirmBtn.style.backgroundColor = 'var(--success-color,#22c55e)';
     confirmBtn.style.color = '#fff';
     confirmBtn.style.border = 'none';
@@ -7358,20 +7567,20 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
         };
 
         if(!newData.domain || !newData.name) {
-            alert('请输入网址和备注名称！');
+            alert(t('请输入网址和备注名称！'));
             return;
         }
 
         if (methodConfig.method === '模拟点击提交按钮' && methodAdvanced && methodAdvanced.variant === 'selector') {
             const trimmedSelector = methodAdvanced.selector ? methodAdvanced.selector.trim() : '';
             if (!trimmedSelector) {
-                alert('请输入有效的 CSS 选择器！');
+                alert(t('请输入有效的 CSS 选择器！'));
                 return;
             }
             try {
                 document.querySelector(trimmedSelector);
             } catch (err) {
-                alert('CSS 选择器语法错误，请检查后再试！');
+                alert(t('CSS 选择器语法错误，请检查后再试！'));
                 return;
             }
             methodAdvanced.selector = trimmedSelector;
@@ -7406,7 +7615,7 @@ function isValidDomainInput(str) {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         setCSSVariables(getCurrentTheme());
         updateStylesOnThemeChange();
-        console.log("🌓 主题模式已切换，样式已更新。");
+        console.log(t('🌓 主题模式已切换，样式已更新。'));
     });
 
     const createButtonContainer = () => {
@@ -7502,14 +7711,14 @@ function isValidDomainInput(str) {
             if (settingsButton) existingContainer.appendChild(settingsButton);
             if (clearButton) existingContainer.appendChild(clearButton);
 
-            console.log("✅ 按钮栏已更新（已过滤隐藏文件夹）。");
+            console.log(t('✅ 按钮栏已更新（已过滤隐藏文件夹）。'));
         } else {
-            console.warn("⚠️ 未找到按钮容器，无法更新按钮栏。");
+            console.warn(t('⚠️ 未找到按钮容器，无法更新按钮栏。'));
         }
         try {
             applyDomainStyles();
         } catch (err) {
-            console.warn('应用域名样式失败:', err);
+            console.warn(t('应用域名样式失败:'), err);
         }
     };
 
@@ -7525,9 +7734,9 @@ function isValidDomainInput(str) {
             appendToMainLayer(buttonContainer);
             // 创建后立即根据域名样式调整高度/注入CSS
             try { applyDomainStyles(); } catch (_) {}
-            console.log("✅ 按钮容器已固定到窗口底部。");
+            console.log(t('✅ 按钮容器已固定到窗口底部。'));
         } else {
-            console.log("ℹ️ 按钮容器已存在，跳过附加。");
+            console.log(t('ℹ️ 按钮容器已存在，跳过附加。'));
         }
         textarea.addEventListener('contextmenu', (e) => {
             e.preventDefault();
@@ -7539,13 +7748,15 @@ function isValidDomainInput(str) {
         if (attachTimeout) clearTimeout(attachTimeout);
         attachTimeout = setTimeout(() => {
             const textareas = getAllTextareas();
-            console.log(`🔍 扫描到 ${textareas.length} 个 textarea 或 contenteditable 元素。`);
+            console.log(t('🔍 扫描到 {{count}} 个 textarea 或 contenteditable 元素。', {
+                count: textareas.length
+            }));
             if (textareas.length === 0) {
-                console.warn("⚠️ 未找到任何 textarea 或 contenteditable 元素。");
+                console.warn(t('⚠️ 未找到任何 textarea 或 contenteditable 元素。'));
                 return;
             }
             attachButtonsToTextarea(textareas[textareas.length - 1]);
-            console.log("✅ 按钮已附加到最新的 textarea 或 contenteditable 元素。");
+            console.log(t('✅ 按钮已附加到最新的 textarea 或 contenteditable 元素。'));
         }, 300);
     };
 
@@ -7664,7 +7875,10 @@ function isValidDomainInput(str) {
                 const clamped = Math.min(200, Math.max(20, matchedStyle.height || buttonConfig.buttonBarHeight || (defaultConfig && defaultConfig.buttonBarHeight) || 40));
                 container.style.height = clamped + 'px';
                 updateButtonBarLayout(container, clamped);
-                console.log(`✅ 已根据 ${matchedStyle.name} 设置按钮栏高度：${clamped}px`);
+                console.log(t('✅ 已根据 {{name}} 设置按钮栏高度：{{height}}px', {
+                    name: matchedStyle.name,
+                    height: clamped
+                }));
                 applyBarBottomSpacing(container, matchedStyle.bottomSpacing, fallbackSpacing);
 
                 // 2) 注入自定义 CSS（若有）
@@ -7673,7 +7887,7 @@ function isValidDomainInput(str) {
                     styleEl.setAttribute('data-domain-style', matchedStyle.domain);
                     styleEl.textContent = matchedStyle.cssCode;
                     document.head.appendChild(styleEl);
-                    console.log(`✅ 已注入自定义CSS至 <head> 来自：${matchedStyle.name}`);
+                    console.log(t('✅ 已注入自定义CSS至 <head> 来自：{{name}}', { name: matchedStyle.name }));
                 }
             } else {
                 // 未匹配到样式时，回退到全局按钮栏高度
@@ -7683,11 +7897,13 @@ function isValidDomainInput(str) {
                 const clampedDefault = Math.min(200, Math.max(20, fallback));
                 container.style.height = clampedDefault + 'px';
                 updateButtonBarLayout(container, clampedDefault);
-                console.log(`ℹ️ 未匹配到样式规则，使用默认按钮栏高度：${clampedDefault}px`);
+                console.log(t('ℹ️ 未匹配到样式规则，使用默认按钮栏高度：{{height}}px', {
+                    height: clampedDefault
+                }));
                 applyBarBottomSpacing(container, fallbackSpacing, fallbackSpacing);
             }
         } catch (err) {
-            console.warn('应用域名样式时出现问题:', err);
+            console.warn(t('应用域名样式时出现问题:'), err);
         }
     };
 
@@ -7707,14 +7923,14 @@ function isValidDomainInput(str) {
             });
             if (triggered) {
                 attachButtons();
-                console.log("🔔 DOM 发生变化，尝试重新附加按钮。");
+                console.log(t('🔔 DOM 发生变化，尝试重新附加按钮。'));
             }
         });
         observer.observe(document.body, {
             childList: true,
             subtree: true,
         });
-        console.log("🔔 MutationObserver 已启动，监听 DOM 变化。");
+        console.log(t('🔔 MutationObserver 已启动，监听 DOM 变化。'));
 
         // 先尝试一次；再延迟一次，保证容器创建完成后也能生效
         try { applyDomainStyles(); } catch (_) {}
@@ -7722,7 +7938,7 @@ function isValidDomainInput(str) {
     };
 
     window.addEventListener('load', () => {
-        console.log("⏳ 页面已完全加载，开始初始化脚本。");
+        console.log(t('⏳ 页面已完全加载，开始初始化脚本。'));
         initialize();
     });
 
