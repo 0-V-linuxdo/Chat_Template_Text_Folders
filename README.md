@@ -1,4 +1,4 @@
-<img src="./Icon.svg" alt="图标" width="60" height="60"/>
+<img src="https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg" alt="图标" width="60" height="60"/>
 
 # [Chat] Template Text Folders
 
