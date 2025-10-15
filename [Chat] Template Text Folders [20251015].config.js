@@ -127,6 +127,9 @@
         "如：button.send-btn 或 form button[type=\"submit\"]": "e.g. button.send-btn or form button[type=\"submit\"]",
         "支持 https:// 链接或 data: URL": "Supports https:// links or data: URLs",
         "导入的配置文件内容无效！": "Imported config file content is invalid!",
+        "自动": "Auto",
+        "中文": "中文",
+        "English": "English",
         "导入的配置文件无效！缺少必要字段。": "Imported config file invalid! Missing required fields.",
         "导入的配置文件解析失败！请确认文件格式正确。": "Failed to parse imported config file! Check the format.",
         "导入配置时发生错误:": "Error occurred while importing config:",
@@ -266,7 +269,6 @@
         "文本模板": "Text Template",
         "样式设置": "Style Settings",
         "提交设置": "Submit Settings",
-        "自动提交 (在填充后自动提交内容)": "Auto submit (submit automatically after filling)",
         "🎨 样式管理": "🎨 Style Manager",
         "💾 关闭并保存": "💾 Save & Close",
         "📊 导入后计数器已更新。": "📊 Counters updated after import.",
@@ -286,8 +288,9 @@
         "\"{{folderName}}\" 文件夹有 {{count}} 个按钮": "Folder \"{{folderName}}\" has {{count}} buttons",
         "📊 计数器已更新: {{folderCount}}个文件夹, {{buttonCount}}个按钮总数": "📊 Counters updated: {{folderCount}} folders, {{buttonCount}} buttons in total",
         "模板变量: {{variable}}": "Template variables: {{variable}}",
-        "🛠️ 配置管理": "🛠️ Config Manager"
-    };
+        "🛠️ 配置管理": "🛠️ Config Manager",
+        "语言": "Language"
+};
 
     const buildLocaleMap = () => {
         const zhTranslations = {};
