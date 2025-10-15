@@ -96,7 +96,7 @@
         "使用 macOS / Meta 键组合模拟提交": "Use macOS/Meta key combo to submit",
         "使用自定义选择器定位需要点击的提交按钮。": "Use a custom selector to locate the submit button.",
         "保存": "Save",
-        "修改": "Update",
+        "修改": "Edit",
         "恢复默认设置：": "Restore defaults:",
         "关闭并保存": "Save & Close",
         "创建": "Create",
