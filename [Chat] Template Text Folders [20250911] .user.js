@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251013] +fix3.4
+// @name         [Chat] Template Text Folders [20251014] +fix1.0
 // @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251013]
+// @version      [20251014]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 // @update-log   insertTextSmart Fixed
 //
@@ -263,6 +263,39 @@
         textarea.style.minHeight = `${minHeight}px`;
         textarea.style.maxHeight = `${maxHeight}px`;
         textarea.style.height = `${targetHeight}px`;
+    };
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    const createAutoFaviconIcon = () => {
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 32 32');
+        svg.setAttribute('data-name', 'Layer 1');
+        svg.setAttribute('id', 'Layer_1');
+        svg.setAttribute('fill', '#000000');
+        svg.setAttribute('xmlns', SVG_NS);
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        svg.style.width = '18px';
+        svg.style.height = '18px';
+        svg.style.display = 'block';
+
+        const segments = [
+            { d: 'M23.75,16A7.7446,7.7446,0,0,1,8.7177,18.6259L4.2849,22.1721A13.244,13.244,0,0,0,29.25,16', fill: '#00ac47' },
+            { d: 'M23.75,16a7.7387,7.7387,0,0,1-3.2516,6.2987l4.3824,3.5059A13.2042,13.2042,0,0,0,29.25,16', fill: '#4285f4' },
+            { d: 'M8.25,16a7.698,7.698,0,0,1,.4677-2.6259L4.2849,9.8279a13.177,13.177,0,0,0,0,12.3442l4.4328-3.5462A7.698,7.698,0,0,1,8.25,16Z', fill: '#ffba00' },
+            { d: 'M16,8.25a7.699,7.699,0,0,1,4.558,1.4958l4.06-3.7893A13.2152,13.2152,0,0,0,4.2849,9.8279l4.4328,3.5462A7.756,7.756,0,0,1,16,8.25Z', fill: '#ea4435' },
+            { d: 'M29.25,15v1L27,19.5H16.5V14H28.25A1,1,0,0,1,29.25,15Z', fill: '#4285f4' }
+        ];
+
+        segments.forEach(({ d, fill }) => {
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', fill);
+            svg.appendChild(path);
+        });
+
+        return svg;
     };
 
     // 用于统一创建 overlay + dialog，样式与默认逻辑保持一致
@@ -6480,13 +6513,7 @@ function showEditDomainStyleDialog(index) {
     autoFaviconBtn2.style.flexShrink = '0';
     autoFaviconBtn2.style.padding = '0';
 
-    const autoFaviconIcon2 = document.createElement('img');
-    autoFaviconIcon2.src = 'https://www.google.com/favicon.ico';
-    autoFaviconIcon2.alt = 'Google';
-    autoFaviconIcon2.style.width = '18px';
-    autoFaviconIcon2.style.height = '18px';
-    autoFaviconIcon2.loading = 'lazy';
-    autoFaviconIcon2.referrerPolicy = 'no-referrer';
+    const autoFaviconIcon2 = createAutoFaviconIcon();
     autoFaviconBtn2.appendChild(autoFaviconIcon2);
 
     faviconActionsRow2.appendChild(faviconHelp2);
@@ -7221,13 +7248,7 @@ function showDomainRuleEditorDialog(ruleData, onSave) {
     autoFaviconBtn.style.flexShrink = '0';
     autoFaviconBtn.style.padding = '0';
 
-    const autoFaviconIcon = document.createElement('img');
-    autoFaviconIcon.src = 'https://www.google.com/favicon.ico';
-    autoFaviconIcon.alt = 'Google';
-    autoFaviconIcon.style.width = '18px';
-    autoFaviconIcon.style.height = '18px';
-    autoFaviconIcon.loading = 'lazy';
-    autoFaviconIcon.referrerPolicy = 'no-referrer';
+    const autoFaviconIcon = createAutoFaviconIcon();
     autoFaviconBtn.appendChild(autoFaviconIcon);
 
     faviconActionsRow.appendChild(faviconHelp);
