@@ -1,0 +1,8 @@
+{
+  "name": "chat-template-text-folders",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js"
+  }
+}
