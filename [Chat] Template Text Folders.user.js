@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251016] +fix1.18
+// @name         [Chat] Template Text Folders [20251016] +fix2.4
 // @namespace    0_V userscripts/[Chat] Template Text Folders
 // @version      [20251016]
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
-// @update-log   insertTextSmart Fixed
+// @update-log   Settings folder preview now mirrors button preview styling
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -524,11 +524,49 @@
                 .cttf-dialog *::-webkit-scrollbar-button {
                     display: none;
                 }
+                .cttf-scrollable {
+                    scrollbar-width: thin;
+                    scrollbar-color: var(--cttf-scrollbar-thumb, rgba(120, 120, 120, 0.6)) transparent;
+                }
+                .cttf-scrollable::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                    background: transparent;
+                }
+                .cttf-scrollable::-webkit-scrollbar-track {
+                    background: transparent;
+                    border: none;
+                    margin: 0;
+                }
+                .cttf-scrollable::-webkit-scrollbar-thumb {
+                    background-color: var(--cttf-scrollbar-thumb, rgba(120, 120, 120, 0.6));
+                    border-radius: 999px;
+                    border: none;
+                }
+                .cttf-scrollable::-webkit-scrollbar-corner {
+                    background: transparent;
+                }
+                .cttf-scrollable::-webkit-scrollbar-button {
+                    display: none;
+                }
                 .hide-scrollbar {
                     scrollbar-width: none;
                 }
                 .hide-scrollbar::-webkit-scrollbar {
                     display: none;
+                }
+                .cttf-dialog input,
+                .cttf-dialog textarea,
+                .cttf-dialog select {
+                    color: var(--input-text-color, var(--text-color, #333333));
+                    background-color: var(--input-bg, var(--dialog-bg, #ffffff));
+                    border-color: var(--input-border-color, var(--border-color, #d1d5db));
+                }
+                .cttf-dialog input::placeholder,
+                .cttf-dialog textarea::placeholder,
+                .cttf-dialog input::-webkit-input-placeholder,
+                .cttf-dialog textarea::-webkit-input-placeholder {
+                    color: var(--input-placeholder-color, var(--input-text-color, rgba(107, 114, 128, 0.75)));
                 }
             `;
             uiShadowRoot.appendChild(baseStyle);
@@ -786,6 +824,7 @@
             shadowColor: 'rgba(0, 0, 0, 0.1)',
             buttonBg: '#f3f4f6',
             buttonHoverBg: '#e5e7eb',
+            clearIconColor: '#333333',
             dangerColor: '#ef4444',
             successColor: '#22c55e',
             addColor: '#fd7e14',
@@ -796,27 +835,36 @@
             tabBg: '#f3f4f6',
             tabActiveBg: '#3B82F6',
             tabHoverBg: '#e5e7eb',
-            tabBorder: '#e5e7eb'
+            tabBorder: '#e5e7eb',
+            inputTextColor: '#1f2937',
+            inputPlaceholderColor: '#9ca3af',
+            inputBg: '#ffffff',
+            inputBorderColor: '#d1d5db'
         },
         dark: {
-            folderBg: 'rgba(31, 41, 55, 0.8)',
-            dialogBg: '#1f2937',
+            folderBg: 'rgba(17, 17, 17, 0.85)',
+            dialogBg: '#111111',
             textColor: '#e5e7eb',
-            borderColor: '#374151',
-            shadowColor: 'rgba(0, 0, 0, 0.3)',
-            buttonBg: '#374151',
-            buttonHoverBg: '#4b5563',
+            borderColor: '#2a2a2a',
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            buttonBg: '#1f1f1f',
+            buttonHoverBg: '#2c2c2c',
+            clearIconColor: '#ffffff',
             dangerColor: '#dc2626',
             successColor: '#16a34a',
             addColor: '#fd7e14',
             primaryColor: '#2563EB',
             infoColor: '#4F46E5',
-            cancelColor: '#4B5563',
+            cancelColor: '#3f3f46',
             overlayBg: 'rgba(0, 0, 0, 0.7)',
-            tabBg: '#374151',
+            tabBg: '#1f1f1f',
             tabActiveBg: '#2563EB',
-            tabHoverBg: '#4b5563',
-            tabBorder: '#4b5563'
+            tabHoverBg: '#2c2c2c',
+            tabBorder: '#2a2a2a',
+            inputTextColor: '#f9fafb',
+            inputPlaceholderColor: 'rgba(255, 255, 255, 0.7)',
+            inputBg: '#1f1f1f',
+            inputBorderColor: '#3f3f46'
         }
     };
 
@@ -1010,7 +1058,8 @@
          *   cssCode: ".some-class { color: red; }"
          * }
          */
-        domainStyleSettings: []
+        domainStyleSettings: [],
+        showFolderIcons: false
     };
 
     defaultConfig.buttonBarHeight = 40;
@@ -1018,18 +1067,36 @@
 
     let buttonConfig = JSON.parse(localStorage.getItem('chatGPTButtonFoldersConfig')) || JSON.parse(JSON.stringify(defaultConfig));
 
+    let configAdjusted = false;
+
     if (!Array.isArray(buttonConfig.domainStyleSettings)) {
         buttonConfig.domainStyleSettings = [];
+        configAdjusted = true;
     }
 
     if (typeof buttonConfig.buttonBarHeight !== 'number') {
         buttonConfig.buttonBarHeight = defaultConfig.buttonBarHeight;
+        configAdjusted = true;
     }
 
     if (typeof buttonConfig.buttonBarBottomSpacing !== 'number') {
         buttonConfig.buttonBarBottomSpacing = defaultConfig.buttonBarBottomSpacing;
+        configAdjusted = true;
     }
-    buttonConfig.buttonBarBottomSpacing = Math.max(-200, Math.min(200, Number(buttonConfig.buttonBarBottomSpacing) || 0));
+    const clampedBottomSpacing = Math.max(-200, Math.min(200, Number(buttonConfig.buttonBarBottomSpacing) || 0));
+    if (buttonConfig.buttonBarBottomSpacing !== clampedBottomSpacing) {
+        buttonConfig.buttonBarBottomSpacing = clampedBottomSpacing;
+        configAdjusted = true;
+    }
+
+    if (typeof buttonConfig.showFolderIcons !== 'boolean') {
+        buttonConfig.showFolderIcons = false;
+        configAdjusted = true;
+    }
+
+    if (configAdjusted) {
+        localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+    }
 
     // 若本地无此字段，则初始化
     if (!buttonConfig.domainAutoSubmitSettings) {
@@ -3726,10 +3793,10 @@
 
     const createClearButton = () => {
         const button = document.createElement('button');
-        button.innerText = '✖️';
+        button.textContent = '✖';
         button.type = 'button';
         button.style.backgroundColor = 'var(--button-bg, #f3f4f6)';
-        button.style.color = 'var(--text-color, #333333)';
+        button.style.color = 'var(--clear-icon-color, var(--text-color, #333333))';
         button.style.border = 'none';
         button.style.borderRadius = '4px';
         button.style.padding = '5px 10px';
@@ -3766,7 +3833,7 @@
     // 新增的配置设置按钮和弹窗
     const createConfigSettingsButton = () => {
         const button = document.createElement('button');
-        button.innerText = t('🛠️ 配置管理');
+        button.innerText = t('🛠️ 脚本配置');
         button.type = 'button';
         button.style.backgroundColor = 'var(--info-color, #4F46E5)';
         button.style.color = 'white';
@@ -3825,11 +3892,12 @@
 
         const dialog = document.createElement('div');
         dialog.classList.add('import-diff-dialog');
+        dialog.classList.add('cttf-dialog');
         dialog.style.cssText = `
             background-color: var(--dialog-bg, #ffffff);
             color: var(--text-color, #333333);
             border-radius: 6px;
-            padding: 24px;
+            padding: 8px 18px 16px;
             box-shadow: 0 18px 36px var(--shadow-color, rgba(15, 23, 42, 0.35));
             border: 1px solid var(--border-color, #e5e7eb);
             width: 960px;
@@ -3889,15 +3957,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 6px;
+            margin-bottom: 6px;
         `;
 
         const title = document.createElement('div');
         title.style.cssText = `
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
             font-size: 18px;
             font-weight: 600;
             color: var(--text-color, #333333);
@@ -3908,7 +3976,7 @@
         headerActions.style.cssText = `
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
         `;
 
         const closeBtn = document.createElement('button');
@@ -4259,7 +4327,7 @@
             summaryBar.style.alignItems = 'center';
             summaryBar.style.columnGap = '0';
             summaryBar.style.rowGap = '8px';
-            summaryBar.style.marginBottom = '16px';
+            summaryBar.style.marginBottom = '8px';
         };
         applySummaryGridLayout();
 
@@ -4310,7 +4378,7 @@
             summaryBar.style.alignItems = 'center';
             summaryBar.style.justifyContent = 'center';
             summaryBar.style.gap = '8px';
-            summaryBar.style.marginBottom = '16px';
+            summaryBar.style.marginBottom = '8px';
             const noDiff = document.createElement('span');
             noDiff.textContent = t('暂无差异，导入配置的结构与当前一致。');
             noDiff.style.color = 'var(--muted-text-color, #6b7280)';
@@ -4381,7 +4449,8 @@
             flex-direction: column;
             gap: 8px;
         `;
-        folderList.classList.add('hide-scrollbar');
+        folderList.classList.add('cttf-scrollable');
+        folderList.style.direction = 'rtl';
         folderPanel.appendChild(folderList);
 
         const detailPanel = document.createElement('div');
@@ -4431,6 +4500,7 @@
                     transition: background-color 0.2s ease, border-color 0.2s ease;
                     color: var(--text-color, #333333);
                 `;
+                folderButton.style.direction = 'ltr';
                 folderButton.addEventListener('click', () => {
                     selectedFolderName = item.name;
                     renderFolderList();
@@ -4692,11 +4762,11 @@
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    gap: 10px;
-                    padding: 14px;
+                    gap: 4px;
+                    padding: 10px;
                     overflow: auto;
                 `;
-                list.classList.add('hide-scrollbar');
+                list.classList.add('cttf-scrollable');
                 column.appendChild(list);
 
                 if (!order.length) {
@@ -4753,10 +4823,10 @@
                     item.style.cssText = `
                         border: 1px solid ${borderColor};
                         border-radius: 6px;
-                        padding: 12px;
+                        padding: 6px 8px;
                         display: flex;
                         flex-direction: column;
-                        gap: 6px;
+                        gap: 3px;
                         background-color: ${backgroundColor};
                     `;
 
@@ -4765,14 +4835,14 @@
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        gap: 8px;
+                        gap: 4px;
                     `;
 
                     const rowLeft = document.createElement('div');
                     rowLeft.style.cssText = `
                         display: flex;
                         align-items: center;
-                        gap: 10px;
+                        gap: 8px;
                         min-width: 0;
                     `;
                     const previewButton = createCustomButtonElement(btnName, btnConfig || {});
@@ -5214,6 +5284,10 @@
                                     // 替换现有配置
                                     buttonConfig = importedConfig;
 
+                                    if (typeof buttonConfig.showFolderIcons !== 'boolean') {
+                                        buttonConfig.showFolderIcons = false;
+                                    }
+
                                     // 确保所有按钮都有'type'字段和'autoSubmit'字段
                                     Object.entries(buttonConfig.folders).forEach(([folderName, folderConfig]) => {
                                         // 确保文件夹有hidden字段
@@ -5326,83 +5400,183 @@
             max-width: 90vw;
         `;
 
-        const configTitle = t('🛠️ 配置管理');
+        const configTitle = t('🛠️ 脚本配置');
         const rowLabelStyle = 'display:inline-flex;min-width:130px;justify-content:flex-start;margin-right:12px;color: var(--text-color, #333333);';
-        setTrustedHTML(dialog, `
-            <h3 style="margin:0 0 20px 0;font-size:18px;font-weight:600; color: var(--text-color, #333333);">${configTitle}</h3>
+        const tabNavigation = `
             <div style="
-                display:flex;
-                flex-direction:column;
-                gap:20px;
-                margin-bottom:20px;
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                border-bottom: 1px solid var(--border-color, #e5e7eb);
             ">
-                <!-- 语言选择 -->
+                <button class="tab-button active" data-tab="appearanceTab" style="
+                    ${Object.entries(styles.button).map(([k, v]) => `${k}:${v}`).join(';')};
+                    background-color: var(--primary-color, #3B82F6);
+                    color: white;
+                    border-radius: 4px 4px 0 0;
+                    border-bottom: 2px solid transparent;
+                ">${t('外观')}</button>
+                <button class="tab-button" data-tab="configTab" style="
+                    ${Object.entries(styles.button).map(([k, v]) => `${k}:${v}`).join(';')};
+                    background-color: var(--button-bg, #f3f4f6);
+                    color: var(--text-color, #333333);
+                    border-radius: 4px 4px 0 0;
+                    border-bottom: 2px solid transparent;
+                ">${t('配置')}</button>
+            </div>
+        `;
+        const appearanceTab = `
+            <div id="appearanceTab" class="tab-content" style="display: block;">
                 <div style="
                     display:flex;
-                    flex-direction:row;
-                    align-items:center;
-                    padding-bottom:16px;
-                    border-bottom:1px solid var(--border-color, #e5e7eb);
+                    flex-direction:column;
+                    gap:20px;
+                    margin-bottom:20px;
                 ">
-                    <span style="${rowLabelStyle}">${t('语言')}：</span>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <button class="config-lang-btn" data-lang="auto" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            border-radius: 999px;
-                            padding: 6px 14px;
-                        ">${t('自动')}</button>
-                        <button class="config-lang-btn" data-lang="zh" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            border-radius: 999px;
-                            padding: 6px 14px;
-                        ">${t('中文')}</button>
-                        <button class="config-lang-btn" data-lang="en" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            border-radius: 999px;
-                            padding: 6px 14px;
-                        ">${t('English')}</button>
+                    <div style="
+                        display:flex;
+                        flex-direction:row;
+                        align-items:center;
+                        padding-bottom:16px;
+                        border-bottom:1px solid var(--border-color, #e5e7eb);
+                    ">
+                        <span style="${rowLabelStyle}">${t('语言')}：</span>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <button class="config-lang-btn" data-lang="auto" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--input-bg, var(--button-bg, #f3f4f6));
+                                color: var(--input-text-color, var(--text-color, #333333));
+                                border: 1px solid var(--input-border-color, var(--border-color, #d1d5db));
+                                border-radius: 999px;
+                                padding: 6px 14px;
+                            ">${t('自动')}</button>
+                            <button class="config-lang-btn" data-lang="zh" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--input-bg, var(--button-bg, #f3f4f6));
+                                color: var(--input-text-color, var(--text-color, #333333));
+                                border: 1px solid var(--input-border-color, var(--border-color, #d1d5db));
+                                border-radius: 999px;
+                                padding: 6px 14px;
+                            ">${t('中文')}</button>
+                            <button class="config-lang-btn" data-lang="en" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--input-bg, var(--button-bg, #f3f4f6));
+                                color: var(--input-text-color, var(--text-color, #333333));
+                                border: 1px solid var(--input-border-color, var(--border-color, #d1d5db));
+                                border-radius: 999px;
+                                padding: 6px 14px;
+                            ">${t('English')}</button>
+                        </div>
                     </div>
-                </div>
-                <!-- 重置按钮部分 -->
-                <div style="
-                    display:flex;
-                    flex-direction:row;
-                    align-items:center;
-                    padding-bottom:16px;
-                    border-bottom:1px solid var(--border-color, #e5e7eb);
-                ">
-                    <span style="${rowLabelStyle}">${t('恢复默认设置：')}</span>
-                    <button id="resetSettingsBtn" style="
-                        ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                        background-color: var(--cancel-color, #6B7280);
-                        color: white;
-                        border-radius:4px;
-                    ">${t('↩️ 重置')}</button>
-                </div>
-                <!-- 导入导出部分 -->
-                <div style="
-                    display:flex;
-                    flex-direction:row;
-                    align-items:center;
-                ">
-                    <span style="${rowLabelStyle}">${t('配置导入导出：')}</span>
-                    <div style="display:flex;gap:8px;">
-                        <button id="importConfigBtn" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            background-color: var(--add-color, #fd7e14);
-                            color: white;
-                            border-radius:4px;
-                        ">${t('📥 导入')}</button>
-                        <button id="exportConfigBtn" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            background-color: var(--success-color, #22c55e);
-                            color: white;
-                            border-radius:4px;
-                        ">${t('📤 导出')}</button>
+                    <div style="
+                        display:flex;
+                        flex-direction:row;
+                        align-items:center;
+                        padding-bottom:16px;
+                        border-bottom:1px solid var(--border-color, #e5e7eb);
+                    ">
+                        <span style="${rowLabelStyle}">${t('文件夹图标：')}</span>
+                        <div class="cttf-switch-wrapper">
+                            <label class="cttf-switch">
+                                <input id="folderIconToggleInput" type="checkbox" />
+                                <span class="cttf-switch-slider"></span>
+                            </label>
+                            <span id="folderIconToggleText" style="
+                                font-size: 13px;
+                                color: var(--text-color, #333333);
+                                font-weight: 500;
+                                min-width: 38px;
+                            ">${t('显示')}</span>
+                        </div>
                     </div>
                 </div>
             </div>
+        `;
+        const configTab = `
+            <div id="configTab" class="tab-content" style="display: none;">
+                <div style="
+                    display:flex;
+                    flex-direction:column;
+                    gap:20px;
+                    margin-bottom:0;
+                ">
+                    <div style="
+                        display:flex;
+                        flex-direction:row;
+                        align-items:center;
+                        padding-bottom:16px;
+                        border-bottom:1px solid var(--border-color, #e5e7eb);
+                    ">
+                        <span style="${rowLabelStyle}">${t('恢复默认设置：')}</span>
+                        <button id="resetSettingsBtn" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            background-color: var(--cancel-color, #6B7280);
+                            color: white;
+                            border-radius:4px;
+                        ">${t('↩️ 重置')}</button>
+                    </div>
+                    <div style="
+                        display:flex;
+                        flex-direction:row;
+                        align-items:center;
+                    ">
+                        <span style="${rowLabelStyle}">${t('配置导入导出：')}</span>
+                        <div style="display:flex;gap:8px;">
+                            <button id="importConfigBtn" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--add-color, #fd7e14);
+                                color: white;
+                                border-radius:4px;
+                            ">${t('📥 导入')}</button>
+                            <button id="exportConfigBtn" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--success-color, #22c55e);
+                                color: white;
+                                border-radius:4px;
+                            ">${t('📤 导出')}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        setTrustedHTML(dialog, `
+            <h3 style="margin:0 0 20px 0;font-size:18px;font-weight:600; color: var(--text-color, #333333);">${configTitle}</h3>
+            ${tabNavigation}
+            ${appearanceTab}
+            ${configTab}
         `);
+
+        const setupTabs = () => {
+            const tabButtons = dialog.querySelectorAll('.tab-button');
+            const tabContents = dialog.querySelectorAll('.tab-content');
+            const activateTab = (targetId) => {
+                tabButtons.forEach((btn) => {
+                    const isActive = btn.dataset.tab === targetId;
+                    btn.classList.toggle('active', isActive);
+                    btn.style.backgroundColor = isActive
+                        ? 'var(--primary-color, #3B82F6)'
+                        : 'var(--button-bg, #f3f4f6)';
+                    btn.style.color = isActive ? 'white' : 'var(--text-color, #333333)';
+                    btn.style.borderBottom = isActive
+                        ? '2px solid var(--primary-color, #3B82F6)'
+                        : '2px solid transparent';
+                });
+                tabContents.forEach((content) => {
+                    content.style.display = content.id === targetId ? 'block' : 'none';
+                });
+            };
+            tabButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.tab;
+                    if (targetId) {
+                        activateTab(targetId);
+                    }
+                });
+            });
+            activateTab('appearanceTab');
+        };
+        setupTabs();
 
         overlay.appendChild(dialog);
         overlay.style.pointerEvents = 'auto';
@@ -5411,10 +5585,69 @@
 
         const langBtnStyle = document.createElement('style');
         langBtnStyle.textContent = `
+            .config-lang-btn {
+                background-color: var(--input-bg, var(--button-bg, #f3f4f6));
+                color: var(--input-text-color, var(--text-color, #333333));
+                border: 1px solid var(--input-border-color, var(--border-color, #d1d5db));
+                transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+            .config-lang-btn:hover {
+                border-color: var(--primary-color, #3B82F6);
+                box-shadow: 0 0 0 1px var(--primary-color, #3B82F6) inset;
+            }
             .config-lang-btn.active {
                 background-color: var(--primary-color, #3B82F6) !important;
                 color: #ffffff !important;
+                border-color: var(--primary-color, #3B82F6) !important;
                 box-shadow: 0 0 0 1px var(--primary-color, #3B82F6) inset;
+            }
+            .cttf-switch-wrapper {
+                display: inline-flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .cttf-switch {
+                position: relative;
+                display: inline-block;
+                width: 48px;
+                height: 24px;
+            }
+            .cttf-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .cttf-switch-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(148, 163, 184, 0.35);
+                border-radius: 999px;
+                transition: background-color 0.25s ease, box-shadow 0.25s ease;
+            }
+            .cttf-switch-slider::before {
+                position: absolute;
+                content: "";
+                height: 20px;
+                width: 20px;
+                left: 2px;
+                top: 2px;
+                background-color: #ffffff;
+                border-radius: 50%;
+                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+                transition: transform 0.25s ease;
+            }
+            .cttf-switch input:checked + .cttf-switch-slider {
+                background-color: #22c55e;
+            }
+            .cttf-switch input:checked + .cttf-switch-slider::before {
+                transform: translateX(24px);
+            }
+            .cttf-switch input:focus-visible + .cttf-switch-slider {
+                box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
             }
         `;
         dialog.appendChild(langBtnStyle);
@@ -5438,13 +5671,55 @@
             });
         });
 
+        const folderIconToggleInput = dialog.querySelector('#folderIconToggleInput');
+        const folderIconToggleText = dialog.querySelector('#folderIconToggleText');
+        const folderIconToggleSlider = dialog.querySelector('.cttf-switch-slider');
+        const folderIconToggleWrapper = dialog.querySelector('.cttf-switch-wrapper');
+        const updateFolderIconToggleState = () => {
+            if (!folderIconToggleInput) {
+                return;
+            }
+        const enabled = buttonConfig.showFolderIcons === true;
+            folderIconToggleInput.checked = enabled;
+            folderIconToggleInput.setAttribute('aria-checked', enabled ? 'true' : 'false');
+            if (folderIconToggleText) {
+                folderIconToggleText.textContent = enabled ? t('显示') : t('隐藏');
+                folderIconToggleText.style.color = enabled
+                    ? 'var(--success-color, #22c55e)'
+                    : 'var(--muted-text-color, #6b7280)';
+            }
+            const tooltipTarget = folderIconToggleWrapper || folderIconToggleSlider;
+            if (tooltipTarget) {
+                tooltipTarget.title = enabled
+                    ? t('点击后隐藏文件夹图标')
+                    : t('点击后显示文件夹图标');
+            }
+        };
+
+        if (folderIconToggleInput) {
+            updateFolderIconToggleState();
+            folderIconToggleInput.addEventListener('change', () => {
+                const enabled = folderIconToggleInput.checked;
+                buttonConfig.showFolderIcons = enabled;
+                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                updateFolderIconToggleState();
+                console.log(t('🖼️ 文件夹图标显示已切换为 {{state}}', {
+                    state: enabled ? t('显示') : t('隐藏')
+                }));
+                if (currentSettingsOverlay) {
+                    renderFolderList();
+                }
+                updateButtonContainer();
+            });
+        }
+
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay) {
                 closeExistingOverlay(overlay);
                 if (currentConfigOverlay === overlay) {
                     currentConfigOverlay = null;
                 }
-                console.log(t('✅ 配置管理弹窗已通过点击外部关闭'));
+                console.log(t('✅ 脚本配置弹窗已通过点击外部关闭'));
             }
         });
 
@@ -5467,34 +5742,34 @@
                     }, 50);
                 }
 
-                // 导入成功后关闭配置管理弹窗
+                // 导入成功后关闭脚本配置弹窗
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log(t('✅ 配置管理弹窗已自动关闭'));
+                    console.log(t('✅ 脚本配置弹窗已自动关闭'));
                 }
             });
         });
 
         dialog.querySelector('#exportConfigBtn').addEventListener('click', () => {
             exportConfig();
-            // 导出完成后关闭配置管理弹窗
+            // 导出完成后关闭脚本配置弹窗
             setTimeout(() => {
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log(t('✅ 配置管理弹窗已在导出后关闭'));
+                    console.log(t('✅ 脚本配置弹窗已在导出后关闭'));
                 }
             }, 500); // 给导出操作一些时间完成
         });
 
         dialog.querySelector('#resetSettingsBtn').addEventListener('click', () => {
         if (confirm(t('确认重置所有配置为默认设置吗？'))) {
-                // 先关闭配置管理弹窗，提升用户体验
+                // 先关闭脚本配置弹窗，提升用户体验
                 if (currentConfigOverlay) {
                     closeExistingOverlay(currentConfigOverlay);
                     currentConfigOverlay = null;
-                    console.log(t('✅ 配置管理弹窗已在重置前关闭'));
+                    console.log(t('✅ 脚本配置弹窗已在重置前关闭'));
                 }
 
                 // 执行配置重置
@@ -5571,32 +5846,99 @@
             folderItem.setAttribute('draggable', 'true');
             folderItem.setAttribute('data-folder', fname);
 
-            const {container: leftInfo, folderPreview} = (function createFolderPreview(fname, fconfig){
-                const container = document.createElement('div');
-                container.style.display = 'flex';
-                container.style.alignItems = 'center';
-                container.style.gap = '8px';
-                container.style.flex = '1';
-                container.style.minWidth = '0'; // 允许收缩
-                container.style.paddingRight = '8px';
+        const { container: leftInfo, folderPreview } = (function createFolderPreview(fname, fconfig) {
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '10px';
+            container.style.flex = '1';
+            container.style.minWidth = '0';
+            container.style.paddingRight = '8px';
 
-                const folderPreview = document.createElement('button');
-                folderPreview.textContent = fname;
-                folderPreview.style.backgroundColor = fconfig.color;
-                folderPreview.style.color = fconfig.textColor || '#ffffff';
-                folderPreview.style.border = 'none';
-                folderPreview.style.borderRadius = '4px';
-                folderPreview.style.padding = '4px 8px';
-                folderPreview.style.fontSize = '14px';
-                folderPreview.style.cursor = 'grab';
-                folderPreview.style.whiteSpace = 'nowrap';
-                folderPreview.style.overflow = 'hidden';
-                folderPreview.style.textOverflow = 'ellipsis';
-                folderPreview.style.maxWidth = '140px';
+            const showIcons = buttonConfig && buttonConfig.showFolderIcons === true;
+            const { iconSymbol, textLabel } = extractButtonIconParts(fname);
+            const normalizedLabel = (textLabel || fname || '').trim();
+            const fallbackLabel = normalizedLabel || fname || t('预览文件夹');
+            const fallbackSymbol = iconSymbol || (Array.from(fallbackLabel)[0] || '📁');
 
-                container.appendChild(folderPreview);
-                return {container, folderPreview};
-            })(fname, fconfig);
+            const previewButton = document.createElement('button');
+            previewButton.type = 'button';
+            previewButton.setAttribute('data-folder-preview', fname);
+            previewButton.title = fname;
+            previewButton.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                border-radius: 4px;
+                background-color: transparent;
+                border: none;
+                cursor: grab;
+                flex-shrink: 1;
+                min-width: 0;
+                max-width: 100%;
+                margin: 0 8px 0 0;
+            `;
+
+            const pill = document.createElement('span');
+            pill.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: ${showIcons ? '6px' : '0'};
+                background: ${fconfig.color || 'var(--primary-color, #3B82F6)'};
+                color: ${fconfig.textColor || '#ffffff'};
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 14px;
+                font-weight: ${selectedFolderName === fname ? '600' : '500'};
+                min-width: 0;
+                max-width: 100%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                pointer-events: none;
+                transition: all 0.2s ease;
+            `;
+
+            if (showIcons) {
+                const iconSpan = document.createElement('span');
+                iconSpan.style.display = 'inline-flex';
+                iconSpan.style.alignItems = 'center';
+                iconSpan.style.justifyContent = 'center';
+                iconSpan.style.fontSize = '14px';
+                iconSpan.style.lineHeight = '1';
+                iconSpan.textContent = fallbackSymbol;
+                pill.appendChild(iconSpan);
+            }
+
+            const textSpan = document.createElement('span');
+            textSpan.style.display = 'inline-flex';
+            textSpan.style.alignItems = 'center';
+            textSpan.style.justifyContent = 'center';
+            textSpan.style.pointerEvents = 'none';
+
+            let textContent = showIcons ? normalizedLabel : (fname || normalizedLabel);
+            if (!showIcons && iconSymbol && !fname.includes(iconSymbol)) {
+                textContent = `${iconSymbol} ${textContent || ''}`.trim();
+            }
+            if (!showIcons && !textContent) {
+                textContent = fallbackLabel;
+            }
+            if (textContent) {
+                textSpan.textContent = textContent;
+                pill.appendChild(textSpan);
+            }
+
+            previewButton.appendChild(pill);
+
+            // Ensure the preview keeps the requested button style while remaining draggable/selectable
+            previewButton.style.whiteSpace = 'nowrap';
+            previewButton.style.alignSelf = 'flex-start';
+
+            container.appendChild(previewButton);
+            return { container, folderPreview: previewButton };
+        })(fname, fconfig);
 
             const rightBtns = document.createElement('div');
             rightBtns.style.display = 'flex';
@@ -6489,7 +6831,7 @@
 
         // 样式管理按钮
         const styleMgmtBtn = document.createElement('button');
-        styleMgmtBtn.innerText = t('🎨 样式管理');
+        styleMgmtBtn.innerText = t('🎨 网站样式');
         styleMgmtBtn.type = 'button';
         styleMgmtBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
         styleMgmtBtn.style.color = 'white';
@@ -6503,7 +6845,7 @@
         });
         headerBtnsWrapper.appendChild(styleMgmtBtn);
 
-        // 原有创建配置管理按钮
+        // 原有创建脚本配置按钮
         const openConfigBtn = createConfigSettingsButton();
         headerBtnsWrapper.appendChild(openConfigBtn);
 
@@ -7316,7 +7658,7 @@ function showStyleSettingsDialog() {
 
     // 使用统一弹窗
     const { overlay, dialog } = createUnifiedDialog({
-        title: '🎨 样式管理',
+        title: '🎨 网站样式',
         width: '750px',
         onClose: () => {
             currentStyleOverlay = null;
@@ -7528,9 +7870,9 @@ function showStyleSettingsDialog() {
                         width:100%;
                         min-height:${cssTextareaHeight}px;
                         max-height:360px;
-                        background-color: rgba(255,255,255,0.92);
-                        color: var(--text-color, #1f2937);
-                        border:1px solid var(--border-color, #d1d5db);
+                        background-color: var(--input-bg, var(--dialog-bg, #ffffff));
+                        color: var(--input-text-color, var(--text-color, #333333));
+                        border:1px solid var(--input-border-color, var(--border-color, #d1d5db));
                         border-radius:6px;
                         padding:12px;
                         font-size:13px;
