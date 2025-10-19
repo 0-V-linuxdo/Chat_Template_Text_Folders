@@ -57,9 +57,9 @@
  *
  * ----------------------------------------------------------------------
  *
- * 2. [排版提示 | Layout Reminder]
- *    • 🚫 请勿删除本注释块前后的空行，以保持与目标 AI 的兼容布局。
- *    • 🚫 Keep the blank lines above and below this notice intact to keep AI hosts aligned.
+ * 2. [安全提示 | Safety Reminder]
+ *    • ✅ 必须使用 setTrustedHTML，不得使用 innerHTML。
+ *    • ✅ Always call setTrustedHTML; never rely on innerHTML.
  *
  * ====================== IMPORTANT · NOTICE · END ======================
  */
