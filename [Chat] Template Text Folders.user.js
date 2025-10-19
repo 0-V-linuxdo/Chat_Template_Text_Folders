@@ -52,14 +52,14 @@
 /* ===================== IMPORTANT · NOTICE · START =====================
  *
  * 1. [编辑指引 | Edit Guidance]
- *    • ⚠️ 这是一个自动生成的文件：请在 src/modules 目录下的模块中进行修改，然后运行 npm run build 在 dist/ 目录下重新生成。
- *    • ⚠️ This project bundles auto-generated artifacts. Make changes inside the modules under src/modules, then run npm run build to regenerate everything under dist/.
+ *    • ⚠️ 这是一个自动生成的文件：请在 `src/modules` 目录下的模块中进行修改，然后运行 `npm run build` 在 `dist/` 目录下重新生成。
+ *    • ⚠️ This project bundles auto-generated artifacts. Make changes inside the modules under `src/modules`, then run `npm run build` to regenerate everything under `dist/`.
  *
  * ----------------------------------------------------------------------
  *
  * 2. [安全提示 | Safety Reminder]
- *    • ✅ 必须使用 setTrustedHTML，不得使用 innerHTML。
- *    • ✅ Always call setTrustedHTML; never rely on innerHTML.
+ *    • ✅ 必须使用 `setTrustedHTML`，不得使用 `innerHTML`。
+ *    • ✅ Always call `setTrustedHTML`; never rely on `innerHTML`.
  *
  * ====================== IMPORTANT · NOTICE · END ======================
  */
