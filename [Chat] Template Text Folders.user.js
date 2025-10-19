@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251016] +fix2.4
-// @namespace    0_V userscripts/[Chat] Template Text Folders
-// @version      [20251016]
+// @name         [Chat] Template Text Folders [20251019] v1.0.0
+// @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
-// @update-log   Settings folder preview now mirrors button preview styling
+//
+// @version      [20251019] v1.0.0
+// @update-log   Refactored module boundaries, moved toolbar logic to dedicated module, and bumped metadata to v1.0.0
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -44,14 +45,33 @@
 // @match        https://www.notion.so/*
 //
 // @grant        none
-// @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20251016%5D.config.js
+// @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20251018%5D.config.js
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
 // ==/UserScript==
+
+/* ===================== IMPORTANT · NOTICE · START =====================
+ *
+ * 1. [编辑指引 | Edit Guidance]
+ *    • ⚠️ 这是一个自动生成的文件：请在 src/modules 目录下的模块中进行修改，然后运行 npm run build 在 dist/ 目录下重新生成。
+ *    • ⚠️ This project bundles auto-generated artifacts. Make changes inside the modules under src/modules, then run npm run build to regenerate everything under dist/.
+ *
+ * ----------------------------------------------------------------------
+ *
+ * 2. [排版提示 | Layout Reminder]
+ *    • 🚫 请勿删除本注释块前后的空行，以保持与目标 AI 的兼容布局。
+ *    • 🚫 Keep the blank lines above and below this notice intact to keep AI hosts aligned.
+ *
+ * ====================== IMPORTANT · NOTICE · END ======================
+ */
+
+/* -------------------------------------------------------------------------- *
+ * Module 01 · Core runtime services (globals, utilities, config bootstrapping)
+ * -------------------------------------------------------------------------- */
 
 (function () {
     'use strict';
 
-    console.log("🎉 [Chat] Template Text Folders [20251013] 🎉");
+    console.log("🎉 [Chat] Template Text Folders [20251018] v1.0.0 🎉");
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {
@@ -74,6 +94,7 @@
         return trustedHTMLPolicy;
     };
 
+    // Trusted Types: always call this helper instead of element.innerHTML to keep every injection compatible with strict hosts.
     const setTrustedHTML = (element, html) => {
         if (!element) {
             return;
@@ -1791,6 +1812,19 @@
         }
     };
 
+
+
+
+
+    // Toolbar-specific interactions are implemented in src/modules/02-toolbar.js
+    let createCustomButton = (name, config, folderName) => {
+        console.warn('createCustomButton is not initialized yet.');
+        return document.createElement('button');
+    };
+/* -------------------------------------------------------------------------- *
+ * Module 02 · Toolbar UI (folder buttons, popovers, quick input tools)
+ * -------------------------------------------------------------------------- */
+
     const formatButtonDisplayLabel = (label) => {
         if (typeof label !== 'string') {
             return '';
@@ -1937,245 +1971,28 @@
         return button;
     };
 
-    const extractTemplateVariables = (text = '') => {
-        if (typeof text !== 'string' || !text.includes('{')) {
-            return [];
-        }
-
-        const matches = new Set();
-        const fallbackMatches = text.match(/\{\{[A-Za-z0-9_-]+\}\|\{[A-Za-z0-9_-]+\}\}/g) || [];
-        fallbackMatches.forEach(match => matches.add(match));
-
-        let sanitized = text;
-        fallbackMatches.forEach(match => {
-            sanitized = sanitized.split(match).join(' ');
-        });
-
-        const singleMatches = sanitized.match(/\{[A-Za-z0-9_-]+\}/g) || [];
-        singleMatches.forEach(match => matches.add(match));
-
-        return Array.from(matches);
-    };
-
-    // 引入全局变量来跟踪当前打开的文件夹
     const currentlyOpenFolder = {
         name: null,
         element: null
     };
 
-    const createCustomButton = (name, config, folderName) => {
-        const button = createCustomButtonElement(name, config, folderName);
-        button.setAttribute('draggable', 'true');
-        button.setAttribute('data-button-name', name);
-        button.setAttribute('data-folder-name', folderName);
-
-        button.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('application/json', JSON.stringify({
-                buttonName: name,
-                sourceFolder: folderName,
-                config: config
-            }));
-            e.currentTarget.style.opacity = '0.5';
-        });
-
-        button.addEventListener('dragend', (e) => {
-            e.currentTarget.style.opacity = '1';
-        });
-
-        button.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            const focusedElement = document.activeElement;
-            if (focusedElement && (focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                setTimeout(() => focusedElement.focus(), 0);
-            }
-        });
-
-        button.addEventListener('mouseenter', () => {
-            button.style.transform = 'scale(1.05)';
-            button.style.boxShadow = '0 3px 6px rgba(0,0,0,0.1)';
-        });
-
-        button.addEventListener('mouseleave', () => {
-            button.style.transform = 'scale(1)';
-            button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-        });
-
-        // 处理按钮点击事件
-        button.addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (config.type === "template") {
-                const focusedElement = document.activeElement;
-                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
-                    return;
-                }
-
-                // 检查模板是否需要剪切板内容
-                const needsClipboard = config.text.includes('{clipboard}') || config.text.includes('{{inputboard}|{clipboard}}');
-
-                let clipboardText = '';
-                if (needsClipboard) {
-                    try {
-                        clipboardText = await navigator.clipboard.readText();
-                    } catch (err) {
-                        console.error("无法访问剪贴板内容:", err);
-                        alert(t('无法访问剪贴板内容。请检查浏览器权限。'));
-                        return;
-                    }
-                }
-
-                // 改进的内容获取方式
-                let inputBoxText = '';
-                if (focusedElement.tagName.toLowerCase() === 'textarea') {
-                    inputBoxText = focusedElement.value;
-                } else {
-                    // 遍历 contenteditable 元素的子节点，正确处理换行
-                    const childNodes = Array.from(focusedElement.childNodes);
-                    const textParts = [];
-                    let lastWasBr = false;
-                    childNodes.forEach((node, index) => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            if (node.textContent.trim() === '') {
-                                if (!lastWasBr && index > 0) {
-                                    textParts.push('\n');
-                                }
-                            } else {
-                                textParts.push(node.textContent);
-                                lastWasBr = false;
-                            }
-                        } else if (node.nodeName === 'BR') {
-                            textParts.push('\n');
-                            lastWasBr = true;
-                        } else if (node.nodeName === 'P' || node.nodeName === 'DIV') {
-                            if (node.textContent.trim() === '') {
-                                textParts.push('\n');
-                            } else {
-                                if (textParts.length > 0) {
-                                    textParts.push('\n');
-                                }
-                                textParts.push(node.textContent);
-                            }
-                            lastWasBr = false;
-                        }
-                    });
-                    inputBoxText = textParts.join('');
-                }
-
-                const selectionText = window.getSelection().toString();
-
-                // 全新的安全变量替换逻辑 - 使用占位符防止嵌套替换
-                let finalText = config.text;
-
-                // 创建变量映射表 - 只有在需要时才包含剪切板内容
-                const variableMap = {
-                    '{{inputboard}|{clipboard}}': inputBoxText.trim() || clipboardText,
-                    '{clipboard}': clipboardText,
-                    '{inputboard}': inputBoxText,
-                    '{selection}': selectionText
-                };
-
-                // 按照优先级顺序进行替换（复合变量优先）
-                const replacementOrder = [
-                    '{{inputboard}|{clipboard}}',
-                    '{clipboard}',
-                    '{inputboard}',
-                    '{selection}'
-                ];
-
-                // 使用安全的占位符机制，确保一次性替换，避免嵌套
-                const placeholderMap = new Map();
-                let placeholderCounter = 0;
-
-                // 第一阶段：将模板中的变量替换为唯一占位符
-                replacementOrder.forEach(variable => {
-                    if (finalText.includes(variable)) {
-                        const placeholder = `__SAFE_PLACEHOLDER_${placeholderCounter++}__`;
-                        placeholderMap.set(placeholder, variableMap[variable]);
-
-                        // 使用 split().join() 确保精确匹配，避免正则表达式问题
-                        finalText = finalText.split(variable).join(placeholder);
-                    }
-                });
-
-                // 第二阶段：将占位符替换为实际值（此时不会再有嵌套问题）
-                placeholderMap.forEach((value, placeholder) => {
-                    finalText = finalText.split(placeholder).join(value);
-                });
-
-                // 统一换行符
-                finalText = finalText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-                const containsInputboard = config.text.includes("{inputboard}") ||
-                    config.text.includes("{{inputboard}|{clipboard}}");
-
-                if (containsInputboard) {
-                    insertTextSmart(focusedElement, finalText, true);
-                    console.log(t('✅ 使用 {inputboard} 变量，输入框内容已被替换。'));
-                } else {
-                    insertTextSmart(focusedElement, finalText, false);
-                    console.log(t('✅ 插入了预设文本。'));
-                }
-
-                // 若开启autoSubmit，则先检测是否完成替换，再延时后提交
-                if (config.autoSubmit) {
-                    try {
-                        // 1. 等待输入框内容与 finalText 匹配，最多等待3秒
-                        await waitForContentMatch(focusedElement, finalText, 100, 3000);
-
-                        // 2. 再额外等待500ms，确保渲染/加载稳定
-                        await new Promise(resolve => setTimeout(resolve, 500));
-
-                        // 3. 调用自动提交
-                        const success = await submitForm();
-                        if (success) {
-                            console.log(t('✅ 自动提交成功（已确认内容替换完成）。'));
-                        } else {
-                    console.warn(t('⚠️ 自动提交失败。'));
-                        }
-                    } catch (error) {
-                        console.error("自动提交前检测文本匹配超时或错误:", error);
-                    }
-                }
-
-            } else if (config.type === "tool") {
-                const focusedElement = document.activeElement;
-                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
-                    return;
-                }
-                switch (config.action) {
-                    case "cut":
-                        handleCut(focusedElement);
-                        break;
-                    case "copy":
-                        handleCopy(focusedElement);
-                        break;
-                    case "paste":
-                        handlePaste(focusedElement);
-                        break;
-                    case "clear":
-                        handleClear(focusedElement);
-                        break;
-                    default:
-                        console.warn(t('未知的工具按钮动作: {{action}}', { action: config.action }));
-                }
-            }
-
-            // 立即关闭弹窗
-            if (currentlyOpenFolder.name === folderName && currentlyOpenFolder.element) {
-                currentlyOpenFolder.element.style.display = 'none';
-                currentlyOpenFolder.name = null;
-                currentlyOpenFolder.element = null;
-                console.log(t('✅ 弹窗 "{{folderName}}" 已立即关闭。', { folderName }));
-            } else {
-                console.warn(t('⚠️ 弹窗 "{{folderName}}" 未被识别为当前打开的弹窗。', { folderName }));
-            }
-        });
-
-        return button;
+    const showTemporaryFeedback = (element, message) => {
+        const feedback = document.createElement('span');
+        feedback.textContent = message;
+        feedback.style.position = 'absolute';
+        feedback.style.bottom = '10px';
+        feedback.style.right = '10px';
+        feedback.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        feedback.style.color = '#fff';
+        feedback.style.padding = '4px 8px';
+        feedback.style.borderRadius = '4px';
+        feedback.style.zIndex = '10001';
+        element.parentElement.appendChild(feedback);
+        setTimeout(() => {
+            feedback.remove();
+        }, 1500);
     };
 
-    // 工具按钮动作处理
     const handleCut = (element) => {
         let text = '';
         if (element.tagName.toLowerCase() === 'textarea') {
@@ -2256,21 +2073,195 @@
         showTemporaryFeedback(element, '清空成功');
     };
 
-    const showTemporaryFeedback = (element, message) => {
-        const feedback = document.createElement('span');
-        feedback.textContent = message;
-        feedback.style.position = 'absolute';
-        feedback.style.bottom = '10px';
-        feedback.style.right = '10px';
-        feedback.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        feedback.style.color = '#fff';
-        feedback.style.padding = '4px 8px';
-        feedback.style.borderRadius = '4px';
-        feedback.style.zIndex = '10001';
-        element.parentElement.appendChild(feedback);
-        setTimeout(() => {
-            feedback.remove();
-        }, 1500);
+    createCustomButton = (name, config, folderName) => {
+        const button = createCustomButtonElement(name, config, folderName);
+        button.setAttribute('draggable', 'true');
+        button.setAttribute('data-button-name', name);
+        button.setAttribute('data-folder-name', folderName);
+
+        button.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                buttonName: name,
+                sourceFolder: folderName,
+                config: config
+            }));
+            e.currentTarget.style.opacity = '0.5';
+        });
+
+        button.addEventListener('dragend', (e) => {
+            e.currentTarget.style.opacity = '1';
+        });
+
+        button.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const focusedElement = document.activeElement;
+            if (focusedElement && (focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+                setTimeout(() => focusedElement.focus(), 0);
+            }
+        });
+
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'scale(1.05)';
+            button.style.boxShadow = '0 3px 6px rgba(0,0,0,0.1)';
+        });
+
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'scale(1)';
+            button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+        });
+
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (config.type === "template") {
+                const focusedElement = document.activeElement;
+                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
+                    return;
+                }
+
+                const needsClipboard = config.text.includes('{clipboard}') || config.text.includes('{{inputboard}|{clipboard}}');
+
+                let clipboardText = '';
+                if (needsClipboard) {
+                    try {
+                        clipboardText = await navigator.clipboard.readText();
+                    } catch (err) {
+                        console.error("无法访问剪贴板内容:", err);
+                        alert(t('无法访问剪贴板内容。请检查浏览器权限。'));
+                        return;
+                    }
+                }
+
+                let inputBoxText = '';
+                if (focusedElement.tagName.toLowerCase() === 'textarea') {
+                    inputBoxText = focusedElement.value;
+                } else {
+                    const childNodes = Array.from(focusedElement.childNodes);
+                    const textParts = [];
+                    let lastWasBr = false;
+                    childNodes.forEach((node, index) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            if (node.textContent.trim() === '') {
+                                if (!lastWasBr && index > 0) {
+                                    textParts.push('\n');
+                                }
+                            } else {
+                                textParts.push(node.textContent);
+                                lastWasBr = false;
+                            }
+                        } else if (node.nodeName === 'BR') {
+                            textParts.push('\n');
+                            lastWasBr = true;
+                        } else if (node.nodeName === 'P' || node.nodeName === 'DIV') {
+                            if (node.textContent.trim() === '') {
+                                textParts.push('\n');
+                            } else {
+                                if (textParts.length > 0) {
+                                    textParts.push('\n');
+                                }
+                                textParts.push(node.textContent);
+                            }
+                            lastWasBr = false;
+                        }
+                    });
+                    inputBoxText = textParts.join('');
+                }
+
+                const selectionText = window.getSelection().toString();
+                let finalText = config.text;
+
+                const variableMap = {
+                    '{{inputboard}|{clipboard}}': inputBoxText.trim() || clipboardText,
+                    '{clipboard}': clipboardText,
+                    '{inputboard}': inputBoxText,
+                    '{selection}': selectionText
+                };
+
+                const replacementOrder = [
+                    '{{inputboard}|{clipboard}}',
+                    '{clipboard}',
+                    '{inputboard}',
+                    '{selection}'
+                ];
+
+                const placeholderMap = new Map();
+                let placeholderCounter = 0;
+
+                replacementOrder.forEach(variable => {
+                    if (finalText.includes(variable)) {
+                        const placeholder = `__SAFE_PLACEHOLDER_${placeholderCounter++}__`;
+                        placeholderMap.set(placeholder, variableMap[variable]);
+                        finalText = finalText.split(variable).join(placeholder);
+                    }
+                });
+
+                placeholderMap.forEach((value, placeholder) => {
+                    finalText = finalText.split(placeholder).join(value);
+                });
+
+                finalText = finalText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+                const containsInputboard = config.text.includes("{inputboard}") ||
+                    config.text.includes("{{inputboard}|{clipboard}}");
+
+                if (containsInputboard) {
+                    insertTextSmart(focusedElement, finalText, true);
+                    console.log(t('✅ 使用 {inputboard} 变量，输入框内容已被替换。'));
+                } else {
+                    insertTextSmart(focusedElement, finalText, false);
+                    console.log(t('✅ 插入了预设文本。'));
+                }
+
+                if (config.autoSubmit) {
+                    try {
+                        await waitForContentMatch(focusedElement, finalText, 100, 3000);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const success = await submitForm();
+                        if (success) {
+                            console.log(t('✅ 自动提交成功（已确认内容替换完成）。'));
+                        } else {
+                            console.warn(t('⚠️ 自动提交失败。'));
+                        }
+                    } catch (error) {
+                        console.error("自动提交前检测文本匹配超时或错误:", error);
+                    }
+                }
+
+            } else if (config.type === "tool") {
+                const focusedElement = document.activeElement;
+                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+                    console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
+                    return;
+                }
+                switch (config.action) {
+                    case "cut":
+                        handleCut(focusedElement);
+                        break;
+                    case "copy":
+                        handleCopy(focusedElement);
+                        break;
+                    case "paste":
+                        handlePaste(focusedElement);
+                        break;
+                    case "clear":
+                        handleClear(focusedElement);
+                        break;
+                    default:
+                        console.warn(t('未知的工具按钮动作: {{action}}', { action: config.action }));
+                }
+            }
+
+            if (currentlyOpenFolder.name === folderName && currentlyOpenFolder.element) {
+                currentlyOpenFolder.element.style.display = 'none';
+                currentlyOpenFolder.name = null;
+                currentlyOpenFolder.element = null;
+                console.log(t('✅ 弹窗 "{{folderName}}" 已立即关闭。', { folderName }));
+            } else {
+                console.warn(t('⚠️ 弹窗 "{{folderName}}" 未被识别为当前打开的弹窗。', { folderName }));
+            }
+        });
+
+        return button;
     };
 
     const createFolderButton = (folderName, folderConfig) => {
@@ -2436,11 +2427,9 @@
     };
 
     let currentConfirmOverlay = null;
-    let currentDiffOverlay = null;
     let currentSettingsOverlay = null;
     let isSettingsFolderPanelCollapsed = false;
     let settingsDialogMainContainer = null;
-    let currentConfigOverlay = null; // 新增的独立配置设置弹窗
     let currentStyleOverlay = null;
 
     const showDeleteFolderConfirmDialog = (folderName, rerenderFn) => {
@@ -3846,6 +3835,1414 @@
         return button;
     };
 
+    const createButtonContainer = () => {
+        const root = getShadowRoot();
+        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
+        if (existingContainer) {
+            updateButtonContainer();
+            return existingContainer;
+        }
+        const buttonContainer = document.createElement('div');
+        buttonContainer.classList.add('folder-buttons-container');
+        buttonContainer.style.pointerEvents = 'auto';
+
+        buttonContainer.style.position = 'fixed';
+        buttonContainer.style.right = '0px';
+        buttonContainer.style.width = '100%';
+        buttonContainer.style.zIndex = '1000';
+
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.flexWrap = 'nowrap';
+        buttonContainer.style.overflowX = 'auto';
+        buttonContainer.style.overflowY = 'hidden';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.marginTop = '0px';
+        buttonContainer.style.height = buttonConfig.buttonBarHeight + 'px';
+
+        buttonContainer.style.scrollbarWidth = 'none';
+        buttonContainer.style.msOverflowStyle = 'none';
+        buttonContainer.classList.add('hide-scrollbar');
+
+        buttonContainer.style.justifyContent = 'center';
+        buttonContainer.style.alignItems = 'center';
+        buttonContainer.style.padding = '6px 15px';
+
+        buttonContainer.style.backgroundColor = 'transparent';
+        buttonContainer.style.boxShadow = 'none';
+        buttonContainer.style.borderRadius = '4px';
+
+        buttonConfig.folderOrder.forEach((name) => {
+            const config = buttonConfig.folders[name];
+            if (config && !config.hidden) {
+                const folderButton = createFolderButton(name, config);
+                buttonContainer.appendChild(folderButton);
+            }
+        });
+
+        buttonContainer.appendChild(createSettingsButton());
+        buttonContainer.appendChild(createClearButton());
+
+        buttonContainer.dataset.barPaddingY = '6';
+        applyBarBottomSpacing(
+            buttonContainer,
+            buttonConfig.buttonBarBottomSpacing,
+            buttonConfig.buttonBarBottomSpacing
+        );
+
+        return buttonContainer;
+    };
+
+    const updateButtonContainer = () => {
+        const root = getShadowRoot();
+        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
+        if (existingContainer) {
+            const settingsButton = existingContainer.querySelector('button:nth-last-child(2)');
+            const clearButton = existingContainer.querySelector('button:last-child');
+
+            setTrustedHTML(existingContainer, '');
+
+            buttonConfig.folderOrder.forEach((name) => {
+                const config = buttonConfig.folders[name];
+                if (config && !config.hidden) {
+                    const folderButton = createFolderButton(name, config);
+                    existingContainer.appendChild(folderButton);
+                }
+            });
+
+            if (settingsButton) existingContainer.appendChild(settingsButton);
+            if (clearButton) existingContainer.appendChild(clearButton);
+
+            console.log(t('✅ 按钮栏已更新（已过滤隐藏文件夹）。'));
+        } else {
+            console.warn(t('⚠️ 未找到按钮容器，无法更新按钮栏。'));
+        }
+        try {
+            applyDomainStyles();
+        } catch (err) {
+            console.warn(t('应用域名样式失败:'), err);
+        }
+    };
+
+    const attachButtonsToTextarea = (textarea) => {
+        let buttonContainer = queryUI('.folder-buttons-container');
+        if (!buttonContainer) {
+            buttonContainer = createButtonContainer();
+            appendToMainLayer(buttonContainer);
+            try { applyDomainStyles(); } catch (_) {}
+            console.log(t('✅ 按钮容器已固定到窗口底部。'));
+        } else {
+            console.log(t('ℹ️ 按钮容器已存在，跳过附加。'));
+        }
+        textarea.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    };
+
+    let attachTimeout;
+    const attachButtons = () => {
+        if (attachTimeout) clearTimeout(attachTimeout);
+        attachTimeout = setTimeout(() => {
+            const textareas = getAllTextareas();
+            console.log(t('🔍 扫描到 {{count}} 个 textarea 或 contenteditable 元素。', {
+                count: textareas.length
+            }));
+            if (textareas.length === 0) {
+                console.warn(t('⚠️ 未找到任何 textarea 或 contenteditable 元素。'));
+                return;
+            }
+            attachButtonsToTextarea(textareas[textareas.length - 1]);
+            console.log(t('✅ 按钮已附加到最新的 textarea 或 contenteditable 元素。'));
+        }, 300);
+    };
+
+    const observeShadowRoots = (node) => {
+        if (node.shadowRoot) {
+            const shadowObserver = new MutationObserver(() => {
+                attachButtons();
+            });
+            shadowObserver.observe(node.shadowRoot, {
+                childList: true,
+                subtree: true,
+            });
+            node.shadowRoot.querySelectorAll('*').forEach(child => observeShadowRoots(child));
+        }
+    };
+/* -------------------------------------------------------------------------- *
+ * Module 03 · Settings panel, configuration flows, folder management helpers
+ * -------------------------------------------------------------------------- */
+
+    const extractTemplateVariables = (text = '') => {
+        if (typeof text !== 'string' || !text.includes('{')) {
+            return [];
+        }
+
+        const matches = new Set();
+        const fallbackMatches = text.match(/\{\{[A-Za-z0-9_-]+\}\|\{[A-Za-z0-9_-]+\}\}/g) || [];
+        fallbackMatches.forEach(match => matches.add(match));
+
+        let sanitized = text;
+        fallbackMatches.forEach(match => {
+            sanitized = sanitized.split(match).join(' ');
+        });
+
+        const singleMatches = sanitized.match(/\{[A-Za-z0-9_-]+\}/g) || [];
+        singleMatches.forEach(match => matches.add(match));
+
+        return Array.from(matches);
+    };
+
+    let selectedFolderName = buttonConfig.folderOrder[0] || null; // 在设置面板中使用
+    let folderListContainer, buttonListContainer; // 在渲染函数中定义
+
+    const renderFolderList = () => {
+        if (!folderListContainer) return;
+        setTrustedHTML(folderListContainer, '');
+        const foldersArray = buttonConfig.folderOrder.map(fname => [fname, buttonConfig.folders[fname]]).filter(([f,c])=>c);
+        foldersArray.forEach(([fname, fconfig]) => {
+            const folderItem = document.createElement('div');
+            folderItem.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px;
+                border-radius: 4px;
+                margin: 4px 0;
+                background-color: ${selectedFolderName === fname ? (isDarkMode() ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.1)') : 'transparent'};
+                cursor: move;
+                direction: ltr;
+                min-height: 36px;
+            `;
+            folderItem.classList.add('folder-item');
+            folderItem.setAttribute('draggable', 'true');
+            folderItem.setAttribute('data-folder', fname);
+
+        const { container: leftInfo, folderPreview } = (function createFolderPreview(fname, fconfig) {
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '10px';
+            container.style.flex = '1';
+            container.style.minWidth = '0';
+            container.style.paddingRight = '8px';
+
+            const showIcons = buttonConfig && buttonConfig.showFolderIcons === true;
+            const { iconSymbol, textLabel } = extractButtonIconParts(fname);
+            const normalizedLabel = (textLabel || fname || '').trim();
+            const fallbackLabel = normalizedLabel || fname || t('预览文件夹');
+            const fallbackSymbol = iconSymbol || (Array.from(fallbackLabel)[0] || '📁');
+
+            const previewButton = document.createElement('button');
+            previewButton.type = 'button';
+            previewButton.setAttribute('data-folder-preview', fname);
+            previewButton.title = fname;
+            previewButton.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                border-radius: 4px;
+                background-color: transparent;
+                border: none;
+                cursor: grab;
+                flex-shrink: 1;
+                min-width: 0;
+                max-width: 100%;
+                margin: 0 8px 0 0;
+            `;
+
+            const pill = document.createElement('span');
+            pill.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: ${showIcons ? '6px' : '0'};
+                background: ${fconfig.color || 'var(--primary-color, #3B82F6)'};
+                color: ${fconfig.textColor || '#ffffff'};
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 14px;
+                font-weight: ${selectedFolderName === fname ? '600' : '500'};
+                min-width: 0;
+                max-width: 100%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                pointer-events: none;
+                transition: all 0.2s ease;
+            `;
+
+            if (showIcons) {
+                const iconSpan = document.createElement('span');
+                iconSpan.style.display = 'inline-flex';
+                iconSpan.style.alignItems = 'center';
+                iconSpan.style.justifyContent = 'center';
+                iconSpan.style.fontSize = '14px';
+                iconSpan.style.lineHeight = '1';
+                iconSpan.textContent = fallbackSymbol;
+                pill.appendChild(iconSpan);
+            }
+
+            const textSpan = document.createElement('span');
+            textSpan.style.display = 'inline-flex';
+            textSpan.style.alignItems = 'center';
+            textSpan.style.justifyContent = 'center';
+            textSpan.style.pointerEvents = 'none';
+
+            let textContent = showIcons ? normalizedLabel : (fname || normalizedLabel);
+            if (!showIcons && iconSymbol && !fname.includes(iconSymbol)) {
+                textContent = `${iconSymbol} ${textContent || ''}`.trim();
+            }
+            if (!showIcons && !textContent) {
+                textContent = fallbackLabel;
+            }
+            if (textContent) {
+                textSpan.textContent = textContent;
+                pill.appendChild(textSpan);
+            }
+
+            previewButton.appendChild(pill);
+
+            // Ensure the preview keeps the requested button style while remaining draggable/selectable
+            previewButton.style.whiteSpace = 'nowrap';
+            previewButton.style.alignSelf = 'flex-start';
+
+            container.appendChild(previewButton);
+            return { container, folderPreview: previewButton };
+        })(fname, fconfig);
+
+            const rightBtns = document.createElement('div');
+            rightBtns.style.display = 'flex';
+            rightBtns.style.gap = '4px'; // 增加按钮间的间距
+            rightBtns.style.alignItems = 'center';
+            rightBtns.style.width = '130px'; // 与标签栏保持一致的宽度
+            rightBtns.style.justifyContent = 'flex-start'; // 改为左对齐
+            rightBtns.style.paddingLeft = '8px'; // 添加左侧padding与标签栏对齐
+            rightBtns.style.paddingRight = '12px'; // 添加右侧padding
+
+            // 创建隐藏状态勾选框容器
+            const hiddenCheckboxContainer = document.createElement('div');
+            hiddenCheckboxContainer.style.display = 'flex';
+            hiddenCheckboxContainer.style.alignItems = 'center';
+            hiddenCheckboxContainer.style.justifyContent = 'center';
+            hiddenCheckboxContainer.style.width = '36px'; // 与标签栏"显示"列宽度一致
+            hiddenCheckboxContainer.style.marginRight = '4px'; // 添加右边距
+            hiddenCheckboxContainer.style.padding = '2px';
+            hiddenCheckboxContainer.style.borderRadius = '3px';
+            hiddenCheckboxContainer.style.cursor = 'pointer';
+            hiddenCheckboxContainer.title = t('勾选后该文件夹将在主界面显示');
+
+            const hiddenCheckbox = document.createElement('input');
+            hiddenCheckbox.type = 'checkbox';
+            hiddenCheckbox.checked = !fconfig.hidden; // 勾选表示显示
+            hiddenCheckbox.style.cursor = 'pointer';
+            hiddenCheckbox.style.accentColor = 'var(--primary-color, #3B82F6)';
+            hiddenCheckbox.style.margin = '0';
+            hiddenCheckbox.style.transform = 'scale(1.1)'; // 稍微放大勾选框以便操作
+
+            // 删除了checkboxText元素，不再显示"显示"文字
+
+            // 关键修复：先添加change事件监听器到checkbox
+            hiddenCheckbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                const newHiddenState = !hiddenCheckbox.checked;
+                fconfig.hidden = newHiddenState;
+                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                console.log(t('✅ 文件夹 "{{folderName}}" 的隐藏状态已设置为 {{state}}', {
+                    folderName: fname,
+                    state: fconfig.hidden
+                }));
+                updateButtonContainer();
+            });
+
+            // 为checkbox添加click事件，确保优先处理
+            hiddenCheckbox.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+
+            // 容器点击事件，点击容器时切换checkbox状态
+            hiddenCheckboxContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                // 如果点击的不是checkbox本身，则手动切换checkbox状态
+                if (e.target !== hiddenCheckbox) {
+                    hiddenCheckbox.checked = !hiddenCheckbox.checked;
+                    // 手动触发change事件
+                    const changeEvent = new Event('change', { bubbles: false });
+                    hiddenCheckbox.dispatchEvent(changeEvent);
+                }
+            });
+
+            hiddenCheckboxContainer.appendChild(hiddenCheckbox);
+            // 不再添加checkboxText
+
+
+            // 创建编辑按钮
+            const editFolderBtn = document.createElement('button');
+            editFolderBtn.textContent = '✏️';
+            editFolderBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 14px;
+                color: var(--primary-color, #3B82F6);
+                width: 36px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 4px;
+            `;
+            editFolderBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showFolderEditDialog(fname, fconfig, (newFolderName) => {
+                    selectedFolderName = newFolderName;
+                    renderFolderList();
+                    renderButtonList();
+                });
+            });
+
+            const deleteFolderBtn = document.createElement('button');
+            deleteFolderBtn.textContent = '🗑️';
+            deleteFolderBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 14px;
+                color: var(--danger-color, #ef4444);
+                width: 36px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            deleteFolderBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showDeleteFolderConfirmDialog(fname, () => {
+                    const allFolders = buttonConfig.folderOrder;
+                    selectedFolderName = allFolders[0] || null;
+                    renderFolderList();
+                    renderButtonList();
+                    updateCounters(); // 更新所有计数器
+                });
+            });
+
+            rightBtns.appendChild(hiddenCheckboxContainer);
+            rightBtns.appendChild(editFolderBtn);
+            rightBtns.appendChild(deleteFolderBtn);
+
+            folderItem.appendChild(leftInfo);
+            folderItem.appendChild(rightBtns);
+
+            // 修改folderItem的点击事件，排除右侧按钮区域
+            folderItem.addEventListener('click', (e) => {
+                // 如果点击的是右侧按钮区域，不触发文件夹选择
+                if (rightBtns.contains(e.target)) {
+                    return;
+                }
+                selectedFolderName = fname;
+                renderFolderList();
+                renderButtonList();
+            });
+
+            folderItem.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', fname);
+                folderItem.style.opacity = '0.5';
+            });
+
+            folderItem.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            folderItem.addEventListener('dragenter', () => {
+                folderItem.style.border = `2px solid var(--primary-color, #3B82F6)`;
+            });
+
+            folderItem.addEventListener('dragleave', () => {
+                folderItem.style.border = 'none';
+            });
+
+            folderItem.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const draggedFolder = e.dataTransfer.getData('text/plain');
+                if (draggedFolder && draggedFolder !== fname) {
+                    const draggedIndex = buttonConfig.folderOrder.indexOf(draggedFolder);
+                    const targetIndex = buttonConfig.folderOrder.indexOf(fname);
+                    if (draggedIndex > -1 && targetIndex > -1) {
+                        const [removed] = buttonConfig.folderOrder.splice(draggedIndex, 1);
+                        buttonConfig.folderOrder.splice(targetIndex, 0, removed);
+                        localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                        renderFolderList();
+                        renderButtonList();
+                        console.log(t('🔄 文件夹顺序已更新：{{draggedFolder}} 移动到 {{targetFolder}} 前。', {
+                            draggedFolder,
+                            targetFolder: fname
+                        }));
+                        // 更新按钮栏
+                        updateButtonContainer();
+                    }
+                }
+                // Check if a button is being dropped onto this folder
+                const buttonData = e.dataTransfer.getData('application/json');
+                if (buttonData) {
+                    try {
+                        const { buttonName: draggedBtnName, sourceFolder } = JSON.parse(buttonData);
+                        if (draggedBtnName && sourceFolder && sourceFolder !== fname) {
+                            // Move the button from sourceFolder to fname
+                            const button = buttonConfig.folders[sourceFolder].buttons[draggedBtnName];
+                            if (button) {
+                                // Remove from source
+                                delete buttonConfig.folders[sourceFolder].buttons[draggedBtnName];
+                                // Add to target
+                                buttonConfig.folders[fname].buttons[draggedBtnName] = button;
+                                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                                renderFolderList();
+                                renderButtonList();
+                                console.log(t('🔄 按钮 "{{buttonName}}" 已从 "{{sourceFolder}}" 移动到 "{{targetFolder}}"。', {
+                                    buttonName: draggedBtnName,
+                                    sourceFolder,
+                                    targetFolder: fname
+                                }));
+                                // Update button container
+                                updateButtonContainer();
+                            }
+                        }
+                    } catch (error) {
+                        console.error("解析拖放数据失败:", error);
+                    }
+                }
+                folderItem.style.border = 'none';
+            });
+
+            folderItem.addEventListener('dragend', () => {
+                folderItem.style.opacity = '1';
+            });
+
+        folderListContainer.appendChild(folderItem);
+    });
+
+    localizeElement(folderListContainer);
+    scheduleLocalization();
+    };
+
+    // 升级：更新所有计数显示的函数
+    const updateCounters = () => {
+        // 计算统计数据
+        const totalFolders = Object.keys(buttonConfig.folders).length;
+        const totalButtons = Object.values(buttonConfig.folders).reduce((sum, folder) => {
+            return sum + Object.keys(folder.buttons).length;
+        }, 0);
+
+        // 更新文件夹总数计数
+        const folderCountBadge = queryUI('#folderCountBadge');
+        if (folderCountBadge) {
+            folderCountBadge.textContent = totalFolders.toString();
+            folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
+        }
+
+        // 更新按钮总数计数
+        const totalButtonCountBadge = queryUI('#totalButtonCountBadge');
+        if (totalButtonCountBadge) {
+            totalButtonCountBadge.textContent = totalButtons.toString();
+            totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
+        }
+
+        // 更新当前文件夹按钮数计数
+        if (selectedFolderName && buttonConfig.folders[selectedFolderName]) {
+            const currentFolderButtonCount = Object.keys(buttonConfig.folders[selectedFolderName].buttons).length;
+            const currentFolderBadge = queryUI('#currentFolderButtonCount');
+            if (currentFolderBadge) {
+                currentFolderBadge.textContent = currentFolderButtonCount.toString();
+                currentFolderBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
+                    folderName: selectedFolderName,
+                    count: currentFolderButtonCount
+                });
+            }
+        }
+
+        console.log(t('📊 计数器已更新: {{folderCount}}个文件夹, {{buttonCount}}个按钮总数', {
+            folderCount: totalFolders,
+            buttonCount: totalButtons
+        }));
+    };
+
+    const renderButtonList = () => {
+        if (!buttonListContainer) return;
+        setTrustedHTML(buttonListContainer, '');
+        if (!selectedFolderName) return;
+        const currentFolderConfig = buttonConfig.folders[selectedFolderName];
+        if (!currentFolderConfig) return;
+
+    const rightHeader = document.createElement('div');
+    rightHeader.style.display = 'flex';
+    rightHeader.style.justifyContent = 'space-between';
+    rightHeader.style.alignItems = 'center';
+    rightHeader.style.marginBottom = '8px';
+
+    const folderNameLabel = document.createElement('h3');
+    folderNameLabel.style.display = 'flex';
+    folderNameLabel.style.alignItems = 'center';
+    folderNameLabel.style.gap = '10px';
+    folderNameLabel.style.margin = '0';
+
+    const folderNameText = document.createElement('span');
+    setTrustedHTML(folderNameText, `➤ <strong>${selectedFolderName}</strong>`);
+
+    const buttonCountBadge = document.createElement('span');
+    buttonCountBadge.id = 'currentFolderButtonCount';
+    buttonCountBadge.style.cssText = `
+        background-color: var(--info-color, #6366F1);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        cursor: help;
+        transition: all 0.2s ease;
+    `;
+
+    // 计算当前文件夹的按钮数量
+    const buttonCount = Object.keys(currentFolderConfig.buttons).length;
+    buttonCountBadge.textContent = buttonCount.toString();
+    buttonCountBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
+        folderName: selectedFolderName,
+        count: buttonCount
+    });
+
+    // 添加hover效果
+    buttonCountBadge.addEventListener('mouseenter', () => {
+        buttonCountBadge.style.transform = 'scale(1.15)';
+        buttonCountBadge.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)';
+    });
+    buttonCountBadge.addEventListener('mouseleave', () => {
+        buttonCountBadge.style.transform = 'scale(1)';
+        buttonCountBadge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    });
+
+    folderNameLabel.appendChild(folderNameText);
+    folderNameLabel.appendChild(buttonCountBadge);
+
+    const addNewButtonBtn = document.createElement('button');
+    Object.assign(addNewButtonBtn.style, styles.button, {
+        backgroundColor: 'var(--add-color, #fd7e14)',
+        color: 'white',
+        borderRadius: '4px'
+    });
+    addNewButtonBtn.textContent = t('+ 新建按钮');
+    addNewButtonBtn.addEventListener('click', () => {
+        showButtonEditDialog(selectedFolderName, '', {}, () => {
+            renderButtonList();
+        });
+    });
+
+    rightHeader.appendChild(folderNameLabel);
+    rightHeader.appendChild(addNewButtonBtn);
+
+    buttonListContainer.appendChild(rightHeader);
+
+    // 新增：创建包含标签栏和内容的容器，滚动条将出现在此容器右侧
+    const contentWithHeaderContainer = document.createElement('div');
+    contentWithHeaderContainer.style.cssText = `
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 4px;
+    `;
+
+    // 创建按钮列表标签栏 - 固定在滚动容器顶部
+    const buttonHeaderBar = document.createElement('div');
+    buttonHeaderBar.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 8px;
+        background-color: var(--button-bg, #f3f4f6);
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 4px 4px 0 0;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-color, #333333);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        flex-shrink: 0;
+    `;
+
+    const leftButtonHeaderLabel = document.createElement('div');
+    leftButtonHeaderLabel.textContent = t('按钮预览');
+    leftButtonHeaderLabel.style.flex = '1';
+    leftButtonHeaderLabel.style.textAlign = 'left';
+    leftButtonHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
+
+    const rightButtonHeaderLabels = document.createElement('div');
+    rightButtonHeaderLabels.style.display = 'flex';
+    rightButtonHeaderLabels.style.gap = '4px';
+    rightButtonHeaderLabels.style.alignItems = 'center';
+    rightButtonHeaderLabels.style.width = '240px';
+    rightButtonHeaderLabels.style.paddingLeft = '8px';
+    rightButtonHeaderLabels.style.paddingRight = '12px';
+
+    const variableLabel = document.createElement('div');
+    variableLabel.textContent = t('变量');
+    variableLabel.style.width = '110px';
+    variableLabel.style.textAlign = 'center';
+    variableLabel.style.fontSize = '12px';
+    variableLabel.style.marginLeft = '-1em';
+    const autoSubmitLabel = document.createElement('div');
+    autoSubmitLabel.textContent = t('自动提交');
+    autoSubmitLabel.style.width = '64px';
+    autoSubmitLabel.style.textAlign = 'center';
+    autoSubmitLabel.style.fontSize = '12px';
+    autoSubmitLabel.style.marginLeft = 'calc(-0.5em)';
+
+    const editButtonLabel = document.createElement('div');
+    editButtonLabel.textContent = t('修改');
+    editButtonLabel.style.width = '40px';
+    editButtonLabel.style.textAlign = 'center';
+    editButtonLabel.style.fontSize = '12px';
+
+    const deleteButtonLabel = document.createElement('div');
+    deleteButtonLabel.textContent = t('删除');
+    deleteButtonLabel.style.width = '36px';
+    deleteButtonLabel.style.textAlign = 'center';
+    deleteButtonLabel.style.fontSize = '12px';
+
+    rightButtonHeaderLabels.appendChild(variableLabel);
+    rightButtonHeaderLabels.appendChild(autoSubmitLabel);
+    rightButtonHeaderLabels.appendChild(editButtonLabel);
+    rightButtonHeaderLabels.appendChild(deleteButtonLabel);
+
+    buttonHeaderBar.appendChild(leftButtonHeaderLabel);
+    buttonHeaderBar.appendChild(rightButtonHeaderLabels);
+
+    // 修改：内容区域不再需要自己的滚动条和边框
+    const btnScrollArea = document.createElement('div');
+    btnScrollArea.style.cssText = `
+        flex: 1;
+        padding: 8px;
+        overflow-y: visible;
+        min-height: 0;
+    `;
+
+    const currentFolderButtons = Object.entries(currentFolderConfig.buttons);
+    const createButtonPreview = (btnName, btnCfg) => {
+        const btnEl = createCustomButtonElement(btnName, btnCfg);
+        btnEl.style.marginBottom = '0px';
+        btnEl.style.marginRight = '8px';
+        btnEl.style.cursor = 'grab';
+        btnEl.style.flexShrink = '1';
+        btnEl.style.minWidth = '0';
+        btnEl.style.maxWidth = '100%';
+        btnEl.style.whiteSpace = 'normal';
+        btnEl.style.wordBreak = 'break-word';
+        btnEl.style.overflow = 'visible';
+        btnEl.style.lineHeight = '1.4';
+        btnEl.style.overflowWrap = 'anywhere';
+        btnEl.style.display = 'inline-flex';
+        btnEl.style.flexWrap = 'wrap';
+        btnEl.style.alignItems = 'center';
+        btnEl.style.justifyContent = 'flex-start';
+        btnEl.style.columnGap = '6px';
+        btnEl.style.rowGap = '2px';
+        btnEl.style.alignSelf = 'flex-start';
+        return btnEl;
+    };
+
+    currentFolderButtons.forEach(([btnName, cfg]) => {
+        const btnItem = document.createElement('div');
+        btnItem.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            padding: 4px;
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: 4px;
+            background-color: var(--button-bg, #f3f4f6);
+            cursor: move;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: visible;
+        `;
+        btnItem.setAttribute('draggable', 'true');
+        btnItem.setAttribute('data-button-name', btnName);
+
+        const leftPart = document.createElement('div');
+        leftPart.style.display = 'flex';
+        leftPart.style.alignItems = 'flex-start';
+        leftPart.style.gap = '8px';
+        leftPart.style.flex = '1';
+        leftPart.style.minWidth = '0';
+        leftPart.style.overflow = 'visible';
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.style.display = 'flex';
+        previewWrapper.style.alignItems = 'flex-start';
+        previewWrapper.style.flex = '1 1 auto';
+        previewWrapper.style.maxWidth = '100%';
+        previewWrapper.style.minWidth = '0';
+        previewWrapper.style.overflow = 'visible';
+        previewWrapper.style.alignSelf = 'flex-start';
+
+        const btnPreview = createButtonPreview(btnName, cfg);
+        previewWrapper.appendChild(btnPreview);
+        leftPart.appendChild(previewWrapper);
+
+        const opsDiv = document.createElement('div');
+        opsDiv.style.display = 'flex';
+        opsDiv.style.gap = '4px';
+        opsDiv.style.alignItems = 'center';
+        opsDiv.style.width = '240px';
+        opsDiv.style.paddingLeft = '8px';
+        opsDiv.style.paddingRight = '12px';
+        opsDiv.style.flexShrink = '0';
+
+        const variableInfoContainer = document.createElement('div');
+        variableInfoContainer.style.display = 'flex';
+        variableInfoContainer.style.alignItems = 'center';
+        variableInfoContainer.style.justifyContent = 'center';
+        variableInfoContainer.style.flexDirection = 'column';
+        variableInfoContainer.style.width = '110px';
+        variableInfoContainer.style.fontSize = '12px';
+        variableInfoContainer.style.lineHeight = '1.2';
+        variableInfoContainer.style.wordBreak = 'break-word';
+        variableInfoContainer.style.textAlign = 'center';
+        variableInfoContainer.style.color = 'var(--text-color, #333333)';
+
+        if (cfg.type === 'template') {
+            const variablesUsed = extractTemplateVariables(cfg.text || '');
+            if (variablesUsed.length > 0) {
+                const displayText = variablesUsed.join(isNonChineseLocale() ? ', ' : '、');
+                variableInfoContainer.textContent = displayText;
+                variableInfoContainer.title = t('模板变量: {{variable}}', { variable: displayText });
+            } else {
+                variableInfoContainer.textContent = t('无');
+                variableInfoContainer.title = t('未使用模板变量');
+            }
+        } else {
+            variableInfoContainer.textContent = '—';
+            variableInfoContainer.title = t('工具按钮不使用模板变量');
+        }
+
+        // 创建"自动提交"开关容器
+        const autoSubmitContainer = document.createElement('div');
+        autoSubmitContainer.style.display = 'flex';
+        autoSubmitContainer.style.alignItems = 'center';
+        autoSubmitContainer.style.justifyContent = 'center';
+        autoSubmitContainer.style.width = '60px';
+
+        const autoSubmitCheckbox = document.createElement('input');
+        autoSubmitCheckbox.type = 'checkbox';
+        autoSubmitCheckbox.checked = cfg.autoSubmit || false;
+        autoSubmitCheckbox.style.cursor = 'pointer';
+        autoSubmitCheckbox.style.accentColor = 'var(--primary-color, #3B82F6)';
+        autoSubmitCheckbox.style.margin = '0';
+        autoSubmitCheckbox.style.transform = 'scale(1.1)';
+        autoSubmitCheckbox.addEventListener('change', () => {
+            cfg.autoSubmit = autoSubmitCheckbox.checked;
+            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+            console.log(t('✅ 按钮 "{{buttonName}}" 的自动提交已设置为 {{state}}', {
+                buttonName: btnName,
+                state: autoSubmitCheckbox.checked
+            }));
+        });
+
+        autoSubmitContainer.appendChild(autoSubmitCheckbox);
+
+        // 创建编辑按钮
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.style.cssText = `
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-color, #3B82F6);
+            font-size: 14px;
+            width: 36px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showButtonEditDialog(selectedFolderName, btnName, cfg, () => {
+                renderButtonList();
+            });
+        });
+
+        // 创建删除按钮
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.style.cssText = `
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--danger-color, #ef4444);
+            font-size: 14px;
+            width: 36px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showDeleteButtonConfirmDialog(selectedFolderName, btnName, () => {
+                renderButtonList();
+            });
+        });
+
+        opsDiv.appendChild(variableInfoContainer);
+        opsDiv.appendChild(autoSubmitContainer);
+        opsDiv.appendChild(editBtn);
+        opsDiv.appendChild(deleteBtn);
+
+        btnItem.appendChild(leftPart);
+        btnItem.appendChild(opsDiv);
+
+        btnItem.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                buttonName: btnName,
+                sourceFolder: selectedFolderName
+            }));
+            btnItem.style.opacity = '0.5';
+        });
+
+        btnItem.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        btnItem.addEventListener('dragenter', () => {
+            btnItem.style.border = `2px solid var(--primary-color, #3B82F6)`;
+        });
+
+        btnItem.addEventListener('dragleave', () => {
+            btnItem.style.border = `1px solid var(--border-color, #e5e7eb)`;
+        });
+
+        btnItem.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const data = JSON.parse(e.dataTransfer.getData('application/json'));
+            const { buttonName: draggedBtnName } = data;
+            if (draggedBtnName && draggedBtnName !== btnName) {
+                const buttonsKeys = Object.keys(buttonConfig.folders[selectedFolderName].buttons);
+                const draggedIndex = buttonsKeys.indexOf(draggedBtnName);
+                const targetIndex = buttonsKeys.indexOf(btnName);
+                if (draggedIndex > -1 && targetIndex > -1) {
+                    const reordered = [...buttonsKeys];
+                    reordered.splice(draggedIndex, 1);
+                    reordered.splice(targetIndex, 0, draggedBtnName);
+                    const newOrderedMap = {};
+                    reordered.forEach(k => {
+                        newOrderedMap[k] = buttonConfig.folders[selectedFolderName].buttons[k];
+                    });
+                    buttonConfig.folders[selectedFolderName].buttons = newOrderedMap;
+                    localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+                    renderButtonList();
+                    console.log(t('🔄 按钮顺序已更新：{{buttonName}} 移动到 {{targetName}} 前。', {
+                        buttonName: draggedBtnName,
+                        targetName: btnName
+                    }));
+                    // 更新按钮栏
+                    updateButtonContainer();
+                }
+            }
+            btnItem.style.border = `1px solid var(--border-color, #e5e7eb)`;
+        });
+
+        btnItem.addEventListener('dragend', () => {
+            btnItem.style.opacity = '1';
+        });
+
+        btnScrollArea.appendChild(btnItem);
+    });
+
+    // 修改：将标签栏和内容区域添加到新的容器中
+    contentWithHeaderContainer.appendChild(buttonHeaderBar);
+    contentWithHeaderContainer.appendChild(btnScrollArea);
+
+    // 修改：将新容器添加到主容器中
+    buttonListContainer.appendChild(contentWithHeaderContainer);
+
+    localizeElement(buttonListContainer);
+    scheduleLocalization();
+};
+
+    function updateButtonBarHeight(newHeight) {
+        const clamped = Math.min(150, Math.max(50, newHeight)); // 限制范围
+        buttonConfig.buttonBarHeight = clamped;
+        localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+
+        // 更新容器高度
+        const container = queryUI('.folder-buttons-container');
+        if (container) {
+            container.style.height = clamped + 'px';
+            try {
+                updateButtonBarLayout(container, clamped);
+            } catch (err) {
+                console.warn('更新按钮栏布局失败:', err);
+            }
+        }
+        console.log(`${t('🔧 按钮栏高度已更新为')} ${clamped} px`);
+        try {
+            applyDomainStyles();
+        } catch (err) {
+            console.warn(t('应用域名样式失败:'), err);
+        }
+    }
+
+    const showUnifiedSettingsDialog = () => {
+        if (settingsDialogMainContainer) {
+            settingsDialogMainContainer.style.minHeight = '';
+            settingsDialogMainContainer = null;
+        }
+        if (currentSettingsOverlay) {
+            closeExistingOverlay(currentSettingsOverlay);
+            currentSettingsOverlay = null;
+        }
+        const overlay = document.createElement('div');
+        overlay.classList.add('settings-overlay');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay-bg, rgba(0, 0, 0, 0.5));
+            backdrop-filter: blur(2px);
+            z-index: 11000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.classList.add('settings-dialog');
+        dialog.classList.add('cttf-dialog');
+        dialog.style.cssText = `
+            background-color: var(--dialog-bg, #ffffff);
+            color: var(--text-color, #333333);
+            border-radius: 4px;
+            padding: 24px;
+            box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
+            border: 1px solid var(--border-color, #e5e7eb);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            width: 920px;
+            max-width: 95vw;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        `;
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '16px';
+
+        const title = document.createElement('h2');
+        title.style.display = 'flex';
+        title.style.alignItems = 'center';
+        title.style.gap = '12px';
+        title.style.margin = '0';
+        title.style.fontSize = '20px';
+        title.style.fontWeight = '600';
+
+        const titleText = document.createElement('span');
+        titleText.textContent = t('⚙️ 设置面板');
+
+        const collapseToggleBtn = document.createElement('button');
+        collapseToggleBtn.type = 'button';
+        collapseToggleBtn.style.cssText = `
+            background-color: transparent;
+            color: var(--text-color, #333333);
+            border: none;
+            border-radius: 4px;
+            padding: 4px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        `;
+        collapseToggleBtn.title = t('折叠左侧设置区域');
+        collapseToggleBtn.setAttribute('aria-label', collapseToggleBtn.title);
+        const collapseToggleSVG = `<svg fill="currentColor" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M 7.7148 49.5742 L 48.2852 49.5742 C 53.1836 49.5742 55.6446 47.1367 55.6446 42.3086 L 55.6446 13.6914 C 55.6446 8.8633 53.1836 6.4258 48.2852 6.4258 L 7.7148 6.4258 C 2.8398 6.4258 .3554 8.8398 .3554 13.6914 L .3554 42.3086 C .3554 47.1602 2.8398 49.5742 7.7148 49.5742 Z M 7.7851 45.8008 C 5.4413 45.8008 4.1288 44.5586 4.1288 42.1211 L 4.1288 13.8789 C 4.1288 11.4414 5.4413 10.1992 7.7851 10.1992 L 18.2148 10.1992 L 18.2148 45.8008 Z M 48.2147 10.1992 C 50.5350 10.1992 51.8708 11.4414 51.8708 13.8789 L 51.8708 42.1211 C 51.8708 44.5586 50.5350 45.8008 48.2147 45.8008 L 21.8944 45.8008 L 21.8944 10.1992 Z M 13.7148 18.8945 C 14.4179 18.8945 15.0507 18.2617 15.0507 17.5820 C 15.0507 16.8789 14.4179 16.2696 13.7148 16.2696 L 8.6757 16.2696 C 7.9726 16.2696 7.3632 16.8789 7.3632 17.5820 C 7.3632 18.2617 7.9726 18.8945 8.6757 18.8945 Z M 13.7148 24.9649 C 14.4179 24.9649 15.0507 24.3320 15.0507 23.6289 C 15.0507 22.9258 14.4179 22.3398 13.7148 22.3398 L 8.6757 22.3398 C 7.9726 22.3398 7.3632 22.9258 7.3632 23.6289 C 7.3632 24.3320 7.9726 24.9649 8.6757 24.9649 Z M 13.7148 31.0118 C 14.4179 31.0118 15.0507 30.4258 15.0507 29.7227 C 15.0507 29.0196 14.4179 28.4102 13.7148 28.4102 L 8.6757 28.4102 C 7.9726 28.4102 7.3632 29.0196 7.3632 29.7227 C 7.3632 30.4258 7.9726 31.0118 8.6757 31.0118 Z"></path></g></svg>`;
+        setTrustedHTML(collapseToggleBtn, collapseToggleSVG);
+        collapseToggleBtn.style.flex = '0 0 auto';
+        collapseToggleBtn.style.flexShrink = '0';
+        collapseToggleBtn.style.width = '28px';
+        collapseToggleBtn.style.height = '28px';
+        collapseToggleBtn.style.minWidth = '28px';
+        collapseToggleBtn.style.minHeight = '28px';
+        collapseToggleBtn.style.maxWidth = '28px';
+        collapseToggleBtn.style.maxHeight = '28px';
+        collapseToggleBtn.style.padding = '0';
+        collapseToggleBtn.style.lineHeight = '0';
+        collapseToggleBtn.style.boxSizing = 'border-box';
+        collapseToggleBtn.style.aspectRatio = '1 / 1';
+        const collapseToggleIcon = collapseToggleBtn.querySelector('svg');
+        if (collapseToggleIcon) {
+            collapseToggleIcon.style.width = '16px';
+            collapseToggleIcon.style.height = '16px';
+            collapseToggleIcon.style.display = 'block';
+            collapseToggleIcon.style.flex = '0 0 auto';
+        }
+
+        // 计数器容器
+        const countersContainer = document.createElement('div');
+        countersContainer.style.display = 'flex';
+        countersContainer.style.gap = '8px';
+        countersContainer.style.alignItems = 'center';
+
+        // 文件夹总数计数器（圆形）
+        const folderCountBadge = document.createElement('span');
+        folderCountBadge.id = 'folderCountBadge';
+        folderCountBadge.style.cssText = `
+            background-color: var(--primary-color, #3B82F6);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: help;
+            transition: all 0.2s ease;
+        `;
+
+        // 按钮总数计数器（圆形）
+        const totalButtonCountBadge = document.createElement('span');
+        totalButtonCountBadge.id = 'totalButtonCountBadge';
+        totalButtonCountBadge.style.cssText = `
+            background-color: var(--success-color, #22c55e);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: help;
+            transition: all 0.2s ease;
+        `;
+
+        // 计算初始数据
+        const totalFolders = Object.keys(buttonConfig.folders).length;
+        const totalButtons = Object.values(buttonConfig.folders).reduce((sum, folder) => {
+            return sum + Object.keys(folder.buttons).length;
+        }, 0);
+
+        // 设置计数和提示
+        folderCountBadge.textContent = totalFolders.toString();
+        folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
+
+        totalButtonCountBadge.textContent = totalButtons.toString();
+        totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
+
+        // 添加hover效果
+        [folderCountBadge, totalButtonCountBadge].forEach(badge => {
+            badge.addEventListener('mouseenter', () => {
+                badge.style.transform = 'scale(1.1)';
+                badge.style.boxShadow = '0 3px 6px rgba(0,0,0,0.15)';
+            });
+            badge.addEventListener('mouseleave', () => {
+                badge.style.transform = 'scale(1)';
+                badge.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            });
+        });
+
+        countersContainer.appendChild(folderCountBadge);
+        countersContainer.appendChild(totalButtonCountBadge);
+
+        title.appendChild(collapseToggleBtn);
+        title.appendChild(titleText);
+        title.appendChild(countersContainer);
+
+        const headerBtnsWrapper = document.createElement('div');
+        headerBtnsWrapper.style.display = 'flex';
+        headerBtnsWrapper.style.gap = '10px';
+
+        // 新建自动化按钮
+        const automationBtn = document.createElement('button');
+        automationBtn.innerText = t('⚡ 自动化');
+        automationBtn.type = 'button';
+        automationBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
+        automationBtn.style.color = 'white';
+        automationBtn.style.border = 'none';
+        automationBtn.style.borderRadius = '4px';
+        automationBtn.style.padding = '5px 10px';
+        automationBtn.style.cursor = 'pointer';
+        automationBtn.style.fontSize = '14px';
+        automationBtn.addEventListener('click', () => {
+            showAutomationSettingsDialog();
+        });
+        headerBtnsWrapper.appendChild(automationBtn);
+
+        // 样式管理按钮
+        const styleMgmtBtn = document.createElement('button');
+        styleMgmtBtn.innerText = t('🎨 网站样式');
+        styleMgmtBtn.type = 'button';
+        styleMgmtBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
+        styleMgmtBtn.style.color = 'white';
+        styleMgmtBtn.style.border = 'none';
+        styleMgmtBtn.style.borderRadius = '4px';
+        styleMgmtBtn.style.padding = '5px 10px';
+        styleMgmtBtn.style.cursor = 'pointer';
+        styleMgmtBtn.style.fontSize = '14px';
+        styleMgmtBtn.addEventListener('click', () => {
+            showStyleSettingsDialog();
+        });
+        headerBtnsWrapper.appendChild(styleMgmtBtn);
+
+        // 原有创建脚本配置按钮
+        const openConfigBtn = createConfigSettingsButton();
+        headerBtnsWrapper.appendChild(openConfigBtn);
+
+        // 原有保存关闭按钮
+        const saveSettingsBtn = document.createElement('button');
+        Object.assign(saveSettingsBtn.style, styles.button, {
+            backgroundColor: 'var(--success-color, #22c55e)',
+            color: 'white',
+            borderRadius: '4px'
+        });
+        saveSettingsBtn.textContent = t('💾 关闭并保存');
+        saveSettingsBtn.addEventListener('click', () => {
+            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
+
+            // 关闭所有相关弹窗
+            if (currentConfigOverlay) {
+                closeExistingOverlay(currentConfigOverlay);
+                currentConfigOverlay = null;
+            }
+
+            if (settingsDialogMainContainer) {
+                settingsDialogMainContainer.style.minHeight = '';
+                settingsDialogMainContainer = null;
+            }
+
+            closeExistingOverlay(overlay);
+            currentSettingsOverlay = null;
+            attachButtons();
+        console.log(t('✅ 设置已保存并关闭设置面板。'));
+            updateButtonContainer();
+        });
+        headerBtnsWrapper.appendChild(saveSettingsBtn);
+
+        header.appendChild(title);
+        header.appendChild(headerBtnsWrapper);
+
+        const mainContainer = document.createElement('div');
+        mainContainer.style.display = 'flex';
+        mainContainer.style.flex = '1';
+        mainContainer.style.overflow = 'hidden';
+        mainContainer.style.flexWrap = 'nowrap';
+        mainContainer.style.overflowX = 'auto';
+        mainContainer.style.borderTop = `1px solid var(--border-color, #e5e7eb)`;
+        settingsDialogMainContainer = mainContainer;
+
+        const folderPanel = document.createElement('div');
+        folderPanel.style.display = 'flex';
+        folderPanel.style.flexDirection = 'column';
+        folderPanel.style.width = '280px';
+        folderPanel.style.minWidth = '280px';
+        folderPanel.style.marginRight = '12px';
+        folderPanel.style.overflowY = 'auto';
+        folderPanel.style.padding = '2px 8px 4px 2px';
+
+        // 新增：创建文件夹列表标签栏
+        const folderHeaderBar = document.createElement('div');
+        folderHeaderBar.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background-color: var(--button-bg, #f3f4f6);
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: 4px 4px 0 0;
+            margin: 0 0 -1px 0;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-color, #333333);
+            border-bottom: 1px solid var(--border-color, #e5e7eb);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        `;
+
+        const leftHeaderLabel = document.createElement('div');
+        leftHeaderLabel.textContent = t('文件夹名称');
+        leftHeaderLabel.style.flex = '1';
+        leftHeaderLabel.style.textAlign = 'left';
+        leftHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
+
+        const rightHeaderLabels = document.createElement('div');
+        rightHeaderLabels.style.display = 'flex';
+        rightHeaderLabels.style.gap = '0px';
+        rightHeaderLabels.style.alignItems = 'center';
+        rightHeaderLabels.style.width = '140px'; // 增加宽度以提供更多间距
+        rightHeaderLabels.style.paddingLeft = '8px'; // 添加左侧padding，向左移动标签
+        rightHeaderLabels.style.paddingRight = '12px'; // 增加右侧间距
+
+        const showLabel = document.createElement('div');
+        showLabel.textContent = t('显示');
+        showLabel.style.width = '36px'; // 稍微减小宽度
+        showLabel.style.textAlign = 'center';
+        showLabel.style.fontSize = '12px';
+        showLabel.style.marginRight = '4px'; // 添加右边距
+
+        const editLabel = document.createElement('div');
+        editLabel.textContent = t('修改');
+        editLabel.style.width = '36px'; // 稍微减小宽度
+        editLabel.style.textAlign = 'center';
+        editLabel.style.fontSize = '12px';
+        editLabel.style.marginRight = '4px'; // 添加右边距
+
+        const deleteLabel = document.createElement('div');
+        deleteLabel.textContent = t('删除');
+        deleteLabel.style.width = '36px'; // 稍微减小宽度
+        deleteLabel.style.textAlign = 'center';
+        deleteLabel.style.fontSize = '12px';
+
+        rightHeaderLabels.appendChild(showLabel);
+        rightHeaderLabels.appendChild(editLabel);
+        rightHeaderLabels.appendChild(deleteLabel);
+
+        folderHeaderBar.appendChild(leftHeaderLabel);
+        folderHeaderBar.appendChild(rightHeaderLabels);
+
+        folderListContainer = document.createElement('div');
+        folderListContainer.style.flex = '1';
+        folderListContainer.style.overflowY = 'auto';
+        folderListContainer.style.padding = '8px';
+        folderListContainer.style.direction = 'rtl';
+        folderListContainer.style.border = '1px solid var(--border-color, #e5e7eb)';
+        folderListContainer.style.borderTop = 'none';
+        folderListContainer.style.borderRadius = '0 0 4px 4px';
+
+        const folderAddContainer = document.createElement('div');
+        folderAddContainer.style.padding = '8px';
+        folderAddContainer.style.display = 'flex';
+        folderAddContainer.style.justifyContent = 'center';
+
+        const addNewFolderBtn = document.createElement('button');
+        Object.assign(addNewFolderBtn.style, styles.button, {
+            backgroundColor: 'var(--add-color, #fd7e14)',
+            color: 'white',
+            borderRadius: '4px'
+        });
+        addNewFolderBtn.textContent = t('+ 新建文件夹');
+        addNewFolderBtn.addEventListener('click', () => {
+            showFolderEditDialog('', {}, (newFolderName) => {
+                selectedFolderName = newFolderName;
+                renderFolderList();
+                renderButtonList();
+                console.log(t('🆕 新建文件夹 "{{folderName}}" 已添加。', { folderName: newFolderName }));
+            });
+        });
+        folderAddContainer.appendChild(addNewFolderBtn);
+
+        folderPanel.appendChild(folderHeaderBar);
+        folderPanel.appendChild(folderListContainer);
+        folderPanel.appendChild(folderAddContainer);
+
+        buttonListContainer = document.createElement('div');
+        buttonListContainer.style.flex = '1';
+        buttonListContainer.style.overflowY = 'auto';
+        buttonListContainer.style.display = 'flex';
+        buttonListContainer.style.flexDirection = 'column';
+        buttonListContainer.style.padding = '8px 8px 4px 8px';
+        buttonListContainer.style.minWidth = '520px'; // 加宽右侧区域以提供更多内容空间
+
+        const updateFolderPanelVisibility = () => {
+            const container = settingsDialogMainContainer || mainContainer;
+            if (isSettingsFolderPanelCollapsed) {
+                if (container) {
+                    const currentHeight = container.offsetHeight;
+                    if (currentHeight > 0) {
+                        container.style.minHeight = `${currentHeight}px`;
+                    } else {
+                        window.requestAnimationFrame(() => {
+                            if (!isSettingsFolderPanelCollapsed) return;
+                            const activeContainer = settingsDialogMainContainer || container;
+                            if (!activeContainer) return;
+                            const measuredHeight = activeContainer.offsetHeight;
+                            if (measuredHeight > 0) {
+                                activeContainer.style.minHeight = `${measuredHeight}px`;
+                            }
+                        });
+                    }
+                }
+                folderPanel.style.display = 'none';
+                collapseToggleBtn.title = t('展开左侧设置区域');
+                collapseToggleBtn.setAttribute('aria-label', t('展开左侧设置区域'));
+            } else {
+                folderPanel.style.display = 'flex';
+                collapseToggleBtn.title = t('折叠左侧设置区域');
+                collapseToggleBtn.setAttribute('aria-label', t('折叠左侧设置区域'));
+                if (container) {
+                    container.style.minHeight = '';
+                }
+            }
+        };
+
+        collapseToggleBtn.addEventListener('click', () => {
+            isSettingsFolderPanelCollapsed = !isSettingsFolderPanelCollapsed;
+            updateFolderPanelVisibility();
+        });
+
+        updateFolderPanelVisibility();
+
+        renderFolderList();
+        renderButtonList();
+
+        mainContainer.appendChild(folderPanel);
+        mainContainer.appendChild(buttonListContainer);
+
+        const footer = document.createElement('div');
+        footer.style.display = 'none';
+        dialog.appendChild(header);
+        dialog.appendChild(mainContainer);
+        dialog.appendChild(footer);
+
+        overlay.appendChild(dialog);
+        overlay.style.pointerEvents = 'auto';
+        appendToOverlayLayer(overlay);
+        currentSettingsOverlay = overlay;
+
+        // 动画效果
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+            dialog.style.transform = 'scale(1)';
+        }, 10);
+    };
+/* -------------------------------------------------------------------------- *
+ * Module 04 · Script config (脚本配置)
+ * -------------------------------------------------------------------------- */
+
+    let currentDiffOverlay = null;
+    let currentConfigOverlay = null;
+
     function exportConfig() {
         const date = new Date();
         const yyyy = date.getFullYear();
@@ -4372,7 +5769,8 @@
         });
 
         if (!folderBadgeCount && !buttonBadgeCount) {
-            summaryBar.innerHTML = '';
+            // Trusted Types: always clear via setTrustedHTML, never innerHTML, to stay compatible with strict hosts (e.g. Google).
+            setTrustedHTML(summaryBar, '');
             summaryBar.style.display = 'flex';
             summaryBar.style.flexWrap = 'wrap';
             summaryBar.style.alignItems = 'center';
@@ -5820,1252 +7218,9 @@
             }
         });
     };
-
-    let selectedFolderName = buttonConfig.folderOrder[0] || null; // 在设置面板中使用
-    let folderListContainer, buttonListContainer; // 在渲染函数中定义
-
-    const renderFolderList = () => {
-        if (!folderListContainer) return;
-        setTrustedHTML(folderListContainer, '');
-        const foldersArray = buttonConfig.folderOrder.map(fname => [fname, buttonConfig.folders[fname]]).filter(([f,c])=>c);
-        foldersArray.forEach(([fname, fconfig]) => {
-            const folderItem = document.createElement('div');
-            folderItem.style.cssText = `
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 8px;
-                border-radius: 4px;
-                margin: 4px 0;
-                background-color: ${selectedFolderName === fname ? (isDarkMode() ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.1)') : 'transparent'};
-                cursor: move;
-                direction: ltr;
-                min-height: 36px;
-            `;
-            folderItem.classList.add('folder-item');
-            folderItem.setAttribute('draggable', 'true');
-            folderItem.setAttribute('data-folder', fname);
-
-        const { container: leftInfo, folderPreview } = (function createFolderPreview(fname, fconfig) {
-            const container = document.createElement('div');
-            container.style.display = 'flex';
-            container.style.alignItems = 'center';
-            container.style.gap = '10px';
-            container.style.flex = '1';
-            container.style.minWidth = '0';
-            container.style.paddingRight = '8px';
-
-            const showIcons = buttonConfig && buttonConfig.showFolderIcons === true;
-            const { iconSymbol, textLabel } = extractButtonIconParts(fname);
-            const normalizedLabel = (textLabel || fname || '').trim();
-            const fallbackLabel = normalizedLabel || fname || t('预览文件夹');
-            const fallbackSymbol = iconSymbol || (Array.from(fallbackLabel)[0] || '📁');
-
-            const previewButton = document.createElement('button');
-            previewButton.type = 'button';
-            previewButton.setAttribute('data-folder-preview', fname);
-            previewButton.title = fname;
-            previewButton.style.cssText = `
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0;
-                border-radius: 4px;
-                background-color: transparent;
-                border: none;
-                cursor: grab;
-                flex-shrink: 1;
-                min-width: 0;
-                max-width: 100%;
-                margin: 0 8px 0 0;
-            `;
-
-            const pill = document.createElement('span');
-            pill.style.cssText = `
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                gap: ${showIcons ? '6px' : '0'};
-                background: ${fconfig.color || 'var(--primary-color, #3B82F6)'};
-                color: ${fconfig.textColor || '#ffffff'};
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 14px;
-                font-weight: ${selectedFolderName === fname ? '600' : '500'};
-                min-width: 0;
-                max-width: 100%;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                pointer-events: none;
-                transition: all 0.2s ease;
-            `;
-
-            if (showIcons) {
-                const iconSpan = document.createElement('span');
-                iconSpan.style.display = 'inline-flex';
-                iconSpan.style.alignItems = 'center';
-                iconSpan.style.justifyContent = 'center';
-                iconSpan.style.fontSize = '14px';
-                iconSpan.style.lineHeight = '1';
-                iconSpan.textContent = fallbackSymbol;
-                pill.appendChild(iconSpan);
-            }
-
-            const textSpan = document.createElement('span');
-            textSpan.style.display = 'inline-flex';
-            textSpan.style.alignItems = 'center';
-            textSpan.style.justifyContent = 'center';
-            textSpan.style.pointerEvents = 'none';
-
-            let textContent = showIcons ? normalizedLabel : (fname || normalizedLabel);
-            if (!showIcons && iconSymbol && !fname.includes(iconSymbol)) {
-                textContent = `${iconSymbol} ${textContent || ''}`.trim();
-            }
-            if (!showIcons && !textContent) {
-                textContent = fallbackLabel;
-            }
-            if (textContent) {
-                textSpan.textContent = textContent;
-                pill.appendChild(textSpan);
-            }
-
-            previewButton.appendChild(pill);
-
-            // Ensure the preview keeps the requested button style while remaining draggable/selectable
-            previewButton.style.whiteSpace = 'nowrap';
-            previewButton.style.alignSelf = 'flex-start';
-
-            container.appendChild(previewButton);
-            return { container, folderPreview: previewButton };
-        })(fname, fconfig);
-
-            const rightBtns = document.createElement('div');
-            rightBtns.style.display = 'flex';
-            rightBtns.style.gap = '4px'; // 增加按钮间的间距
-            rightBtns.style.alignItems = 'center';
-            rightBtns.style.width = '130px'; // 与标签栏保持一致的宽度
-            rightBtns.style.justifyContent = 'flex-start'; // 改为左对齐
-            rightBtns.style.paddingLeft = '8px'; // 添加左侧padding与标签栏对齐
-            rightBtns.style.paddingRight = '12px'; // 添加右侧padding
-
-            // 创建隐藏状态勾选框容器
-            const hiddenCheckboxContainer = document.createElement('div');
-            hiddenCheckboxContainer.style.display = 'flex';
-            hiddenCheckboxContainer.style.alignItems = 'center';
-            hiddenCheckboxContainer.style.justifyContent = 'center';
-            hiddenCheckboxContainer.style.width = '36px'; // 与标签栏"显示"列宽度一致
-            hiddenCheckboxContainer.style.marginRight = '4px'; // 添加右边距
-            hiddenCheckboxContainer.style.padding = '2px';
-            hiddenCheckboxContainer.style.borderRadius = '3px';
-            hiddenCheckboxContainer.style.cursor = 'pointer';
-            hiddenCheckboxContainer.title = t('勾选后该文件夹将在主界面显示');
-
-            const hiddenCheckbox = document.createElement('input');
-            hiddenCheckbox.type = 'checkbox';
-            hiddenCheckbox.checked = !fconfig.hidden; // 勾选表示显示
-            hiddenCheckbox.style.cursor = 'pointer';
-            hiddenCheckbox.style.accentColor = 'var(--primary-color, #3B82F6)';
-            hiddenCheckbox.style.margin = '0';
-            hiddenCheckbox.style.transform = 'scale(1.1)'; // 稍微放大勾选框以便操作
-
-            // 删除了checkboxText元素，不再显示"显示"文字
-
-            // 关键修复：先添加change事件监听器到checkbox
-            hiddenCheckbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                const newHiddenState = !hiddenCheckbox.checked;
-                fconfig.hidden = newHiddenState;
-                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                console.log(t('✅ 文件夹 "{{folderName}}" 的隐藏状态已设置为 {{state}}', {
-                    folderName: fname,
-                    state: fconfig.hidden
-                }));
-                updateButtonContainer();
-            });
-
-            // 为checkbox添加click事件，确保优先处理
-            hiddenCheckbox.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-            });
-
-            // 容器点击事件，点击容器时切换checkbox状态
-            hiddenCheckboxContainer.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-
-                // 如果点击的不是checkbox本身，则手动切换checkbox状态
-                if (e.target !== hiddenCheckbox) {
-                    hiddenCheckbox.checked = !hiddenCheckbox.checked;
-                    // 手动触发change事件
-                    const changeEvent = new Event('change', { bubbles: false });
-                    hiddenCheckbox.dispatchEvent(changeEvent);
-                }
-            });
-
-            hiddenCheckboxContainer.appendChild(hiddenCheckbox);
-            // 不再添加checkboxText
-
-
-            // 创建编辑按钮
-            const editFolderBtn = document.createElement('button');
-            editFolderBtn.textContent = '✏️';
-            editFolderBtn.style.cssText = `
-                background: none;
-                border: none;
-                cursor: pointer;
-                font-size: 14px;
-                color: var(--primary-color, #3B82F6);
-                width: 36px;
-                height: 32px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-right: 4px;
-            `;
-            editFolderBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showFolderEditDialog(fname, fconfig, (newFolderName) => {
-                    selectedFolderName = newFolderName;
-                    renderFolderList();
-                    renderButtonList();
-                });
-            });
-
-            const deleteFolderBtn = document.createElement('button');
-            deleteFolderBtn.textContent = '🗑️';
-            deleteFolderBtn.style.cssText = `
-                background: none;
-                border: none;
-                cursor: pointer;
-                font-size: 14px;
-                color: var(--danger-color, #ef4444);
-                width: 36px;
-                height: 32px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-            deleteFolderBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showDeleteFolderConfirmDialog(fname, () => {
-                    const allFolders = buttonConfig.folderOrder;
-                    selectedFolderName = allFolders[0] || null;
-                    renderFolderList();
-                    renderButtonList();
-                    updateCounters(); // 更新所有计数器
-                });
-            });
-
-            rightBtns.appendChild(hiddenCheckboxContainer);
-            rightBtns.appendChild(editFolderBtn);
-            rightBtns.appendChild(deleteFolderBtn);
-
-            folderItem.appendChild(leftInfo);
-            folderItem.appendChild(rightBtns);
-
-            // 修改folderItem的点击事件，排除右侧按钮区域
-            folderItem.addEventListener('click', (e) => {
-                // 如果点击的是右侧按钮区域，不触发文件夹选择
-                if (rightBtns.contains(e.target)) {
-                    return;
-                }
-                selectedFolderName = fname;
-                renderFolderList();
-                renderButtonList();
-            });
-
-            folderItem.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', fname);
-                folderItem.style.opacity = '0.5';
-            });
-
-            folderItem.addEventListener('dragover', (e) => {
-                e.preventDefault();
-            });
-
-            folderItem.addEventListener('dragenter', () => {
-                folderItem.style.border = `2px solid var(--primary-color, #3B82F6)`;
-            });
-
-            folderItem.addEventListener('dragleave', () => {
-                folderItem.style.border = 'none';
-            });
-
-            folderItem.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const draggedFolder = e.dataTransfer.getData('text/plain');
-                if (draggedFolder && draggedFolder !== fname) {
-                    const draggedIndex = buttonConfig.folderOrder.indexOf(draggedFolder);
-                    const targetIndex = buttonConfig.folderOrder.indexOf(fname);
-                    if (draggedIndex > -1 && targetIndex > -1) {
-                        const [removed] = buttonConfig.folderOrder.splice(draggedIndex, 1);
-                        buttonConfig.folderOrder.splice(targetIndex, 0, removed);
-                        localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                        renderFolderList();
-                        renderButtonList();
-                        console.log(t('🔄 文件夹顺序已更新：{{draggedFolder}} 移动到 {{targetFolder}} 前。', {
-                            draggedFolder,
-                            targetFolder: fname
-                        }));
-                        // 更新按钮栏
-                        updateButtonContainer();
-                    }
-                }
-                // Check if a button is being dropped onto this folder
-                const buttonData = e.dataTransfer.getData('application/json');
-                if (buttonData) {
-                    try {
-                        const { buttonName: draggedBtnName, sourceFolder } = JSON.parse(buttonData);
-                        if (draggedBtnName && sourceFolder && sourceFolder !== fname) {
-                            // Move the button from sourceFolder to fname
-                            const button = buttonConfig.folders[sourceFolder].buttons[draggedBtnName];
-                            if (button) {
-                                // Remove from source
-                                delete buttonConfig.folders[sourceFolder].buttons[draggedBtnName];
-                                // Add to target
-                                buttonConfig.folders[fname].buttons[draggedBtnName] = button;
-                                localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                                renderFolderList();
-                                renderButtonList();
-                                console.log(t('🔄 按钮 "{{buttonName}}" 已从 "{{sourceFolder}}" 移动到 "{{targetFolder}}"。', {
-                                    buttonName: draggedBtnName,
-                                    sourceFolder,
-                                    targetFolder: fname
-                                }));
-                                // Update button container
-                                updateButtonContainer();
-                            }
-                        }
-                    } catch (error) {
-                        console.error("解析拖放数据失败:", error);
-                    }
-                }
-                folderItem.style.border = 'none';
-            });
-
-            folderItem.addEventListener('dragend', () => {
-                folderItem.style.opacity = '1';
-            });
-
-        folderListContainer.appendChild(folderItem);
-    });
-
-    localizeElement(folderListContainer);
-    scheduleLocalization();
-    };
-
-    // 升级：更新所有计数显示的函数
-    const updateCounters = () => {
-        // 计算统计数据
-        const totalFolders = Object.keys(buttonConfig.folders).length;
-        const totalButtons = Object.values(buttonConfig.folders).reduce((sum, folder) => {
-            return sum + Object.keys(folder.buttons).length;
-        }, 0);
-
-        // 更新文件夹总数计数
-        const folderCountBadge = queryUI('#folderCountBadge');
-        if (folderCountBadge) {
-            folderCountBadge.textContent = totalFolders.toString();
-            folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
-        }
-
-        // 更新按钮总数计数
-        const totalButtonCountBadge = queryUI('#totalButtonCountBadge');
-        if (totalButtonCountBadge) {
-            totalButtonCountBadge.textContent = totalButtons.toString();
-            totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
-        }
-
-        // 更新当前文件夹按钮数计数
-        if (selectedFolderName && buttonConfig.folders[selectedFolderName]) {
-            const currentFolderButtonCount = Object.keys(buttonConfig.folders[selectedFolderName].buttons).length;
-            const currentFolderBadge = queryUI('#currentFolderButtonCount');
-            if (currentFolderBadge) {
-                currentFolderBadge.textContent = currentFolderButtonCount.toString();
-                currentFolderBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
-                    folderName: selectedFolderName,
-                    count: currentFolderButtonCount
-                });
-            }
-        }
-
-        console.log(t('📊 计数器已更新: {{folderCount}}个文件夹, {{buttonCount}}个按钮总数', {
-            folderCount: totalFolders,
-            buttonCount: totalButtons
-        }));
-    };
-
-    const renderButtonList = () => {
-        if (!buttonListContainer) return;
-        setTrustedHTML(buttonListContainer, '');
-        if (!selectedFolderName) return;
-        const currentFolderConfig = buttonConfig.folders[selectedFolderName];
-        if (!currentFolderConfig) return;
-
-    const rightHeader = document.createElement('div');
-    rightHeader.style.display = 'flex';
-    rightHeader.style.justifyContent = 'space-between';
-    rightHeader.style.alignItems = 'center';
-    rightHeader.style.marginBottom = '8px';
-
-    const folderNameLabel = document.createElement('h3');
-    folderNameLabel.style.display = 'flex';
-    folderNameLabel.style.alignItems = 'center';
-    folderNameLabel.style.gap = '10px';
-    folderNameLabel.style.margin = '0';
-
-    const folderNameText = document.createElement('span');
-    setTrustedHTML(folderNameText, `➤ <strong>${selectedFolderName}</strong>`);
-
-    const buttonCountBadge = document.createElement('span');
-    buttonCountBadge.id = 'currentFolderButtonCount';
-    buttonCountBadge.style.cssText = `
-        background-color: var(--info-color, #6366F1);
-        color: white;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        font-size: 11px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        cursor: help;
-        transition: all 0.2s ease;
-    `;
-
-    // 计算当前文件夹的按钮数量
-    const buttonCount = Object.keys(currentFolderConfig.buttons).length;
-    buttonCountBadge.textContent = buttonCount.toString();
-    buttonCountBadge.title = t('"{{folderName}}" 文件夹有 {{count}} 个按钮', {
-        folderName: selectedFolderName,
-        count: buttonCount
-    });
-
-    // 添加hover效果
-    buttonCountBadge.addEventListener('mouseenter', () => {
-        buttonCountBadge.style.transform = 'scale(1.15)';
-        buttonCountBadge.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)';
-    });
-    buttonCountBadge.addEventListener('mouseleave', () => {
-        buttonCountBadge.style.transform = 'scale(1)';
-        buttonCountBadge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-    });
-
-    folderNameLabel.appendChild(folderNameText);
-    folderNameLabel.appendChild(buttonCountBadge);
-
-    const addNewButtonBtn = document.createElement('button');
-    Object.assign(addNewButtonBtn.style, styles.button, {
-        backgroundColor: 'var(--add-color, #fd7e14)',
-        color: 'white',
-        borderRadius: '4px'
-    });
-    addNewButtonBtn.textContent = t('+ 新建按钮');
-    addNewButtonBtn.addEventListener('click', () => {
-        showButtonEditDialog(selectedFolderName, '', {}, () => {
-            renderButtonList();
-        });
-    });
-
-    rightHeader.appendChild(folderNameLabel);
-    rightHeader.appendChild(addNewButtonBtn);
-
-    buttonListContainer.appendChild(rightHeader);
-
-    // 新增：创建包含标签栏和内容的容器，滚动条将出现在此容器右侧
-    const contentWithHeaderContainer = document.createElement('div');
-    contentWithHeaderContainer.style.cssText = `
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        border: 1px solid var(--border-color, #e5e7eb);
-        border-radius: 4px;
-    `;
-
-    // 创建按钮列表标签栏 - 固定在滚动容器顶部
-    const buttonHeaderBar = document.createElement('div');
-    buttonHeaderBar.style.cssText = `
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 6px 8px;
-        background-color: var(--button-bg, #f3f4f6);
-        border-bottom: 1px solid var(--border-color, #e5e7eb);
-        border-radius: 4px 4px 0 0;
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--text-color, #333333);
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        flex-shrink: 0;
-    `;
-
-    const leftButtonHeaderLabel = document.createElement('div');
-    leftButtonHeaderLabel.textContent = t('按钮预览');
-    leftButtonHeaderLabel.style.flex = '1';
-    leftButtonHeaderLabel.style.textAlign = 'left';
-    leftButtonHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
-
-    const rightButtonHeaderLabels = document.createElement('div');
-    rightButtonHeaderLabels.style.display = 'flex';
-    rightButtonHeaderLabels.style.gap = '4px';
-    rightButtonHeaderLabels.style.alignItems = 'center';
-    rightButtonHeaderLabels.style.width = '240px';
-    rightButtonHeaderLabels.style.paddingLeft = '8px';
-    rightButtonHeaderLabels.style.paddingRight = '12px';
-
-    const variableLabel = document.createElement('div');
-    variableLabel.textContent = t('变量');
-    variableLabel.style.width = '110px';
-    variableLabel.style.textAlign = 'center';
-    variableLabel.style.fontSize = '12px';
-    variableLabel.style.marginLeft = '-1em';
-    const autoSubmitLabel = document.createElement('div');
-    autoSubmitLabel.textContent = t('自动提交');
-    autoSubmitLabel.style.width = '64px';
-    autoSubmitLabel.style.textAlign = 'center';
-    autoSubmitLabel.style.fontSize = '12px';
-    autoSubmitLabel.style.marginLeft = 'calc(-0.5em)';
-
-    const editButtonLabel = document.createElement('div');
-    editButtonLabel.textContent = t('修改');
-    editButtonLabel.style.width = '40px';
-    editButtonLabel.style.textAlign = 'center';
-    editButtonLabel.style.fontSize = '12px';
-
-    const deleteButtonLabel = document.createElement('div');
-    deleteButtonLabel.textContent = t('删除');
-    deleteButtonLabel.style.width = '36px';
-    deleteButtonLabel.style.textAlign = 'center';
-    deleteButtonLabel.style.fontSize = '12px';
-
-    rightButtonHeaderLabels.appendChild(variableLabel);
-    rightButtonHeaderLabels.appendChild(autoSubmitLabel);
-    rightButtonHeaderLabels.appendChild(editButtonLabel);
-    rightButtonHeaderLabels.appendChild(deleteButtonLabel);
-
-    buttonHeaderBar.appendChild(leftButtonHeaderLabel);
-    buttonHeaderBar.appendChild(rightButtonHeaderLabels);
-
-    // 修改：内容区域不再需要自己的滚动条和边框
-    const btnScrollArea = document.createElement('div');
-    btnScrollArea.style.cssText = `
-        flex: 1;
-        padding: 8px;
-        overflow-y: visible;
-        min-height: 0;
-    `;
-
-    const currentFolderButtons = Object.entries(currentFolderConfig.buttons);
-    const createButtonPreview = (btnName, btnCfg) => {
-        const btnEl = createCustomButtonElement(btnName, btnCfg);
-        btnEl.style.marginBottom = '0px';
-        btnEl.style.marginRight = '8px';
-        btnEl.style.cursor = 'grab';
-        btnEl.style.flexShrink = '1';
-        btnEl.style.minWidth = '0';
-        btnEl.style.maxWidth = '100%';
-        btnEl.style.whiteSpace = 'normal';
-        btnEl.style.wordBreak = 'break-word';
-        btnEl.style.overflow = 'visible';
-        btnEl.style.lineHeight = '1.4';
-        btnEl.style.overflowWrap = 'anywhere';
-        btnEl.style.display = 'inline-flex';
-        btnEl.style.flexWrap = 'wrap';
-        btnEl.style.alignItems = 'center';
-        btnEl.style.justifyContent = 'flex-start';
-        btnEl.style.columnGap = '6px';
-        btnEl.style.rowGap = '2px';
-        btnEl.style.alignSelf = 'flex-start';
-        return btnEl;
-    };
-
-    currentFolderButtons.forEach(([btnName, cfg]) => {
-        const btnItem = document.createElement('div');
-        btnItem.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-            padding: 4px;
-            border: 1px solid var(--border-color, #e5e7eb);
-            border-radius: 4px;
-            background-color: var(--button-bg, #f3f4f6);
-            cursor: move;
-            width: 100%;
-            box-sizing: border-box;
-            overflow: visible;
-        `;
-        btnItem.setAttribute('draggable', 'true');
-        btnItem.setAttribute('data-button-name', btnName);
-
-        const leftPart = document.createElement('div');
-        leftPart.style.display = 'flex';
-        leftPart.style.alignItems = 'flex-start';
-        leftPart.style.gap = '8px';
-        leftPart.style.flex = '1';
-        leftPart.style.minWidth = '0';
-        leftPart.style.overflow = 'visible';
-
-        const previewWrapper = document.createElement('div');
-        previewWrapper.style.display = 'flex';
-        previewWrapper.style.alignItems = 'flex-start';
-        previewWrapper.style.flex = '1 1 auto';
-        previewWrapper.style.maxWidth = '100%';
-        previewWrapper.style.minWidth = '0';
-        previewWrapper.style.overflow = 'visible';
-        previewWrapper.style.alignSelf = 'flex-start';
-
-        const btnPreview = createButtonPreview(btnName, cfg);
-        previewWrapper.appendChild(btnPreview);
-        leftPart.appendChild(previewWrapper);
-
-        const opsDiv = document.createElement('div');
-        opsDiv.style.display = 'flex';
-        opsDiv.style.gap = '4px';
-        opsDiv.style.alignItems = 'center';
-        opsDiv.style.width = '240px';
-        opsDiv.style.paddingLeft = '8px';
-        opsDiv.style.paddingRight = '12px';
-        opsDiv.style.flexShrink = '0';
-
-        const variableInfoContainer = document.createElement('div');
-        variableInfoContainer.style.display = 'flex';
-        variableInfoContainer.style.alignItems = 'center';
-        variableInfoContainer.style.justifyContent = 'center';
-        variableInfoContainer.style.flexDirection = 'column';
-        variableInfoContainer.style.width = '110px';
-        variableInfoContainer.style.fontSize = '12px';
-        variableInfoContainer.style.lineHeight = '1.2';
-        variableInfoContainer.style.wordBreak = 'break-word';
-        variableInfoContainer.style.textAlign = 'center';
-        variableInfoContainer.style.color = 'var(--text-color, #333333)';
-
-        if (cfg.type === 'template') {
-            const variablesUsed = extractTemplateVariables(cfg.text || '');
-            if (variablesUsed.length > 0) {
-                const displayText = variablesUsed.join(isNonChineseLocale() ? ', ' : '、');
-                variableInfoContainer.textContent = displayText;
-                variableInfoContainer.title = t('模板变量: {{variable}}', { variable: displayText });
-            } else {
-                variableInfoContainer.textContent = t('无');
-                variableInfoContainer.title = t('未使用模板变量');
-            }
-        } else {
-            variableInfoContainer.textContent = '—';
-            variableInfoContainer.title = t('工具按钮不使用模板变量');
-        }
-
-        // 创建"自动提交"开关容器
-        const autoSubmitContainer = document.createElement('div');
-        autoSubmitContainer.style.display = 'flex';
-        autoSubmitContainer.style.alignItems = 'center';
-        autoSubmitContainer.style.justifyContent = 'center';
-        autoSubmitContainer.style.width = '60px';
-
-        const autoSubmitCheckbox = document.createElement('input');
-        autoSubmitCheckbox.type = 'checkbox';
-        autoSubmitCheckbox.checked = cfg.autoSubmit || false;
-        autoSubmitCheckbox.style.cursor = 'pointer';
-        autoSubmitCheckbox.style.accentColor = 'var(--primary-color, #3B82F6)';
-        autoSubmitCheckbox.style.margin = '0';
-        autoSubmitCheckbox.style.transform = 'scale(1.1)';
-        autoSubmitCheckbox.addEventListener('change', () => {
-            cfg.autoSubmit = autoSubmitCheckbox.checked;
-            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-            console.log(t('✅ 按钮 "{{buttonName}}" 的自动提交已设置为 {{state}}', {
-                buttonName: btnName,
-                state: autoSubmitCheckbox.checked
-            }));
-        });
-
-        autoSubmitContainer.appendChild(autoSubmitCheckbox);
-
-        // 创建编辑按钮
-        const editBtn = document.createElement('button');
-        editBtn.textContent = '✏️';
-        editBtn.style.cssText = `
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--primary-color, #3B82F6);
-            font-size: 14px;
-            width: 36px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showButtonEditDialog(selectedFolderName, btnName, cfg, () => {
-                renderButtonList();
-            });
-        });
-
-        // 创建删除按钮
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.style.cssText = `
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--danger-color, #ef4444);
-            font-size: 14px;
-            width: 36px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showDeleteButtonConfirmDialog(selectedFolderName, btnName, () => {
-                renderButtonList();
-            });
-        });
-
-        opsDiv.appendChild(variableInfoContainer);
-        opsDiv.appendChild(autoSubmitContainer);
-        opsDiv.appendChild(editBtn);
-        opsDiv.appendChild(deleteBtn);
-
-        btnItem.appendChild(leftPart);
-        btnItem.appendChild(opsDiv);
-
-        btnItem.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('application/json', JSON.stringify({
-                buttonName: btnName,
-                sourceFolder: selectedFolderName
-            }));
-            btnItem.style.opacity = '0.5';
-        });
-
-        btnItem.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-
-        btnItem.addEventListener('dragenter', () => {
-            btnItem.style.border = `2px solid var(--primary-color, #3B82F6)`;
-        });
-
-        btnItem.addEventListener('dragleave', () => {
-            btnItem.style.border = `1px solid var(--border-color, #e5e7eb)`;
-        });
-
-        btnItem.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const data = JSON.parse(e.dataTransfer.getData('application/json'));
-            const { buttonName: draggedBtnName } = data;
-            if (draggedBtnName && draggedBtnName !== btnName) {
-                const buttonsKeys = Object.keys(buttonConfig.folders[selectedFolderName].buttons);
-                const draggedIndex = buttonsKeys.indexOf(draggedBtnName);
-                const targetIndex = buttonsKeys.indexOf(btnName);
-                if (draggedIndex > -1 && targetIndex > -1) {
-                    const reordered = [...buttonsKeys];
-                    reordered.splice(draggedIndex, 1);
-                    reordered.splice(targetIndex, 0, draggedBtnName);
-                    const newOrderedMap = {};
-                    reordered.forEach(k => {
-                        newOrderedMap[k] = buttonConfig.folders[selectedFolderName].buttons[k];
-                    });
-                    buttonConfig.folders[selectedFolderName].buttons = newOrderedMap;
-                    localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-                    renderButtonList();
-                    console.log(t('🔄 按钮顺序已更新：{{buttonName}} 移动到 {{targetName}} 前。', {
-                        buttonName: draggedBtnName,
-                        targetName: btnName
-                    }));
-                    // 更新按钮栏
-                    updateButtonContainer();
-                }
-            }
-            btnItem.style.border = `1px solid var(--border-color, #e5e7eb)`;
-        });
-
-        btnItem.addEventListener('dragend', () => {
-            btnItem.style.opacity = '1';
-        });
-
-        btnScrollArea.appendChild(btnItem);
-    });
-
-    // 修改：将标签栏和内容区域添加到新的容器中
-    contentWithHeaderContainer.appendChild(buttonHeaderBar);
-    contentWithHeaderContainer.appendChild(btnScrollArea);
-
-    // 修改：将新容器添加到主容器中
-    buttonListContainer.appendChild(contentWithHeaderContainer);
-
-    localizeElement(buttonListContainer);
-    scheduleLocalization();
-};
-
-    function updateButtonBarHeight(newHeight) {
-        const clamped = Math.min(150, Math.max(50, newHeight)); // 限制范围
-        buttonConfig.buttonBarHeight = clamped;
-        localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-
-        // 更新容器高度
-        const container = queryUI('.folder-buttons-container');
-        if (container) {
-            container.style.height = clamped + 'px';
-            try {
-                updateButtonBarLayout(container, clamped);
-            } catch (err) {
-                console.warn('更新按钮栏布局失败:', err);
-            }
-        }
-        console.log(`${t('🔧 按钮栏高度已更新为')} ${clamped} px`);
-        try {
-            applyDomainStyles();
-        } catch (err) {
-            console.warn(t('应用域名样式失败:'), err);
-        }
-    }
-
-    const showUnifiedSettingsDialog = () => {
-        if (settingsDialogMainContainer) {
-            settingsDialogMainContainer.style.minHeight = '';
-            settingsDialogMainContainer = null;
-        }
-        if (currentSettingsOverlay) {
-            closeExistingOverlay(currentSettingsOverlay);
-            currentSettingsOverlay = null;
-        }
-        const overlay = document.createElement('div');
-        overlay.classList.add('settings-overlay');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--overlay-bg, rgba(0, 0, 0, 0.5));
-            backdrop-filter: blur(2px);
-            z-index: 11000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        `;
-
-        const dialog = document.createElement('div');
-        dialog.classList.add('settings-dialog');
-        dialog.classList.add('cttf-dialog');
-        dialog.style.cssText = `
-            background-color: var(--dialog-bg, #ffffff);
-            color: var(--text-color, #333333);
-            border-radius: 4px;
-            padding: 24px;
-            box-shadow: 0 8px 24px var(--shadow-color, rgba(0,0,0,0.1));
-            border: 1px solid var(--border-color, #e5e7eb);
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            width: 920px;
-            max-width: 95vw;
-            max-height: 80vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.marginBottom = '16px';
-
-        const title = document.createElement('h2');
-        title.style.display = 'flex';
-        title.style.alignItems = 'center';
-        title.style.gap = '12px';
-        title.style.margin = '0';
-        title.style.fontSize = '20px';
-        title.style.fontWeight = '600';
-
-        const titleText = document.createElement('span');
-        titleText.textContent = t('⚙️ 设置面板');
-
-        const collapseToggleBtn = document.createElement('button');
-        collapseToggleBtn.type = 'button';
-        collapseToggleBtn.style.cssText = `
-            background-color: transparent;
-            color: var(--text-color, #333333);
-            border: none;
-            border-radius: 4px;
-            padding: 4px;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        `;
-        collapseToggleBtn.title = t('折叠左侧设置区域');
-        collapseToggleBtn.setAttribute('aria-label', collapseToggleBtn.title);
-        const collapseToggleSVG = `<svg fill="currentColor" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M 7.7148 49.5742 L 48.2852 49.5742 C 53.1836 49.5742 55.6446 47.1367 55.6446 42.3086 L 55.6446 13.6914 C 55.6446 8.8633 53.1836 6.4258 48.2852 6.4258 L 7.7148 6.4258 C 2.8398 6.4258 .3554 8.8398 .3554 13.6914 L .3554 42.3086 C .3554 47.1602 2.8398 49.5742 7.7148 49.5742 Z M 7.7851 45.8008 C 5.4413 45.8008 4.1288 44.5586 4.1288 42.1211 L 4.1288 13.8789 C 4.1288 11.4414 5.4413 10.1992 7.7851 10.1992 L 18.2148 10.1992 L 18.2148 45.8008 Z M 48.2147 10.1992 C 50.5350 10.1992 51.8708 11.4414 51.8708 13.8789 L 51.8708 42.1211 C 51.8708 44.5586 50.5350 45.8008 48.2147 45.8008 L 21.8944 45.8008 L 21.8944 10.1992 Z M 13.7148 18.8945 C 14.4179 18.8945 15.0507 18.2617 15.0507 17.5820 C 15.0507 16.8789 14.4179 16.2696 13.7148 16.2696 L 8.6757 16.2696 C 7.9726 16.2696 7.3632 16.8789 7.3632 17.5820 C 7.3632 18.2617 7.9726 18.8945 8.6757 18.8945 Z M 13.7148 24.9649 C 14.4179 24.9649 15.0507 24.3320 15.0507 23.6289 C 15.0507 22.9258 14.4179 22.3398 13.7148 22.3398 L 8.6757 22.3398 C 7.9726 22.3398 7.3632 22.9258 7.3632 23.6289 C 7.3632 24.3320 7.9726 24.9649 8.6757 24.9649 Z M 13.7148 31.0118 C 14.4179 31.0118 15.0507 30.4258 15.0507 29.7227 C 15.0507 29.0196 14.4179 28.4102 13.7148 28.4102 L 8.6757 28.4102 C 7.9726 28.4102 7.3632 29.0196 7.3632 29.7227 C 7.3632 30.4258 7.9726 31.0118 8.6757 31.0118 Z"></path></g></svg>`;
-        setTrustedHTML(collapseToggleBtn, collapseToggleSVG);
-        collapseToggleBtn.style.flex = '0 0 auto';
-        collapseToggleBtn.style.flexShrink = '0';
-        collapseToggleBtn.style.width = '28px';
-        collapseToggleBtn.style.height = '28px';
-        collapseToggleBtn.style.minWidth = '28px';
-        collapseToggleBtn.style.minHeight = '28px';
-        collapseToggleBtn.style.maxWidth = '28px';
-        collapseToggleBtn.style.maxHeight = '28px';
-        collapseToggleBtn.style.padding = '0';
-        collapseToggleBtn.style.lineHeight = '0';
-        collapseToggleBtn.style.boxSizing = 'border-box';
-        collapseToggleBtn.style.aspectRatio = '1 / 1';
-        const collapseToggleIcon = collapseToggleBtn.querySelector('svg');
-        if (collapseToggleIcon) {
-            collapseToggleIcon.style.width = '16px';
-            collapseToggleIcon.style.height = '16px';
-            collapseToggleIcon.style.display = 'block';
-            collapseToggleIcon.style.flex = '0 0 auto';
-        }
-
-        // 计数器容器
-        const countersContainer = document.createElement('div');
-        countersContainer.style.display = 'flex';
-        countersContainer.style.gap = '8px';
-        countersContainer.style.alignItems = 'center';
-
-        // 文件夹总数计数器（圆形）
-        const folderCountBadge = document.createElement('span');
-        folderCountBadge.id = 'folderCountBadge';
-        folderCountBadge.style.cssText = `
-            background-color: var(--primary-color, #3B82F6);
-            color: white;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 12px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            cursor: help;
-            transition: all 0.2s ease;
-        `;
-
-        // 按钮总数计数器（圆形）
-        const totalButtonCountBadge = document.createElement('span');
-        totalButtonCountBadge.id = 'totalButtonCountBadge';
-        totalButtonCountBadge.style.cssText = `
-            background-color: var(--success-color, #22c55e);
-            color: white;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 12px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            cursor: help;
-            transition: all 0.2s ease;
-        `;
-
-        // 计算初始数据
-        const totalFolders = Object.keys(buttonConfig.folders).length;
-        const totalButtons = Object.values(buttonConfig.folders).reduce((sum, folder) => {
-            return sum + Object.keys(folder.buttons).length;
-        }, 0);
-
-        // 设置计数和提示
-        folderCountBadge.textContent = totalFolders.toString();
-        folderCountBadge.title = t('共有 {{count}} 个文件夹', { count: totalFolders });
-
-        totalButtonCountBadge.textContent = totalButtons.toString();
-        totalButtonCountBadge.title = t('所有文件夹共有 {{count}} 个按钮', { count: totalButtons });
-
-        // 添加hover效果
-        [folderCountBadge, totalButtonCountBadge].forEach(badge => {
-            badge.addEventListener('mouseenter', () => {
-                badge.style.transform = 'scale(1.1)';
-                badge.style.boxShadow = '0 3px 6px rgba(0,0,0,0.15)';
-            });
-            badge.addEventListener('mouseleave', () => {
-                badge.style.transform = 'scale(1)';
-                badge.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-            });
-        });
-
-        countersContainer.appendChild(folderCountBadge);
-        countersContainer.appendChild(totalButtonCountBadge);
-
-        title.appendChild(collapseToggleBtn);
-        title.appendChild(titleText);
-        title.appendChild(countersContainer);
-
-        const headerBtnsWrapper = document.createElement('div');
-        headerBtnsWrapper.style.display = 'flex';
-        headerBtnsWrapper.style.gap = '10px';
-
-        // 新建自动化按钮
-        const automationBtn = document.createElement('button');
-        automationBtn.innerText = t('⚡ 自动化');
-        automationBtn.type = 'button';
-        automationBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
-        automationBtn.style.color = 'white';
-        automationBtn.style.border = 'none';
-        automationBtn.style.borderRadius = '4px';
-        automationBtn.style.padding = '5px 10px';
-        automationBtn.style.cursor = 'pointer';
-        automationBtn.style.fontSize = '14px';
-        automationBtn.addEventListener('click', () => {
-            showAutomationSettingsDialog();
-        });
-        headerBtnsWrapper.appendChild(automationBtn);
-
-        // 样式管理按钮
-        const styleMgmtBtn = document.createElement('button');
-        styleMgmtBtn.innerText = t('🎨 网站样式');
-        styleMgmtBtn.type = 'button';
-        styleMgmtBtn.style.backgroundColor = 'var(--info-color, #4F46E5)';
-        styleMgmtBtn.style.color = 'white';
-        styleMgmtBtn.style.border = 'none';
-        styleMgmtBtn.style.borderRadius = '4px';
-        styleMgmtBtn.style.padding = '5px 10px';
-        styleMgmtBtn.style.cursor = 'pointer';
-        styleMgmtBtn.style.fontSize = '14px';
-        styleMgmtBtn.addEventListener('click', () => {
-            showStyleSettingsDialog();
-        });
-        headerBtnsWrapper.appendChild(styleMgmtBtn);
-
-        // 原有创建脚本配置按钮
-        const openConfigBtn = createConfigSettingsButton();
-        headerBtnsWrapper.appendChild(openConfigBtn);
-
-        // 原有保存关闭按钮
-        const saveSettingsBtn = document.createElement('button');
-        Object.assign(saveSettingsBtn.style, styles.button, {
-            backgroundColor: 'var(--success-color, #22c55e)',
-            color: 'white',
-            borderRadius: '4px'
-        });
-        saveSettingsBtn.textContent = t('💾 关闭并保存');
-        saveSettingsBtn.addEventListener('click', () => {
-            localStorage.setItem('chatGPTButtonFoldersConfig', JSON.stringify(buttonConfig));
-
-            // 关闭所有相关弹窗
-            if (currentConfigOverlay) {
-                closeExistingOverlay(currentConfigOverlay);
-                currentConfigOverlay = null;
-            }
-
-            if (settingsDialogMainContainer) {
-                settingsDialogMainContainer.style.minHeight = '';
-                settingsDialogMainContainer = null;
-            }
-
-            closeExistingOverlay(overlay);
-            currentSettingsOverlay = null;
-            attachButtons();
-        console.log(t('✅ 设置已保存并关闭设置面板。'));
-            updateButtonContainer();
-        });
-        headerBtnsWrapper.appendChild(saveSettingsBtn);
-
-        header.appendChild(title);
-        header.appendChild(headerBtnsWrapper);
-
-        const mainContainer = document.createElement('div');
-        mainContainer.style.display = 'flex';
-        mainContainer.style.flex = '1';
-        mainContainer.style.overflow = 'hidden';
-        mainContainer.style.flexWrap = 'nowrap';
-        mainContainer.style.overflowX = 'auto';
-        mainContainer.style.borderTop = `1px solid var(--border-color, #e5e7eb)`;
-        settingsDialogMainContainer = mainContainer;
-
-        const folderPanel = document.createElement('div');
-        folderPanel.style.display = 'flex';
-        folderPanel.style.flexDirection = 'column';
-        folderPanel.style.width = '280px';
-        folderPanel.style.minWidth = '280px';
-        folderPanel.style.marginRight = '12px';
-        folderPanel.style.overflowY = 'auto';
-        folderPanel.style.padding = '2px 8px 4px 2px';
-
-        // 新增：创建文件夹列表标签栏
-        const folderHeaderBar = document.createElement('div');
-        folderHeaderBar.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 8px;
-            background-color: var(--button-bg, #f3f4f6);
-            border: 1px solid var(--border-color, #e5e7eb);
-            border-radius: 4px 4px 0 0;
-            margin: 0 0 -1px 0;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-color, #333333);
-            border-bottom: 1px solid var(--border-color, #e5e7eb);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        `;
-
-        const leftHeaderLabel = document.createElement('div');
-        leftHeaderLabel.textContent = t('文件夹名称');
-        leftHeaderLabel.style.flex = '1';
-        leftHeaderLabel.style.textAlign = 'left';
-        leftHeaderLabel.style.paddingLeft = 'calc(8px + 1em)';
-
-        const rightHeaderLabels = document.createElement('div');
-        rightHeaderLabels.style.display = 'flex';
-        rightHeaderLabels.style.gap = '0px';
-        rightHeaderLabels.style.alignItems = 'center';
-        rightHeaderLabels.style.width = '140px'; // 增加宽度以提供更多间距
-        rightHeaderLabels.style.paddingLeft = '8px'; // 添加左侧padding，向左移动标签
-        rightHeaderLabels.style.paddingRight = '12px'; // 增加右侧间距
-
-        const showLabel = document.createElement('div');
-        showLabel.textContent = t('显示');
-        showLabel.style.width = '36px'; // 稍微减小宽度
-        showLabel.style.textAlign = 'center';
-        showLabel.style.fontSize = '12px';
-        showLabel.style.marginRight = '4px'; // 添加右边距
-
-        const editLabel = document.createElement('div');
-        editLabel.textContent = t('修改');
-        editLabel.style.width = '36px'; // 稍微减小宽度
-        editLabel.style.textAlign = 'center';
-        editLabel.style.fontSize = '12px';
-        editLabel.style.marginRight = '4px'; // 添加右边距
-
-        const deleteLabel = document.createElement('div');
-        deleteLabel.textContent = t('删除');
-        deleteLabel.style.width = '36px'; // 稍微减小宽度
-        deleteLabel.style.textAlign = 'center';
-        deleteLabel.style.fontSize = '12px';
-
-        rightHeaderLabels.appendChild(showLabel);
-        rightHeaderLabels.appendChild(editLabel);
-        rightHeaderLabels.appendChild(deleteLabel);
-
-        folderHeaderBar.appendChild(leftHeaderLabel);
-        folderHeaderBar.appendChild(rightHeaderLabels);
-
-        folderListContainer = document.createElement('div');
-        folderListContainer.style.flex = '1';
-        folderListContainer.style.overflowY = 'auto';
-        folderListContainer.style.padding = '8px';
-        folderListContainer.style.direction = 'rtl';
-        folderListContainer.style.border = '1px solid var(--border-color, #e5e7eb)';
-        folderListContainer.style.borderTop = 'none';
-        folderListContainer.style.borderRadius = '0 0 4px 4px';
-
-        const folderAddContainer = document.createElement('div');
-        folderAddContainer.style.padding = '8px';
-        folderAddContainer.style.display = 'flex';
-        folderAddContainer.style.justifyContent = 'center';
-
-        const addNewFolderBtn = document.createElement('button');
-        Object.assign(addNewFolderBtn.style, styles.button, {
-            backgroundColor: 'var(--add-color, #fd7e14)',
-            color: 'white',
-            borderRadius: '4px'
-        });
-        addNewFolderBtn.textContent = t('+ 新建文件夹');
-        addNewFolderBtn.addEventListener('click', () => {
-            showFolderEditDialog('', {}, (newFolderName) => {
-                selectedFolderName = newFolderName;
-                renderFolderList();
-                renderButtonList();
-                console.log(t('🆕 新建文件夹 "{{folderName}}" 已添加。', { folderName: newFolderName }));
-            });
-        });
-        folderAddContainer.appendChild(addNewFolderBtn);
-
-        folderPanel.appendChild(folderHeaderBar);
-        folderPanel.appendChild(folderListContainer);
-        folderPanel.appendChild(folderAddContainer);
-
-        buttonListContainer = document.createElement('div');
-        buttonListContainer.style.flex = '1';
-        buttonListContainer.style.overflowY = 'auto';
-        buttonListContainer.style.display = 'flex';
-        buttonListContainer.style.flexDirection = 'column';
-        buttonListContainer.style.padding = '8px 8px 4px 8px';
-        buttonListContainer.style.minWidth = '520px'; // 加宽右侧区域以提供更多内容空间
-
-        const updateFolderPanelVisibility = () => {
-            const container = settingsDialogMainContainer || mainContainer;
-            if (isSettingsFolderPanelCollapsed) {
-                if (container) {
-                    const currentHeight = container.offsetHeight;
-                    if (currentHeight > 0) {
-                        container.style.minHeight = `${currentHeight}px`;
-                    } else {
-                        window.requestAnimationFrame(() => {
-                            if (!isSettingsFolderPanelCollapsed) return;
-                            const activeContainer = settingsDialogMainContainer || container;
-                            if (!activeContainer) return;
-                            const measuredHeight = activeContainer.offsetHeight;
-                            if (measuredHeight > 0) {
-                                activeContainer.style.minHeight = `${measuredHeight}px`;
-                            }
-                        });
-                    }
-                }
-                folderPanel.style.display = 'none';
-                collapseToggleBtn.title = t('展开左侧设置区域');
-                collapseToggleBtn.setAttribute('aria-label', t('展开左侧设置区域'));
-            } else {
-                folderPanel.style.display = 'flex';
-                collapseToggleBtn.title = t('折叠左侧设置区域');
-                collapseToggleBtn.setAttribute('aria-label', t('折叠左侧设置区域'));
-                if (container) {
-                    container.style.minHeight = '';
-                }
-            }
-        };
-
-        collapseToggleBtn.addEventListener('click', () => {
-            isSettingsFolderPanelCollapsed = !isSettingsFolderPanelCollapsed;
-            updateFolderPanelVisibility();
-        });
-
-        updateFolderPanelVisibility();
-
-        renderFolderList();
-        renderButtonList();
-
-        mainContainer.appendChild(folderPanel);
-        mainContainer.appendChild(buttonListContainer);
-
-        const footer = document.createElement('div');
-        footer.style.display = 'none';
-        dialog.appendChild(header);
-        dialog.appendChild(mainContainer);
-        dialog.appendChild(footer);
-
-        overlay.appendChild(dialog);
-        overlay.style.pointerEvents = 'auto';
-        appendToOverlayLayer(overlay);
-        currentSettingsOverlay = overlay;
-
-        // 动画效果
-        setTimeout(() => {
-            overlay.style.opacity = '1';
-            dialog.style.transform = 'scale(1)';
-        }, 10);
-    };
+/* -------------------------------------------------------------------------- *
+ * Module 05 · Automation rules dialogs and submission helpers
+ * -------------------------------------------------------------------------- */
 
 let currentAutomationOverlay = null;
 /**
@@ -8217,6 +8372,141 @@ function showStyleSettingsDialog() {
     dialog.appendChild(closeSaveBtn);
 
 }
+/* -------------------------------------------------------------------------- *
+ * Module 06 · Domain-specific style configuration & runtime helpers
+ * -------------------------------------------------------------------------- */
+
+    // Domain style helpers shared across modules --------------------------------
+
+    const clampBarSpacingValue = (value, fallback = 0) => {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return Math.max(-200, Math.min(200, parsed));
+        }
+        const fallbackParsed = Number(fallback);
+        if (Number.isFinite(fallbackParsed)) {
+            return Math.max(-200, Math.min(200, fallbackParsed));
+        }
+        return 0;
+    };
+
+    const applyBarBottomSpacing = (container, spacing, fallbackSpacing = 0) => {
+        if (!container) return 0;
+        const desiredSpacing = clampBarSpacingValue(spacing, fallbackSpacing);
+        const paddingY = Number(container.dataset.barPaddingY) || 0;
+        const adjustedBottom = desiredSpacing - paddingY;
+        container.style.transform = 'translateY(0)';
+        container.style.bottom = `${adjustedBottom}px`;
+        container.dataset.barBottomSpacing = String(desiredSpacing);
+        return desiredSpacing;
+    };
+
+    // 根据目标高度调整底部按钮栏的布局和内部按钮尺寸
+    updateButtonBarLayout = (container, targetHeight) => {
+        if (!container) return;
+        const numericHeight = Number(targetHeight);
+        if (!Number.isFinite(numericHeight) || numericHeight <= 0) return;
+
+        const barHeight = Math.max(32, Math.round(numericHeight));
+        const scale = Math.max(0.6, Math.min(2.5, barHeight / 40));
+
+        const paddingYBase = Math.round(6 * scale);
+        const paddingYMax = Math.max(4, Math.floor((barHeight - 24) / 2));
+        const paddingY = Math.min(Math.max(4, Math.min(20, paddingYBase)), paddingYMax);
+        const paddingX = Math.max(12, Math.min(48, Math.round(15 * scale)));
+        const gapSize = Math.max(6, Math.min(28, Math.round(10 * scale)));
+
+        container.style.padding = `${paddingY}px ${paddingX}px`;
+        container.style.gap = `${gapSize}px`;
+
+        const innerHeight = Math.max(20, barHeight - paddingY * 2);
+        const fontSize = Math.max(12, Math.min(22, Math.round(14 * scale)));
+        let verticalPadding = Math.max(4, Math.min(18, Math.round(6 * scale)));
+        const maxVerticalPadding = Math.max(4, Math.floor((innerHeight - fontSize) / 2));
+        if (verticalPadding > maxVerticalPadding) {
+            verticalPadding = Math.max(4, maxVerticalPadding);
+        }
+        const horizontalPadding = Math.max(12, Math.min(56, Math.round(12 * scale)));
+        const borderRadius = Math.max(4, Math.min(20, Math.round(4 * scale)));
+        const lineHeight = Math.max(fontSize + 2, innerHeight - verticalPadding * 2);
+
+        const buttons = Array.from(container.children).filter(node => node.tagName === 'BUTTON');
+        buttons.forEach(btn => {
+            btn.style.minHeight = `${innerHeight}px`;
+            btn.style.height = `${innerHeight}px`;
+            btn.style.padding = `${verticalPadding}px ${horizontalPadding}px`;
+            btn.style.fontSize = `${fontSize}px`;
+            btn.style.borderRadius = `${borderRadius}px`;
+            btn.style.lineHeight = `${lineHeight}px`;
+            if (!btn.style.display) btn.style.display = 'inline-flex';
+            if (!btn.style.alignItems) btn.style.alignItems = 'center';
+        });
+
+        container.dataset.barHeight = String(barHeight);
+        container.dataset.barPaddingY = String(verticalPadding);
+    };
+
+    // 应用当前域名样式（高度 + 自定义 CSS），可在多处复用
+    applyDomainStyles = () => {
+        try {
+            const container = queryUI('.folder-buttons-container');
+            const currentHost = window.location.hostname || '';
+            if (!container) return;
+
+            const fallbackSpacing = clampBarSpacingValue(
+                typeof buttonConfig.buttonBarBottomSpacing === 'number'
+                    ? buttonConfig.buttonBarBottomSpacing
+                    : (defaultConfig && typeof defaultConfig.buttonBarBottomSpacing === 'number'
+                        ? defaultConfig.buttonBarBottomSpacing
+                        : 0)
+            );
+
+            // 清理当前域名下已注入的旧样式，避免重复叠加
+            try {
+                document.querySelectorAll('style[data-domain-style]').forEach(el => {
+                    const d = el.getAttribute('data-domain-style') || '';
+                    if (d && currentHost.includes(d)) {
+                        el.remove();
+                    }
+                });
+            } catch (e) {
+                console.warn('清理旧样式失败:', e);
+            }
+
+            const matchedStyle = (buttonConfig.domainStyleSettings || []).find(s => s && currentHost.includes(s.domain));
+            if (matchedStyle) {
+                const clamped = Math.min(200, Math.max(20, matchedStyle.height || buttonConfig.buttonBarHeight || (defaultConfig && defaultConfig.buttonBarHeight) || 40));
+                container.style.height = clamped + 'px';
+                updateButtonBarLayout(container, clamped);
+                console.log(t('✅ 已根据 {{name}} 设置按钮栏高度：{{height}}px', {
+                    name: matchedStyle.name,
+                    height: clamped
+                }));
+                applyBarBottomSpacing(container, matchedStyle.bottomSpacing, fallbackSpacing);
+
+                if (matchedStyle.cssCode) {
+                    const styleEl = document.createElement('style');
+                    styleEl.setAttribute('data-domain-style', matchedStyle.domain);
+                    styleEl.textContent = matchedStyle.cssCode;
+                    document.head.appendChild(styleEl);
+                    console.log(t('✅ 已注入自定义CSS至 <head> 来自：{{name}}', { name: matchedStyle.name }));
+                }
+            } else {
+                const fallback = (buttonConfig && typeof buttonConfig.buttonBarHeight === 'number')
+                    ? buttonConfig.buttonBarHeight
+                    : (defaultConfig && defaultConfig.buttonBarHeight) || 40;
+                const clampedDefault = Math.min(200, Math.max(20, fallback));
+                container.style.height = clampedDefault + 'px';
+                updateButtonBarLayout(container, clampedDefault);
+                console.log(t('ℹ️ 未匹配到样式规则，使用默认按钮栏高度：{{height}}px', {
+                    height: clampedDefault
+                }));
+                applyBarBottomSpacing(container, fallbackSpacing, fallbackSpacing);
+            }
+        } catch (err) {
+            console.warn(t('应用域名样式时出现问题:'), err);
+        }
+    };
 
     /**
      * 新建/编辑域名样式对话框
@@ -9345,301 +9635,9 @@ function isValidDomainInput(str) {
     if (!str.includes('.')) return false;
     return true;
 }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        setCSSVariables(getCurrentTheme());
-        updateStylesOnThemeChange();
-        console.log(t('🌓 主题模式已切换，样式已更新。'));
-    });
-
-    const createButtonContainer = () => {
-        const root = getShadowRoot();
-        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
-        if (existingContainer) {
-            // 使用updateButtonContainer来处理已存在的容器
-            updateButtonContainer();
-            return existingContainer;
-        }
-        // 创建新容器
-        const buttonContainer = document.createElement('div');
-        buttonContainer.classList.add('folder-buttons-container');
-        buttonContainer.style.pointerEvents = 'auto';
-
-        // 设置固定定位和位置
-        buttonContainer.style.position = 'fixed';
-        buttonContainer.style.right = '0px';
-        buttonContainer.style.width = '100%';
-        buttonContainer.style.zIndex = '1000'; // 确保按钮容器始终显示在顶层
-
-        // 基本样式
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.flexWrap = 'nowrap';  // 改为不换行
-        buttonContainer.style.overflowX = 'auto';   // 横向滚动
-        buttonContainer.style.overflowY = 'hidden'; // 禁止纵向滚动
-        buttonContainer.style.gap = '10px';
-        buttonContainer.style.marginTop = '0px';
-        buttonContainer.style.height = buttonConfig.buttonBarHeight + 'px';
-
-        // 滚动条处理
-        buttonContainer.style.scrollbarWidth = 'none';        // for Firefox
-        buttonContainer.style.msOverflowStyle = 'none';       // for IE/Edge
-        buttonContainer.classList.add('hide-scrollbar');      // 用于自定义::-webkit-scrollbar
-
-        // 内容布局
-        buttonContainer.style.justifyContent = 'center';
-        buttonContainer.style.alignItems = 'center';
-        buttonContainer.style.padding = '6px 15px';
-
-        // 移除原有的背景色和阴影，设置为透明
-        buttonContainer.style.backgroundColor = 'transparent';
-        buttonContainer.style.boxShadow = 'none';
-        buttonContainer.style.borderRadius = '4px';
-
-        // 添加所有未隐藏的文件夹按钮
-        buttonConfig.folderOrder.forEach((name) => {
-            const config = buttonConfig.folders[name];
-            if (config && !config.hidden) { // 只显示未隐藏的文件夹
-                const folderButton = createFolderButton(name, config);
-                buttonContainer.appendChild(folderButton);
-            }
-        });
-
-        // 按顺序添加功能按钮
-        // 现在所有工具按钮都在 '🖱️' 文件夹内，不再直接添加
-        // 仅添加设置和清空按钮
-        buttonContainer.appendChild(createSettingsButton());
-        buttonContainer.appendChild(createClearButton());
-
-        // 初始记录 paddingY，确保偏移计算有默认值
-        buttonContainer.dataset.barPaddingY = '6';
-        applyBarBottomSpacing(
-            buttonContainer,
-            buttonConfig.buttonBarBottomSpacing,
-            buttonConfig.buttonBarBottomSpacing
-        );
-
-        return buttonContainer;
-    };
-
-    const updateButtonContainer = () => {
-        const root = getShadowRoot();
-        let existingContainer = root ? root.querySelector('.folder-buttons-container') : null;
-        if (existingContainer) {
-            // 保存所有功能按钮的引用
-            const settingsButton = existingContainer.querySelector('button:nth-last-child(2)');
-            const clearButton = existingContainer.querySelector('button:last-child');
-
-            // 清空容器
-            setTrustedHTML(existingContainer, '');
-
-            // 重新添加未隐藏的文件夹按钮
-            buttonConfig.folderOrder.forEach((name) => {
-                const config = buttonConfig.folders[name];
-                if (config && !config.hidden) { // 只显示未隐藏的文件夹
-                    const folderButton = createFolderButton(name, config);
-                    existingContainer.appendChild(folderButton);
-                }
-            });
-
-            // 按正确顺序重新添加功能按钮
-            if (settingsButton) existingContainer.appendChild(settingsButton);
-            if (clearButton) existingContainer.appendChild(clearButton);
-
-            console.log(t('✅ 按钮栏已更新（已过滤隐藏文件夹）。'));
-        } else {
-            console.warn(t('⚠️ 未找到按钮容器，无法更新按钮栏。'));
-        }
-        try {
-            applyDomainStyles();
-        } catch (err) {
-            console.warn(t('应用域名样式失败:'), err);
-        }
-    };
-
-    const attachButtonsToTextarea = (textarea) => {
-        // 仅附加一次按钮容器
-        let buttonContainer = queryUI('.folder-buttons-container');
-        if (!buttonContainer) {
-            buttonContainer = createButtonContainer();
-            // 插入按钮容器到 textarea 的父元素之后
-            // 根据ChatGPT的DOM结构，可能需要调整插入位置
-            // textarea.parentElement.insertBefore(buttonContainer, textarea.nextSibling);
-            // console.log("✅ 按钮容器已附加到 textarea 元素。");
-            appendToMainLayer(buttonContainer);
-            // 创建后立即根据域名样式调整高度/注入CSS
-            try { applyDomainStyles(); } catch (_) {}
-            console.log(t('✅ 按钮容器已固定到窗口底部。'));
-        } else {
-            console.log(t('ℹ️ 按钮容器已存在，跳过附加。'));
-        }
-        textarea.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-    };
-
-    let attachTimeout;
-    const attachButtons = () => {
-        if (attachTimeout) clearTimeout(attachTimeout);
-        attachTimeout = setTimeout(() => {
-            const textareas = getAllTextareas();
-            console.log(t('🔍 扫描到 {{count}} 个 textarea 或 contenteditable 元素。', {
-                count: textareas.length
-            }));
-            if (textareas.length === 0) {
-                console.warn(t('⚠️ 未找到任何 textarea 或 contenteditable 元素。'));
-                return;
-            }
-            attachButtonsToTextarea(textareas[textareas.length - 1]);
-            console.log(t('✅ 按钮已附加到最新的 textarea 或 contenteditable 元素。'));
-        }, 300);
-    };
-
-    const observeShadowRoots = (node) => {
-        if (node.shadowRoot) {
-            const shadowObserver = new MutationObserver(() => {
-                attachButtons();
-            });
-            shadowObserver.observe(node.shadowRoot, {
-                childList: true,
-                subtree: true,
-            });
-            node.shadowRoot.querySelectorAll('*').forEach(child => observeShadowRoots(child));
-        }
-    };
-
-    const clampBarSpacingValue = (value, fallback = 0) => {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) {
-            return Math.max(-200, Math.min(200, parsed));
-        }
-        const fallbackParsed = Number(fallback);
-        if (Number.isFinite(fallbackParsed)) {
-            return Math.max(-200, Math.min(200, fallbackParsed));
-        }
-        return 0;
-    };
-
-    const applyBarBottomSpacing = (container, spacing, fallbackSpacing = 0) => {
-        if (!container) return 0;
-        const desiredSpacing = clampBarSpacingValue(spacing, fallbackSpacing);
-        const paddingY = Number(container.dataset.barPaddingY) || 0;
-        const adjustedBottom = desiredSpacing - paddingY;
-        container.style.transform = 'translateY(0)';
-        container.style.bottom = `${adjustedBottom}px`;
-        container.dataset.barBottomSpacing = String(desiredSpacing);
-        return desiredSpacing;
-    };
-
-    // 根据目标高度调整底部按钮栏的布局和内部按钮尺寸
-    updateButtonBarLayout = (container, targetHeight) => {
-        if (!container) return;
-        const numericHeight = Number(targetHeight);
-        if (!Number.isFinite(numericHeight) || numericHeight <= 0) return;
-
-        const barHeight = Math.max(32, Math.round(numericHeight));
-        const scale = Math.max(0.6, Math.min(2.5, barHeight / 40));
-
-        const paddingYBase = Math.round(6 * scale);
-        const paddingYMax = Math.max(4, Math.floor((barHeight - 24) / 2));
-        const paddingY = Math.min(Math.max(4, Math.min(20, paddingYBase)), paddingYMax);
-        const paddingX = Math.max(12, Math.min(48, Math.round(15 * scale)));
-        const gapSize = Math.max(6, Math.min(28, Math.round(10 * scale)));
-
-        container.style.padding = `${paddingY}px ${paddingX}px`;
-        container.style.gap = `${gapSize}px`;
-
-        const innerHeight = Math.max(20, barHeight - paddingY * 2);
-        const fontSize = Math.max(12, Math.min(22, Math.round(14 * scale)));
-        let verticalPadding = Math.max(4, Math.min(18, Math.round(6 * scale)));
-        const maxVerticalPadding = Math.max(4, Math.floor((innerHeight - fontSize) / 2));
-        if (verticalPadding > maxVerticalPadding) {
-            verticalPadding = Math.max(4, maxVerticalPadding);
-        }
-        const horizontalPadding = Math.max(12, Math.min(56, Math.round(12 * scale)));
-        const borderRadius = Math.max(4, Math.min(20, Math.round(4 * scale)));
-        const lineHeight = Math.max(fontSize + 2, innerHeight - verticalPadding * 2);
-
-        const buttons = Array.from(container.children).filter(node => node.tagName === 'BUTTON');
-        buttons.forEach(btn => {
-            btn.style.minHeight = `${innerHeight}px`;
-            btn.style.height = `${innerHeight}px`;
-            btn.style.padding = `${verticalPadding}px ${horizontalPadding}px`;
-            btn.style.fontSize = `${fontSize}px`;
-            btn.style.borderRadius = `${borderRadius}px`;
-            btn.style.lineHeight = `${lineHeight}px`;
-            if (!btn.style.display) btn.style.display = 'inline-flex';
-            if (!btn.style.alignItems) btn.style.alignItems = 'center';
-        });
-
-        container.dataset.barHeight = String(barHeight);
-        container.dataset.barPaddingY = String(verticalPadding);
-    };
-
-    // 应用当前域名样式（高度 + 自定义 CSS），可在多处复用
-    applyDomainStyles = () => {
-        try {
-            const container = queryUI('.folder-buttons-container');
-            const currentHost = window.location.hostname || '';
-            // 若容器未创建，先跳过
-            if (!container) return;
-
-            const fallbackSpacing = clampBarSpacingValue(
-                typeof buttonConfig.buttonBarBottomSpacing === 'number'
-                    ? buttonConfig.buttonBarBottomSpacing
-                    : (defaultConfig && typeof defaultConfig.buttonBarBottomSpacing === 'number'
-                        ? defaultConfig.buttonBarBottomSpacing
-                        : 0)
-            );
-
-            // 清理当前域名下已注入的旧样式，避免重复叠加
-            try {
-                document.querySelectorAll('style[data-domain-style]').forEach(el => {
-                    const d = el.getAttribute('data-domain-style') || '';
-                    if (d && currentHost.includes(d)) {
-                        el.remove();
-                    }
-                });
-            } catch (e) {
-                console.warn('清理旧样式失败:', e);
-            }
-
-            const matchedStyle = (buttonConfig.domainStyleSettings || []).find(s => s && currentHost.includes(s.domain));
-            if (matchedStyle) {
-                // 1) 按域名样式设置按钮栏高度
-                const clamped = Math.min(200, Math.max(20, matchedStyle.height || buttonConfig.buttonBarHeight || (defaultConfig && defaultConfig.buttonBarHeight) || 40));
-                container.style.height = clamped + 'px';
-                updateButtonBarLayout(container, clamped);
-                console.log(t('✅ 已根据 {{name}} 设置按钮栏高度：{{height}}px', {
-                    name: matchedStyle.name,
-                    height: clamped
-                }));
-                applyBarBottomSpacing(container, matchedStyle.bottomSpacing, fallbackSpacing);
-
-                // 2) 注入自定义 CSS（若有）
-                if (matchedStyle.cssCode) {
-                    const styleEl = document.createElement('style');
-                    styleEl.setAttribute('data-domain-style', matchedStyle.domain);
-                    styleEl.textContent = matchedStyle.cssCode;
-                    document.head.appendChild(styleEl);
-                    console.log(t('✅ 已注入自定义CSS至 <head> 来自：{{name}}', { name: matchedStyle.name }));
-                }
-            } else {
-                // 未匹配到样式时，回退到全局按钮栏高度
-                const fallback = (buttonConfig && typeof buttonConfig.buttonBarHeight === 'number')
-                    ? buttonConfig.buttonBarHeight
-                    : (defaultConfig && defaultConfig.buttonBarHeight) || 40;
-                const clampedDefault = Math.min(200, Math.max(20, fallback));
-                container.style.height = clampedDefault + 'px';
-                updateButtonBarLayout(container, clampedDefault);
-                console.log(t('ℹ️ 未匹配到样式规则，使用默认按钮栏高度：{{height}}px', {
-                    height: clampedDefault
-                }));
-                applyBarBottomSpacing(container, fallbackSpacing, fallbackSpacing);
-            }
-        } catch (err) {
-            console.warn(t('应用域名样式时出现问题:'), err);
-        }
-    };
+/* -------------------------------------------------------------------------- *
+ * Module 07 · Initialization workflow and runtime observers
+ * -------------------------------------------------------------------------- */
 
     const initialize = () => {
         attachButtons();
@@ -9684,6 +9682,12 @@ function isValidDomainInput(str) {
         // 重新应用一次域名样式，防止主题切换后高度或注入样式丢失
         try { applyDomainStyles(); } catch (_) {}
     };
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        setCSSVariables(getCurrentTheme());
+        updateStylesOnThemeChange();
+        console.log(t('🌓 主题模式已切换，样式已更新。'));
+    });
 
     // Initial setting of CSS variables
     setCSSVariables(getCurrentTheme());
