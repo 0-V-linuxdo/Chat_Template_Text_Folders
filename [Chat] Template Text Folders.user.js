@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251205] v1.0.0
+// @name         [Chat] Template Text Folders [20251205] v1.1.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 //
-// @version      [20251205] v1.0.0
-// @update-log   Added Gemini rich-text (Quill) insertion support and refreshed match list for new domains.
+// @version      [20251205] v1.1.0
+// @update-log   Improved Gemini Business input support and deep editable detection for shadow DOM editors.
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -1230,12 +1230,65 @@
     let applyDomainStyles = () => {};
     let updateButtonBarLayout = () => {};
 
+    const isEditableElement = (node) => {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+        const tag = node.tagName ? node.tagName.toLowerCase() : '';
+        return tag === 'textarea' || node.isContentEditable;
+    };
+
+    const getDeepActiveElement = (root = document) => {
+        const active = root && root.activeElement ? root.activeElement : null;
+        if (active && active.shadowRoot && active.shadowRoot.activeElement) {
+            return getDeepActiveElement(active.shadowRoot);
+        }
+        return active;
+    };
+
+    const findEditableDescendant = (root) => {
+        if (!root) return null;
+        if (isEditableElement(root)) return root;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
+        let node = walker.nextNode();
+        while (node) {
+            if (isEditableElement(node)) {
+                return node;
+            }
+            if (node.shadowRoot) {
+                const nested = findEditableDescendant(node.shadowRoot);
+                if (nested) return nested;
+            }
+            node = walker.nextNode();
+        }
+        return null;
+    };
+
+    const getFocusedEditableElement = () => {
+        const activeElement = getDeepActiveElement();
+        if (isEditableElement(activeElement)) {
+            return activeElement;
+        }
+        if (activeElement && activeElement.shadowRoot) {
+            const shadowEditable = findEditableDescendant(activeElement.shadowRoot);
+            if (shadowEditable) return shadowEditable;
+        }
+        if (activeElement) {
+            const childEditable = findEditableDescendant(activeElement);
+            if (childEditable) return childEditable;
+        }
+        const selection = typeof window !== 'undefined' ? window.getSelection() : null;
+        const anchorElement = selection && selection.anchorNode ? selection.anchorNode.parentElement : null;
+        if (isEditableElement(anchorElement)) {
+            return anchorElement;
+        }
+        return null;
+    };
+
     const getAllTextareas = (root = document) => {
         let textareas = [];
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
         let node = walker.nextNode();
         while (node) {
-            if (node.tagName && (node.tagName.toLowerCase() === 'textarea' || node.getAttribute('contenteditable') === 'true')) {
+            if (isEditableElement(node)) {
                 textareas.push(node);
             }
             if (node.shadowRoot) {
@@ -1283,7 +1336,7 @@
                 target.dispatchEvent(inputEvent);
             }
             target.focus();
-        } else if (target.getAttribute('contenteditable') === 'true') {
+        } else if (target.isContentEditable) {
             // 增强的contenteditable处理
             insertIntoContentEditable(target, normalizedText, replaceAll);
         }
@@ -2153,9 +2206,9 @@
 
         button.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            const focusedElement = document.activeElement;
-            if (focusedElement && (focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
-                setTimeout(() => focusedElement.focus(), 0);
+            const focusedElement = getFocusedEditableElement();
+            if (isEditableElement(focusedElement)) {
+                setTimeout(() => focusedElement && focusedElement.focus(), 0);
             }
         });
 
@@ -2172,8 +2225,8 @@
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             if (config.type === "template") {
-                const focusedElement = document.activeElement;
-                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+                const focusedElement = getFocusedEditableElement();
+                if (!isEditableElement(focusedElement)) {
                     console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                     return;
                 }
@@ -2287,8 +2340,8 @@
                 }
 
             } else if (config.type === "tool") {
-                const focusedElement = document.activeElement;
-                if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+                const focusedElement = getFocusedEditableElement();
+                if (!isEditableElement(focusedElement)) {
                     console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                     return;
                 }
@@ -3675,8 +3728,8 @@
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const focusedElement = document.activeElement;
-            if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+            const focusedElement = getFocusedEditableElement();
+            if (!isEditableElement(focusedElement)) {
                 console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
@@ -3751,8 +3804,8 @@
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const focusedElement = document.activeElement;
-            if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+            const focusedElement = getFocusedEditableElement();
+            if (!isEditableElement(focusedElement)) {
                 console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
@@ -3809,8 +3862,8 @@
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const focusedElement = document.activeElement;
-            if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+            const focusedElement = getFocusedEditableElement();
+            if (!isEditableElement(focusedElement)) {
                 console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
@@ -3859,8 +3912,8 @@
         button.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation(); // 阻止事件冒泡
-            const focusedElement = document.activeElement;
-            if (!focusedElement || !(focusedElement.tagName === 'TEXTAREA' || focusedElement.getAttribute('contenteditable') === 'true')) {
+            const focusedElement = getFocusedEditableElement();
+            if (!isEditableElement(focusedElement)) {
                 console.warn(t('当前未聚焦到有效的 textarea 或 contenteditable 元素。'));
                 return;
             }
