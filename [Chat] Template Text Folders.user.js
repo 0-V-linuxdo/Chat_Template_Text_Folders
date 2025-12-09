@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251209] v1.4.0
+// @name         [Chat] Template Text Folders [20251209] v1.5.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 //
-// @version      [20251209] v1.4.0
-// @update-log   Drive 设置区域优化：模式状态高亮、分隔线布局、按钮行排布与间距微调。
+// @version      [20251209] v1.5.0
+// @update-log   Drive 设置区域：读取方式按钮右对齐、配置信息字号统一、分隔线上移。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -73,7 +73,7 @@
 (function () {
     'use strict';
 
-    console.log("🎉 [Chat] Template Text Folders [20251209] v1.0.0 🎉");
+    console.log("🎉 [Chat] Template Text Folders [20251209] v1.5.0 🎉");
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {
@@ -8052,73 +8052,72 @@
                         padding-top:0;
                         margin-top:0;
                     ">
-                        <div style="display:flex;flex-direction:column;gap:4px;margin-top:0; margin-bottom:10px;">
+                        <div style="display:flex;flex-direction:column;gap:6px;margin-top:0; margin-bottom:10px;">
+                            <div style="
+                                display:grid;
+                                grid-template-columns:auto 1fr;
+                                align-items:center;
+                                column-gap:12px;
+                                row-gap:8px;
+                                width:100%;
+                            ">
+                                <span style="font-size:16px;color:var(--text-color, #333333);white-space:nowrap;">${t('读取方式')}：</span>
+                                <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+                                    <button type="button" data-drive-request-mode="default" style="
+                                        padding:6px 12px;
+                                        border-radius:18px;
+                                        border:1px solid var(--border-color, #d1d5db);
+                                        background: transparent;
+                                        color: var(--text-color, #333333);
+                                        cursor: pointer;
+                                    " title="${t('优先 GM 请求')}">${t('默认')}</button>
+                                    <button type="button" data-drive-request-mode="adguard" style="
+                                        padding:6px 12px;
+                                        border-radius:18px;
+                                        border:1px solid var(--border-color, #d1d5db);
+                                        background: transparent;
+                                        color: var(--text-color, #333333);
+                                        cursor: pointer;
+                                    " title="${t('优先 fetch')}">${t('适配：AdGuard')}</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="height:1px;background:var(--border-color, #e5e7eb);margin:0 0 8px 0;"></div>
+                        <div id="driveConfigFold" style="display:flex;flex-direction:column;gap:6px;">
                             <div style="
                                 display:flex;
                                 align-items:center;
                                 justify-content:space-between;
-                                gap:10px;
-                            ">
-                                <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
-                                    <div style="
-                                        display:flex;
-                                        align-items:center;
-                                        gap:8px;
-                                        width:100%;
-                                        justify-content:space-between;
-                                    ">
-                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('读取方式')}</span>
-                                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-left:auto;">
-                                            <button type="button" data-drive-request-mode="default" style="
-                                                padding:6px 12px;
-                                                border-radius:18px;
-                                                border:1px solid var(--border-color, #d1d5db);
-                                                background: transparent;
-                                                color: var(--text-color, #333333);
-                                                cursor: pointer;
-                                            " title="${t('优先 GM 请求')}">${t('默认')}</button>
-                                            <button type="button" data-drive-request-mode="adguard" style="
-                                                padding:6px 12px;
-                                                border-radius:18px;
-                                                border:1px solid var(--border-color, #d1d5db);
-                                                background: transparent;
-                                                color: var(--text-color, #333333);
-                                                cursor: pointer;
-                                            " title="${t('优先 fetch')}">${t('适配：AdGuard')}</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="height:1px;background:var(--border-color, #e5e7eb);margin:6px 0 2px 0;"></div>
-                        <div id="driveConfigFold" style="display:flex;flex-direction:column;gap:6px;">
-                            <div style="display:flex;align-items:center;gap:6px;cursor:pointer;" id="driveConfigFoldToggle">
-                                <span style="font-size:13px;color:var(--text-color, #333333);font-weight:600;">${t('配置信息')}</span>
+                                gap:8px;
+                                width:100%;
+                                cursor:pointer;
+                            " id="driveConfigFoldToggle">
+                                <span style="font-size:16px;color:var(--text-color, #333333);">${t('配置信息')}</span>
                                 <span id="driveConfigFoldArrow" style="font-size:12px;color:var(--muted-text-color, #6b7280);">▼</span>
                             </div>
                             <div id="driveConfigFields" style="display:flex;flex-direction:column;gap:6px;">
                                     <label style="display:flex;flex-direction:column;gap:6px;">
-                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端 ID')}</span>
+                                        <span style="${rowLabelStyle}font-size:15px;">· ${t('客户端 ID')}</span>
                                         <div class="cttf-sync-field" data-secret="false" data-visible="true">
                                             <textarea id="driveClientIdInput" class="cttf-sync-textarea" rows="3" data-min-rows="3" autocomplete="off" spellcheck="false" placeholder="xxx.apps.googleusercontent.com"></textarea>
                                         </div>
                                     </label>
                                     <label style="display:flex;flex-direction:column;gap:6px;">
-                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端密钥')}</span>
+                                        <span style="${rowLabelStyle}font-size:15px;">· ${t('客户端密钥')}</span>
                                         <div class="cttf-sync-field" data-secret="true" data-visible="false">
                                             <textarea id="driveClientSecretInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="your_client_secret"></textarea>
                                             <button type="button" class="cttf-sync-toggle" data-target="driveClientSecretInput" aria-label="Toggle visibility">👁</button>
                                         </div>
                                     </label>
                                     <label style="display:flex;flex-direction:column;gap:6px;">
-                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('Refresh Token')}</span>
+                                        <span style="${rowLabelStyle}font-size:15px;">· ${t('Refresh Token')}</span>
                                         <div class="cttf-sync-field" data-secret="true" data-visible="false">
                                             <textarea id="driveRefreshTokenInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="ya29...."></textarea>
                                             <button type="button" class="cttf-sync-toggle" data-target="driveRefreshTokenInput" aria-label="Toggle visibility">👁</button>
                                         </div>
                                     </label>
                                     <label style="display:flex;flex-direction:column;gap:6px;">
-                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('目标文件名')}</span>
+                                        <span style="${rowLabelStyle}font-size:15px;">· ${t('目标文件名')}</span>
                                         <div class="cttf-sync-field" data-secret="false" data-visible="true">
                                             <textarea id="driveFileNameInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="[Chat] Template Text Folders.backup.json"></textarea>
                                         </div>
@@ -8126,14 +8125,14 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="driveSaveRow" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <button id="saveDriveSettingsBtn" style="
+                            <div id="driveSaveRow" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                                <button id="saveDriveSettingsBtn" style="
                                 ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                                 background-color: var(--primary-color, #3B82F6);
                                 color: white;
                                 border-radius:4px;
-                            ">${t('保存 Drive 设置')}</button>
-                        </div>
+                            ">${t('💾 保存 Drive 设置')}</button>
+                            </div>
                         <div style="height:1px;background:var(--border-color, #e5e7eb);margin:4px 0 8px 0;"></div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                             <div style="display:flex;flex:1;gap:8px;min-width:220px;">
@@ -8143,14 +8142,14 @@
                                 color: white;
                                 border-radius:4px;
                                 flex:1;
-                                ">${t('上传配置')}</button>
+                                ">${t('📤 上传配置')}</button>
                                 <button id="downloadDriveConfigBtn" style="
                                     ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
                                     background-color: var(--info-color, #4F46E5);
                                     color: white;
                                     border-radius:4px;
                                     flex:1;
-                                ">${t('拉取配置')}</button>
+                                ">${t('📥 拉取配置')}</button>
                             </div>
                             <span id="driveSyncStatus" style="
                                 font-size: 13px;
