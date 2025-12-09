@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20251208] v1.4.0
+// @name         [Chat] Template Text Folders [20251209] v1.4.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在AI页面上添加预设文本文件夹和按钮，提升输入效率。
 //
-// @version      [20251208] v1.4.0
-// @update-log   Google Drive 同步改为外置模块：默认不加载，开启同步后通过 require 动态获取。
+// @version      [20251209] v1.4.0
+// @update-log   Drive 设置区域优化：模式状态高亮、分隔线布局、按钮行排布与间距微调。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -47,7 +47,6 @@
 // @grant        GM_xmlhttpRequest
 // @connect      oauth2.googleapis.com
 // @connect      www.googleapis.com
-// @connect      raw.githubusercontent.com
 // @require      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders%20%5B20251016%5D.config.js
 // @icon         https://raw.githubusercontent.com/0-V-linuxdo/Chat_Template_Text_Folders/main/Icon.svg
 // ==/UserScript==
@@ -74,7 +73,7 @@
 (function () {
     'use strict';
 
-    console.log("🎉 [Chat] Template Text Folders [20251208] v1.4.0 🎉");
+    console.log("🎉 [Chat] Template Text Folders [20251209] v1.0.0 🎉");
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {
@@ -4083,7 +4082,547 @@
         }
     };
 /* -------------------------------------------------------------------------- *
- * Module 03 · Settings panel, configuration flows, folder management helpers
+ * [Chat] Template Text Folders · Google Drive sync module (bundled)
+ * -------------------------------------------------------------------------- */
+
+(function (global) {
+    'use strict';
+
+    const DRIVE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+    const DRIVE_FILES_ENDPOINT = 'https://www.googleapis.com/drive/v3/files';
+    const DRIVE_UPLOAD_ENDPOINT = 'https://www.googleapis.com/upload/drive/v3/files';
+
+    const DEFAULT_STORAGE_KEY = 'cttfDriveSettings';
+    const DEFAULT_FILE_NAME = '[Chat] Template Text Folders.backup.json';
+
+    const safeStringify = (value, fallback = '') => {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return fallback;
+        }
+    };
+
+    function createDriveSyncModule(options = {}) {
+        const storageKey = options.storageKey || DEFAULT_STORAGE_KEY;
+        const defaultFileName = options.defaultFileName || DEFAULT_FILE_NAME;
+        const translate = typeof options.translate === 'function' ? options.translate : (text) => text;
+
+        let t = translate;
+        let driveAccessToken = '';
+        let driveAccessTokenExpireAt = 0;
+
+        const resolveGMRequest = () => {
+            try {
+                if (typeof GM_xmlhttpRequest === 'function') {
+                    return GM_xmlhttpRequest;
+                }
+                if (typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.GM_xmlhttpRequest === 'function') {
+                    return unsafeWindow.GM_xmlhttpRequest;
+                }
+                if (typeof window !== 'undefined' && typeof window.GM_xmlhttpRequest === 'function') {
+                    return window.GM_xmlhttpRequest;
+                }
+            } catch (_) {
+                /* ignore resolution errors */
+            }
+            return null;
+        };
+
+        const resolveFetch = () => {
+            try {
+                if (typeof fetch === 'function') {
+                    return fetch;
+                }
+                if (typeof globalThis !== 'undefined' && typeof globalThis.fetch === 'function') {
+                    return globalThis.fetch;
+                }
+                if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+                    return window.fetch.bind(window);
+                }
+                if (typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.fetch === 'function') {
+                    return unsafeWindow.fetch.bind(unsafeWindow);
+                }
+            } catch (_) {
+                /* ignore resolution errors */
+            }
+            return null;
+        };
+
+        const performDriveRequest = async (options = {}) => {
+            const attemptGM = async () => {
+                const gmRequest = resolveGMRequest();
+                if (!gmRequest) return null;
+                return new Promise((resolve, reject) => {
+                    try {
+                        gmRequest({
+                            method: options.method || 'GET',
+                            url: options.url,
+                            headers: options.headers,
+                            data: options.data,
+                            onload: (response) => {
+                                const payload = {
+                                    status: response.status,
+                                    responseText: response.responseText || ''
+                                };
+                                if (payload.status === 0) {
+                                    reject(new Error('GM_xmlhttpRequest returned status 0 (likely blocked or offline).'));
+                                    return;
+                                }
+                                resolve(payload);
+                            },
+                            onerror: (err) => {
+                                const message = err?.error || err?.message || safeStringify(err, '{}');
+                                reject(new Error(message));
+                            }
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            };
+
+            const attemptFetch = async () => {
+                const fetchApi = resolveFetch();
+                if (!fetchApi) return null;
+                const response = await fetchApi(options.url, {
+                    method: options.method || 'GET',
+                    headers: options.headers,
+                    body: options.data,
+                    credentials: 'omit',
+                    mode: 'cors',
+                    cache: 'no-store'
+                });
+                return {
+                    status: response.status,
+                    responseText: await response.text()
+                };
+            };
+
+            const pref = driveSyncSettings.requestMode === 'adguard' ? ['fetch', 'gm'] : ['gm', 'fetch'];
+            let lastError = null;
+            for (const method of pref) {
+                try {
+                    if (method === 'gm') {
+                        const res = await attemptGM();
+                        if (res) return res;
+                    } else {
+                        const res = await attemptFetch();
+                        if (res) return res;
+                    }
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+            throw lastError || new Error('No request API available for Drive sync.');
+        };
+
+        const buildHttpError = (label, response) => {
+            const status = response?.status ?? 0;
+            const text = response?.responseText || '';
+            const error = new Error(`${label} HTTP ${status}: ${text || '[empty response]'}`);
+            error.status = status;
+            error.responseText = text;
+            return error;
+        };
+
+        const baseSettings = {
+            enabled: false,
+            clientId: '',
+            clientSecret: '',
+            refreshToken: '',
+            fileId: '',
+            fileName: defaultFileName,
+            lastSyncedAt: 0,
+            requestMode: 'default', // 'default' | 'adguard'
+            configCollapsed: false
+        };
+
+        const readSettings = () => {
+            try {
+                const raw = localStorage.getItem(storageKey);
+                if (!raw) return { ...baseSettings };
+                const parsed = JSON.parse(raw);
+                return {
+                    ...baseSettings,
+                    ...(parsed && typeof parsed === 'object' ? parsed : {})
+                };
+            } catch (error) {
+                console.warn('[CTTF] Drive settings parse failed:', error);
+                return { ...baseSettings };
+            }
+        };
+
+        let driveSyncSettings = readSettings();
+
+        const persistSettings = () => {
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(driveSyncSettings));
+            } catch (error) {
+                console.warn('[CTTF] Drive settings persist failed:', error);
+            }
+        };
+
+        const setTranslator = (fn) => {
+            if (typeof fn === 'function') {
+                t = fn;
+            }
+        };
+
+        const resetAuthCache = () => {
+            driveAccessToken = '';
+            driveAccessTokenExpireAt = 0;
+        };
+
+        const normalizeRequestMode = (value) => (value === 'adguard' ? 'adguard' : 'default');
+        const normalizeBool = (value, fallback = false) => (typeof value === 'boolean' ? value : fallback);
+
+        const updateSettings = (partial = {}) => {
+            const prev = { ...driveSyncSettings };
+            driveSyncSettings = {
+                ...driveSyncSettings,
+                ...partial,
+                requestMode: normalizeRequestMode(partial.requestMode ?? driveSyncSettings.requestMode),
+                configCollapsed: normalizeBool(partial.configCollapsed ?? driveSyncSettings.configCollapsed, false)
+            };
+            const name = (driveSyncSettings.fileName || '').trim();
+            driveSyncSettings.fileName = name || defaultFileName;
+            const credsChanged =
+                prev.clientId !== driveSyncSettings.clientId ||
+                prev.clientSecret !== driveSyncSettings.clientSecret ||
+                prev.refreshToken !== driveSyncSettings.refreshToken;
+            const fileTargetChanged = prev.fileName !== driveSyncSettings.fileName;
+            if (credsChanged) {
+                resetAuthCache();
+                driveSyncSettings.fileId = '';
+            } else if (fileTargetChanged) {
+                driveSyncSettings.fileId = '';
+            }
+            persistSettings();
+            return { ...driveSyncSettings };
+        };
+
+        const getFileName = () => {
+            const name = (driveSyncSettings.fileName || '').trim();
+            if (name) {
+                return name;
+            }
+            driveSyncSettings.fileName = defaultFileName;
+            persistSettings();
+            return driveSyncSettings.fileName;
+        };
+
+        const hasDriveCredentials = () => Boolean(
+            driveSyncSettings.clientId &&
+            driveSyncSettings.clientSecret &&
+            driveSyncSettings.refreshToken
+        );
+
+        const ensureDriveSyncApiAvailable = () => {
+            const available = Boolean(resolveGMRequest() || resolveFetch());
+            if (!available) {
+                try {
+                    alert(t('当前环境不支持跨域请求，请在脚本管理器中启用 GM_xmlhttpRequest。'));
+                } catch (_) {
+                    /* noop */
+                }
+            }
+            return available;
+        };
+
+        const refreshDriveAccessToken = async () => {
+            const body = [
+                ['client_id', driveSyncSettings.clientId],
+                ['client_secret', driveSyncSettings.clientSecret],
+                ['refresh_token', driveSyncSettings.refreshToken],
+                ['grant_type', 'refresh_token']
+            ]
+                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value || ''))}`)
+                .join('&');
+            let response;
+            try {
+                response = await performDriveRequest({
+                    method: 'POST',
+                    url: DRIVE_TOKEN_ENDPOINT,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    data: body
+                });
+            } catch (error) {
+                throw new Error(`Drive token request failed: ${error?.message || safeStringify(error, '{}')}`);
+            }
+            const text = response.responseText || '';
+            const status = response.status;
+            const json = text ? JSON.parse(text) : {};
+            if (status >= 200 && status < 300) {
+                if (json.error) {
+                    throw new Error(`Drive token error: ${safeStringify(json, '[invalid json]')}`);
+                }
+                return json;
+            }
+            throw new Error(`Drive token HTTP ${status}: ${text || '[empty response]'}`);
+        };
+
+        async function ensureDriveAccessToken() {
+            const now = Date.now();
+            if (driveAccessToken && now < driveAccessTokenExpireAt - 60000) {
+                return driveAccessToken;
+            }
+            const tokenPayload = await refreshDriveAccessToken();
+            driveAccessToken = tokenPayload.access_token;
+            const expiresIn = Number(tokenPayload.expires_in) || 3600;
+            driveAccessTokenExpireAt = now + expiresIn * 1000;
+            return driveAccessToken;
+        }
+
+        async function listDriveConfigFiles(token, targetName = getFileName()) {
+            const params = new URLSearchParams({
+                pageSize: '5',
+                fields: 'files(id,name,mimeType,modifiedTime,size)',
+                orderBy: 'modifiedTime desc'
+            });
+            const sanitizedName = (targetName || '').replace(/'/g, "\\'");
+            params.set('q', `(trashed = false) and name = '${sanitizedName}'`);
+            let response;
+            try {
+                response = await performDriveRequest({
+                    method: 'GET',
+                    url: `${DRIVE_FILES_ENDPOINT}?${params.toString()}`,
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json'
+                    }
+                });
+            } catch (error) {
+                throw new Error(`Drive list network error: ${error?.message || safeStringify(error, '{}')}`);
+            }
+            if (response.status >= 200 && response.status < 300) {
+                const data = JSON.parse(response.responseText || '{}');
+                return Array.isArray(data.files) ? data.files : [];
+            }
+            throw buildHttpError('Drive list', response);
+        }
+
+        async function downloadDriveFileContent(fileId, token) {
+            const encoded = encodeURIComponent(fileId);
+            let response;
+            try {
+                response = await performDriveRequest({
+                    method: 'GET',
+                    url: `${DRIVE_FILES_ENDPOINT}/${encoded}?alt=media`,
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+            } catch (error) {
+                throw new Error(`Drive download network error: ${error?.message || safeStringify(error, '{}')}`);
+            }
+            if (response.status >= 200 && response.status < 300) {
+                return response.responseText || '';
+            }
+            let parsed;
+            try {
+                parsed = response.responseText ? JSON.parse(response.responseText) : null;
+            } catch {
+                parsed = null;
+            }
+            const err = parsed?.error?.message
+                ? `Drive download HTTP ${response.status}: ${parsed.error.message}`
+                : `Drive download HTTP ${response.status}: ${response.responseText || ''}`;
+            const error = new Error(err);
+            error.status = response.status;
+            error.responseText = response.responseText || '';
+            throw error;
+        }
+
+        async function uploadDriveConfigFile({ token, fileId, fileName, content }) {
+            const boundary = `cttfBoundary${Date.now()}`;
+            const metadata = {
+                name: fileName || getFileName(),
+                mimeType: 'application/json'
+            };
+            const multipartBody = [
+                `--${boundary}`,
+                'Content-Type: application/json; charset=UTF-8',
+                '',
+                JSON.stringify(metadata),
+                `--${boundary}`,
+                'Content-Type: application/json',
+                '',
+                content,
+                `--${boundary}--`,
+                ''
+            ].join('\r\n');
+            const hasFileId = Boolean(fileId);
+            const targetUrl = hasFileId
+                ? `${DRIVE_UPLOAD_ENDPOINT}/${encodeURIComponent(fileId)}?uploadType=multipart`
+                : `${DRIVE_UPLOAD_ENDPOINT}?uploadType=multipart`;
+            let response;
+            try {
+                response = await performDriveRequest({
+                    method: hasFileId ? 'PATCH' : 'POST',
+                    url: targetUrl,
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`
+                    },
+                    data: multipartBody
+                });
+            } catch (error) {
+                throw new Error(`Drive upload network error: ${error?.message || safeStringify(error, '{}')}`);
+            }
+            const text = response.responseText || '';
+            const json = text ? JSON.parse(text) : {};
+            if (response.status >= 200 && response.status < 300) {
+                return json;
+            }
+            throw new Error(`Drive upload HTTP ${response.status}: ${text || '[empty response]'}`);
+        }
+
+        const formatDriveError = (error) => {
+            if (!error) return t('Drive 请求失败：') + 'Unknown error';
+            if (typeof error === 'string') return error;
+            if (error?.message) return error.message;
+            try {
+                return JSON.stringify(error);
+            } catch {
+                return String(error);
+            }
+        };
+
+        async function syncUploadConfigToDrive(content) {
+            const token = await ensureDriveAccessToken();
+            const serializedContent = typeof content === 'string' ? content : safeStringify(content, '{}');
+            const targetName = getFileName();
+            const cachedId = (driveSyncSettings.fileId || '').trim();
+            let uploadResult = null;
+            try {
+                uploadResult = await uploadDriveConfigFile({
+                    token,
+                    fileId: cachedId,
+                    fileName: targetName,
+                    content: serializedContent
+                });
+            } catch (error) {
+                if (cachedId) {
+                    uploadResult = await uploadDriveConfigFile({
+                        token,
+                        fileId: '',
+                        fileName: targetName,
+                        content: serializedContent
+                    });
+                } else {
+                    throw error;
+                }
+            }
+            const resolvedId = uploadResult?.id || cachedId || '';
+            driveSyncSettings.fileId = resolvedId;
+            driveSyncSettings.fileName = uploadResult?.name || targetName;
+            driveSyncSettings.lastSyncedAt = Date.now();
+            persistSettings();
+            return {
+                uploadResult,
+                settings: { ...driveSyncSettings }
+            };
+        }
+
+        const isAuthError = (status) => status === 401 || status === 403;
+        const isFileStaleError = (status) => status === 404 || isAuthError(status) || status === 400;
+
+        async function syncDownloadConfigFromDrive() {
+            let token = await ensureDriveAccessToken();
+            const targetName = getFileName();
+
+            const buildNotFoundError = () => {
+                const err = new Error(t('未找到云端配置文件。'));
+                err.code = 'NOT_FOUND';
+                return err;
+            };
+
+            const fetchLatestFileMeta = async () => {
+                const files = await listDriveConfigFiles(token, targetName);
+                if (!Array.isArray(files) || files.length === 0) {
+                    throw buildNotFoundError();
+                }
+                return files[0];
+            };
+
+            const attemptDownload = async ({ forceRelist = false, allowTokenRetry = true } = {}) => {
+                let fileMeta = null;
+                let fileId = (driveSyncSettings.fileId || '').trim();
+                if (!fileId || forceRelist) {
+                    try {
+                        fileMeta = await fetchLatestFileMeta();
+                        fileId = fileMeta?.id || '';
+                    } catch (error) {
+                        const status = error?.status || 0;
+                        if (allowTokenRetry && isAuthError(status)) {
+                            resetAuthCache();
+                            token = await ensureDriveAccessToken();
+                            return attemptDownload({ forceRelist, allowTokenRetry: false });
+                        }
+                        throw error;
+                    }
+                }
+                try {
+                    const content = await downloadDriveFileContent(fileId, token);
+                    return { content, fileId, fileMeta };
+                } catch (error) {
+                    const status = error?.status || 0;
+                    if (allowTokenRetry && isAuthError(status)) {
+                        resetAuthCache();
+                        token = await ensureDriveAccessToken();
+                        return attemptDownload({ forceRelist, allowTokenRetry: false });
+                    }
+                    if (!forceRelist && isFileStaleError(status)) {
+                        return attemptDownload({ forceRelist: true, allowTokenRetry: false });
+                    }
+                    throw error;
+                }
+            };
+
+            const { content, fileId, fileMeta } = await attemptDownload();
+            driveSyncSettings.fileId = fileId;
+            driveSyncSettings.fileName = fileMeta?.name || driveSyncSettings.fileName || targetName;
+            driveSyncSettings.lastSyncedAt = Date.now();
+            persistSettings();
+            return {
+                id: fileId,
+                name: driveSyncSettings.fileName,
+                content,
+                settings: { ...driveSyncSettings }
+            };
+        }
+
+        return {
+            setTranslator,
+            getSettings: () => ({ ...driveSyncSettings }),
+            updateSettings,
+            persistSettings,
+            resetAuthCache,
+            getFileName,
+            hasDriveCredentials,
+            ensureDriveSyncApiAvailable,
+            formatDriveError,
+            syncUploadConfigToDrive,
+            syncDownloadConfigFromDrive
+        };
+    }
+
+    const exported = {
+        createDriveSyncModule,
+        DEFAULT_FILE_NAME,
+        DEFAULT_STORAGE_KEY
+    };
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = exported;
+    }
+    global.CTTFDriveSyncModule = exported;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+/* -------------------------------------------------------------------------- *
+ * Module 04 · Settings panel, configuration flows, folder management helpers
  * -------------------------------------------------------------------------- */
 
     const extractTemplateVariables = (text = '') => {
@@ -5352,60 +5891,53 @@
         }, 10);
     };
 /* -------------------------------------------------------------------------- *
- * Module 04 · Script config (脚本配置)
+ * Module 05 · Script config (脚本配置)
  * -------------------------------------------------------------------------- */
 
     let currentDiffOverlay = null;
     let currentConfigOverlay = null;
-    const DRIVE_SETTINGS_STORAGE_KEY = 'cttfDriveSettings';
     const DEFAULT_DRIVE_FILE_NAME = '[Chat] Template Text Folders.backup.json';
-    const DRIVE_MODULE_DEFAULT_URL = 'https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/sync/%5BChat%5D%20Template%20Text%20Folders.drive-sync.js';
+    const DRIVE_MODULE_DEFAULT_URL = 'https://raw.githubusercontent.com/0-V-linuxdo/Chat_Template_Text_Folders/main/sync/%5BChat%5D%20Template%20Text%20Folders.drive-sync.js';
+    const DRIVE_MODULE_FALLBACK_URLS = [
+        'https://cdn.jsdelivr.net/gh/0-V-linuxdo/Chat_Template_Text_Folders/sync/%5BChat%5D%20Template%20Text%20Folders.drive-sync.js',
+        'https://raw.fastgit.org/0-V-linuxdo/Chat_Template_Text_Folders/main/sync/%5BChat%5D%20Template%20Text%20Folders.drive-sync.js'
+    ];
+    const DRIVE_HOST_PREFS_KEY = 'cttfDriveHostPrefs';
 
     let driveSyncService = null;
     let driveModulePromise = null;
-    let driveSettingsSnapshot = (() => {
-        const fallback = {
-            enabled: false,
-            clientId: '',
-            clientSecret: '',
-            refreshToken: '',
-            fileId: '',
-            fileName: DEFAULT_DRIVE_FILE_NAME,
-            lastSyncedAt: 0,
-            moduleUrl: ''
-        };
+    let cachedDriveSettings = null;
+    let driveHostPrefs = (() => {
+        const fallback = { enabled: false, moduleUrl: '' };
         try {
-            const raw = localStorage.getItem(DRIVE_SETTINGS_STORAGE_KEY);
+            const raw = localStorage.getItem(DRIVE_HOST_PREFS_KEY);
             if (!raw) return { ...fallback };
             const parsed = JSON.parse(raw);
-            const merged = { ...fallback, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
-            const name = (merged.fileName || '').trim();
-            merged.fileName = name || DEFAULT_DRIVE_FILE_NAME;
-            return merged;
+            return { ...fallback, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
         } catch (error) {
-            console.warn('[Chat] Template Text Folders · Drive settings parse failed:', error);
+            console.warn('[Chat] Template Text Folders · Drive host prefs parse failed:', error);
             return { ...fallback };
         }
     })();
 
-    const persistDriveSettingsSnapshot = (patch = {}) => {
-        driveSettingsSnapshot = {
-            ...driveSettingsSnapshot,
-            ...patch
-        };
-        const name = (driveSettingsSnapshot.fileName || '').trim();
-        driveSettingsSnapshot.fileName = name || DEFAULT_DRIVE_FILE_NAME;
+    const persistDriveHostPrefs = (patch = {}) => {
+        driveHostPrefs = { ...driveHostPrefs, ...patch };
         try {
-            localStorage.setItem(DRIVE_SETTINGS_STORAGE_KEY, JSON.stringify(driveSettingsSnapshot));
+            localStorage.setItem(DRIVE_HOST_PREFS_KEY, JSON.stringify(driveHostPrefs));
         } catch (error) {
-            console.warn('[Chat] Template Text Folders · Drive settings persist failed:', error);
+            console.warn('[Chat] Template Text Folders · Drive host prefs persist failed:', error);
         }
-        return driveSettingsSnapshot;
+        return driveHostPrefs;
     };
 
-    const getDriveModuleUrl = () => {
-        const custom = (driveSettingsSnapshot.moduleUrl || '').trim();
-        return custom || DRIVE_MODULE_DEFAULT_URL;
+    const getDriveModuleCandidateUrls = () => {
+        const custom = (driveHostPrefs.moduleUrl || '').trim();
+        const urls = [
+            custom,
+            DRIVE_MODULE_DEFAULT_URL,
+            ...DRIVE_MODULE_FALLBACK_URLS
+        ].filter(Boolean);
+        return Array.from(new Set(urls));
     };
 
     const formatDriveModuleLoadError = (error) => {
@@ -5419,17 +5951,208 @@
         }
     };
 
-    const evaluateDriveModuleCode = (code) => {
-        const factory = new Function(`
-            "use strict";
-            ${code}
-            return (typeof CTTFDriveSyncModule !== 'undefined'
-                ? CTTFDriveSyncModule
-                : (typeof window !== 'undefined' ? window.CTTFDriveSyncModule : null));
-        `);
-        return factory();
+    const getPageNonce = () => {
+        const scriptWithNonce = document.querySelector('script[nonce]');
+        if (scriptWithNonce && scriptWithNonce.nonce) {
+            return scriptWithNonce.nonce;
+        }
+        return null;
     };
 
+    const bridgeGMForDriveModule = () => {
+        try {
+            if (typeof GM_xmlhttpRequest === 'function') {
+                if (typeof window !== 'undefined' && !window.GM_xmlhttpRequest) {
+                    window.GM_xmlhttpRequest = GM_xmlhttpRequest;
+                }
+                if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.GM_xmlhttpRequest) {
+                    unsafeWindow.GM_xmlhttpRequest = GM_xmlhttpRequest;
+                }
+            }
+            if (typeof GM_addElement === 'function') {
+                if (typeof window !== 'undefined' && !window.GM_addElement) {
+                    window.GM_addElement = GM_addElement;
+                }
+                if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.GM_addElement) {
+                    unsafeWindow.GM_addElement = GM_addElement;
+                }
+            }
+        } catch (_) {
+            /* ignore bridge errors */
+        }
+    };
+
+    const resolveGMXmlhttpRequest = () => {
+        try {
+            if (typeof GM_xmlhttpRequest === 'function') {
+                return GM_xmlhttpRequest;
+            }
+            if (typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.GM_xmlhttpRequest === 'function') {
+                return unsafeWindow.GM_xmlhttpRequest;
+            }
+            if (typeof window !== 'undefined' && typeof window.GM_xmlhttpRequest === 'function') {
+                return window.GM_xmlhttpRequest;
+            }
+        } catch (_) {
+            /* ignore resolution errors */
+        }
+        return null;
+    };
+
+    const resolveDriveModuleFetch = () => {
+        try {
+            if (typeof fetch === 'function') {
+                return fetch;
+            }
+            if (typeof globalThis !== 'undefined' && typeof globalThis.fetch === 'function') {
+                return globalThis.fetch;
+            }
+            if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+                return window.fetch.bind(window);
+            }
+            if (typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.fetch === 'function') {
+                return unsafeWindow.fetch.bind(unsafeWindow);
+            }
+        } catch (_) {
+            /* ignore resolution errors */
+        }
+        return null;
+    };
+
+    const fetchDriveModuleContent = (url) => new Promise((resolve, reject) => {
+        const gmRequest = resolveGMXmlhttpRequest();
+        if (gmRequest) {
+            gmRequest({
+                method: 'GET',
+                url,
+                onload: (response) => {
+                    if (response.status >= 200 && response.status < 300) {
+                        resolve(response.responseText || '');
+                    } else {
+                        reject(new Error(`Drive module HTTP ${response.status}: ${response.responseText || '[empty response]'}`));
+                    }
+                },
+                onerror: (err) => {
+                    reject(new Error(`Drive module fetch failed: ${err?.error || err?.message || JSON.stringify(err) || '[unknown error]'}`));
+                }
+            });
+            return;
+        }
+        const fetchApi = resolveDriveModuleFetch();
+        if (fetchApi) {
+            fetchApi(url, { cache: 'no-store' })
+                .then(async (response) => {
+                    const text = await response.text();
+                    if (response.ok) {
+                        resolve(text);
+                    } else {
+                        reject(new Error(`Drive module HTTP ${response.status}: ${text || '[empty response]'}`));
+                    }
+                })
+                .catch((error) => {
+                    reject(new Error(`Drive module fetch failed: ${error?.message || JSON.stringify(error) || '[unknown error]'}`));
+                });
+            return;
+        }
+        reject(new Error('GM_xmlhttpRequest is not available to fetch Drive module.'));
+    });
+
+    const injectDriveModuleScript = (src, nonce) => new Promise((resolve, reject) => {
+        if (typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
+            resolve(CTTFDriveSyncModule);
+            return;
+        }
+        bridgeGMForDriveModule();
+        const target = document.head || document.documentElement || document.body;
+        if (!target) {
+            reject(new Error('No document head/body to inject Drive module.'));
+            return;
+        }
+        const existing = target.querySelector(`script[data-cttf-drive-module="true"][src="${src}"]`);
+        if (existing && typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
+            resolve(CTTFDriveSyncModule);
+            return;
+        }
+        const onLoaded = () => {
+            if (typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
+                resolve(CTTFDriveSyncModule);
+            } else {
+                reject(new Error('Drive sync module loaded but CTTFDriveSyncModule not found.'));
+            }
+        };
+        const onError = (err) => {
+            const srcAttr = (err?.target && err.target.src) ? err.target.src : src;
+            reject(new Error(`Drive module request failed: ${err?.message || err?.type || '[unknown error]'} · src=${srcAttr}`));
+        };
+        const injector = typeof GM_addElement === 'function'
+            ? () => GM_addElement(target, 'script', {
+                src,
+                'data-cttf-drive-module': 'true',
+                nonce,
+                onload: onLoaded,
+                onerror: onError
+            })
+            : () => {
+                const el = document.createElement('script');
+                el.src = src;
+                el.setAttribute('data-cttf-drive-module', 'true');
+                el.async = true;
+                if (nonce) {
+                    el.setAttribute('nonce', nonce);
+                }
+                el.onload = onLoaded;
+                el.onerror = onError;
+                target.appendChild(el);
+            };
+        try {
+            injector();
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    const loadDriveModuleViaRequire = (url) => {
+        return new Promise((resolve, reject) => {
+            const existing = document.querySelector(`script[data-cttf-drive-module="true"][src="${url}"]`);
+            if (existing && typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
+                resolve(CTTFDriveSyncModule);
+                return;
+            }
+            const onLoaded = () => {
+                if (typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
+                    resolve(CTTFDriveSyncModule);
+                } else {
+                    reject(new Error('Drive sync module loaded but CTTFDriveSyncModule not found.'));
+                }
+            };
+            const onError = (err) => {
+                const src = (err?.target && err.target.src) ? err.target.src : url;
+                reject(new Error(`Drive module request failed: ${err?.message || err?.type || '[unknown error]'} · src=${src}`));
+            };
+            const target = document.head || document.documentElement || document.body;
+            if (!target) {
+                reject(new Error('No document head/body to inject Drive module.'));
+                return;
+            }
+            const nonce = getPageNonce();
+            injectDriveModuleScript(url, nonce).then(resolve).catch(async (err) => {
+                console.warn('[CTTF] Drive module direct load failed, fallback to blob URL', err);
+                try {
+                    const code = await fetchDriveModuleContent(url);
+                    const blob = new Blob([code], { type: 'text/javascript' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    try {
+                        await injectDriveModuleScript(blobUrl, nonce);
+                        resolve(CTTFDriveSyncModule);
+                    } finally {
+                        URL.revokeObjectURL(blobUrl);
+                    }
+                } catch (fetchErr) {
+                    reject(fetchErr);
+                }
+            });
+        });
+    };
     const loadDriveModule = () => {
         if (typeof CTTFDriveSyncModule !== 'undefined' && CTTFDriveSyncModule?.createDriveSyncModule) {
             return Promise.resolve(CTTFDriveSyncModule);
@@ -5437,35 +6160,21 @@
         if (driveModulePromise) {
             return driveModulePromise;
         }
-        const url = getDriveModuleUrl();
-        driveModulePromise = new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url,
-                onload: (response) => {
-                    if (response.status >= 200 && response.status < 300) {
-                        try {
-                            const module = evaluateDriveModuleCode(response.responseText || '');
-                            if (!module || typeof module.createDriveSyncModule !== 'function') {
-                                driveModulePromise = null;
-                                reject(new Error('Drive sync module did not expose createDriveSyncModule.'));
-                                return;
-                            }
-                            resolve(module);
-                        } catch (error) {
-                            driveModulePromise = null;
-                            reject(error);
-                        }
-                    } else {
-                        driveModulePromise = null;
-                        reject(new Error(`Drive module HTTP ${response.status}: ${response.responseText || ''}`));
-                    }
-                },
-                onerror: (err) => {
-                    driveModulePromise = null;
-                    reject(new Error(`Drive module request failed: ${JSON.stringify(err)}`));
+        const candidateUrls = getDriveModuleCandidateUrls();
+        driveModulePromise = (async () => {
+            let lastError = null;
+            for (const url of candidateUrls) {
+                try {
+                    return await loadDriveModuleViaRequire(url);
+                } catch (error) {
+                    lastError = error;
+                    console.warn('[CTTF] Drive module load failed, try next candidate:', url, error);
                 }
-            });
+            }
+            throw lastError || new Error('Drive module load failed: no candidate succeeded.');
+        })().catch((error) => {
+            driveModulePromise = null;
+            throw error;
         });
         return driveModulePromise;
     };
@@ -5484,7 +6193,7 @@
             throw new Error('Drive sync module is invalid.');
         }
         driveSyncService = module.createDriveSyncModule({
-            storageKey: DRIVE_SETTINGS_STORAGE_KEY,
+            // Let the external module own its storage; only pass display defaults and translator.
             defaultFileName: DEFAULT_DRIVE_FILE_NAME,
             translate: t
         });
@@ -5492,7 +6201,7 @@
             try { driveSyncService.setTranslator(t); } catch (_) {}
         }
         if (driveSyncService.getSettings) {
-            driveSettingsSnapshot = driveSyncService.getSettings();
+            cachedDriveSettings = driveSyncService.getSettings();
         }
         return driveSyncService;
     };
@@ -5580,11 +6289,49 @@
         console.log(t('📤 配置已导出。'));
     }
 
-    function showImportDiffPreview(currentConfig, importedConfig) {
+    const cloneConfigForComparison = (value) => {
+        if (value == null) return value;
+        try {
+            return JSON.parse(JSON.stringify(value));
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders config clone failed:', error);
+            return value;
+        }
+    };
+
+    const toComparableStructure = (value) => {
+        if (value === null || typeof value !== 'object') {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            return value.map((item) => toComparableStructure(item));
+        }
+        const sorted = {};
+        Object.keys(value).sort().forEach((key) => {
+            sorted[key] = toComparableStructure(value[key]);
+        });
+        return sorted;
+    };
+
+    const configsStructurallyEqual = (a, b) => {
+        if (a === b) return true;
+        try {
+            const left = toComparableStructure(cloneConfigForComparison(a));
+            const right = toComparableStructure(cloneConfigForComparison(b));
+            return JSON.stringify(left) === JSON.stringify(right);
+        } catch (error) {
+            console.warn('[Chat] Template Text Folders config compare failed:', error);
+            return false;
+        }
+    };
+
+    function showImportDiffPreview(currentConfig, importedConfig, options = {}) {
         if (currentDiffOverlay) {
             closeExistingOverlay(currentDiffOverlay);
             currentDiffOverlay = null;
         }
+        const currentLabel = options.currentLabel || t('当前配置');
+        const importedLabel = options.importedLabel || t('导入配置');
 
         const overlay = document.createElement('div');
         overlay.classList.add('import-diff-overlay');
@@ -5867,55 +6614,95 @@
             const currentOrder = Object.keys(currentButtons);
             const importedOrder = Object.keys(importedButtons);
 
+            // 1) 建立名称桶，便于同名匹配（名称正规化）
             const importedBuckets = new Map();
-            importedOrder.forEach((btnName) => {
+            importedOrder.forEach((btnName, idx) => {
                 const normalized = normalizeButtonNameForDiff(btnName);
                 if (!importedBuckets.has(normalized)) {
                     importedBuckets.set(normalized, []);
                 }
-                importedBuckets.get(normalized).push(btnName);
+                importedBuckets.get(normalized).push({ name: btnName, index: idx });
             });
 
+            // 2) 先对齐同名按钮
             const usedImportedNames = new Set();
+            const matched = []; // { currentName, importedName, importedIndex }
 
             currentOrder.forEach((btnName) => {
                 const normalized = normalizeButtonNameForDiff(btnName);
                 const bucket = importedBuckets.get(normalized) || [];
-                const matchedName = bucket.find((candidate) => !usedImportedNames.has(candidate)) || null;
-                if (matchedName) {
-                    usedImportedNames.add(matchedName);
+                const matchedEntry = bucket.find((candidate) => !usedImportedNames.has(candidate.name)) || null;
+                if (matchedEntry) {
+                    usedImportedNames.add(matchedEntry.name);
+                    matched.push({ currentName: btnName, importedName: matchedEntry.name, importedIndex: matchedEntry.index });
+                } else {
+                    matched.push({ currentName: btnName, importedName: null, importedIndex: -1 });
                 }
-                const currentBtn = currentButtons[btnName] || null;
-                const importedBtn = matchedName ? (importedButtons[matchedName] || null) : null;
+            });
+
+            // 3) 计算最长递增子序列，最小化标记的“顺序变更”集合
+            const matchedImportedNames = new Set();
+            const matchedIndices = matched
+                .filter((pair) => pair.importedIndex >= 0)
+                .map((pair) => pair.importedIndex);
+            const lisIndices = new Set();
+            (function markLIS(seq) {
+                const n = seq.length;
+                if (!n) return;
+                const dp = Array(n).fill(1);
+                const prev = Array(n).fill(-1);
+                let bestLen = 1;
+                let bestIdx = 0;
+                for (let i = 1; i < n; i++) {
+                    for (let j = 0; j < i; j++) {
+                        if (seq[j] < seq[i] && dp[j] + 1 > dp[i]) {
+                            dp[i] = dp[j] + 1;
+                            prev[i] = j;
+                        }
+                    }
+                    if (dp[i] > bestLen) {
+                        bestLen = dp[i];
+                        bestIdx = i;
+                    }
+                }
+                let idx = bestIdx;
+                while (idx >= 0) {
+                    lisIndices.add(seq[idx]);
+                    idx = prev[idx];
+                }
+            })(matchedIndices);
+
+            matched.forEach((pair) => {
+                const currentBtn = currentButtons[pair.currentName] || null;
+                const importedBtn = pair.importedName ? (importedButtons[pair.importedName] || null) : null;
                 const fieldsChanged = [];
+                let renamed = false;
                 if (currentBtn && importedBtn) {
-                    const keys = new Set([
-                        ...Object.keys(currentBtn),
-                        ...Object.keys(importedBtn)
-                    ]);
+                    const keys = new Set([...Object.keys(currentBtn), ...Object.keys(importedBtn)]);
                     keys.forEach((key) => {
                         if (!deepEqual(currentBtn[key], importedBtn[key])) {
                             fieldsChanged.push(key);
                         }
                     });
+                    const trimmedCurrent = typeof pair.currentName === 'string' ? pair.currentName.trim() : pair.currentName;
+                    const trimmedImported = typeof pair.importedName === 'string' ? pair.importedName.trim() : pair.importedName;
+                    renamed = Boolean(trimmedCurrent !== trimmedImported);
                 }
-                const orderChanged = currentBtn && importedBtn
-                    ? currentOrder.indexOf(btnName) !== importedOrder.indexOf(matchedName)
+                const orderChanged = pair.importedIndex >= 0
+                    ? !lisIndices.has(pair.importedIndex)
                     : false;
-                const trimmedCurrent = typeof btnName === 'string' ? btnName.trim() : btnName;
-                const trimmedImported = typeof matchedName === 'string' ? matchedName.trim() : matchedName;
-                const renamed = Boolean(currentBtn && importedBtn && trimmedCurrent !== trimmedImported);
                 let status = 'unchanged';
                 if (!importedBtn) {
                     status = 'removed';
-                } else if (fieldsChanged.length || orderChanged || renamed) {
+                } else if (fieldsChanged.length || renamed || orderChanged) {
                     status = 'changed';
                 }
+                const normalized = normalizeButtonNameForDiff(pair.currentName || pair.importedName);
                 result.push({
-                    id: normalized || btnName,
-                    name: btnName,
-                    currentName: btnName,
-                    importedName: matchedName,
+                    id: normalized || pair.currentName || pair.importedName,
+                    name: pair.currentName || pair.importedName,
+                    currentName: pair.currentName,
+                    importedName: pair.importedName,
                     current: currentBtn,
                     imported: importedBtn,
                     fieldsChanged,
@@ -5923,12 +6710,14 @@
                     renamed,
                     status
                 });
+                if (pair.importedName) {
+                    matchedImportedNames.add(pair.importedName);
+                }
             });
 
+            // 4) 仅存在于云端的按钮
             importedOrder.forEach((btnName) => {
-                if (usedImportedNames.has(btnName)) {
-                    return;
-                }
+                if (matchedImportedNames.has(btnName)) return;
                 const normalized = normalizeButtonNameForDiff(btnName);
                 const importedBtn = importedButtons[btnName] || null;
                 result.push({
@@ -5996,7 +6785,7 @@
             summary.button.removed += buttonCounts.removed;
             summary.button.changed += buttonCounts.changed;
 
-            const hasOrderChange = currentFolder && importedFolder && currentIndex !== importedIndex;
+            const hasOrderChange = buttonDiffs.some((btn) => btn.orderChanged);
 
             let status = 'unchanged';
             if (!currentFolder) {
@@ -6286,27 +7075,27 @@
                 if (item.status !== 'unchanged') {
                     const statusVariant = statusVariantMap[item.status];
                     let statusLabel = t(statusTextMap[item.status]);
-                    if (item.status === 'changed') {
-                        const detailLabels = [];
-                        if (item.hasOrderChange) {
-                            detailLabels.push(t('顺序'));
-                        }
-                        if (item.metaChanges.length) {
-                            detailLabels.push(t('设置'));
-                        }
-                        if (detailLabels.length) {
-                            const separator = isNonChineseLocale() ? ', ' : '、';
-                            const colon = isNonChineseLocale() ? ': ' : '：';
-                            statusLabel = `${statusLabel}${colon}${detailLabels.join(separator)}`;
-                        }
-                    }
-                    right.appendChild(createBadge(statusLabel, statusVariant));
+            if (item.status === 'changed') {
+                const detailLabels = [];
+                if (item.hasOrderChange) {
+                    detailLabels.push(t('顺序'));
                 }
+                if (item.metaChanges.length) {
+                    detailLabels.push(t('设置'));
+                }
+                if (detailLabels.length) {
+                    const separator = isNonChineseLocale() ? ', ' : '、';
+                    const colon = isNonChineseLocale() ? ': ' : '：';
+                    statusLabel = `${statusLabel}${colon}${detailLabels.join(separator)}`;
+                }
+            }
+            right.appendChild(createBadge(statusLabel, statusVariant));
+        }
 
-                const buttonHiglight = item.status !== 'unchanged' || item.hasOrderChange || item.metaChanges.length;
-                if (buttonHiglight) {
-                    folderButton.setAttribute('data-diff', 'true');
-                }
+        const buttonHiglight = item.status !== 'unchanged' || item.metaChanges.length || item.hasOrderChange;
+            if (buttonHiglight) {
+                folderButton.setAttribute('data-diff', 'true');
+            }
 
                 folderButton.appendChild(left);
                 folderButton.appendChild(right);
@@ -6600,27 +7389,27 @@
                         gap: 6px;
                         flex-shrink: 0;
                     `;
-                        if (diffInfo && diffInfo.status !== 'unchanged') {
-                            const statusVariant = statusVariantMap[diffInfo.status] || 'neutral';
-                            let badgeLabel = t(statusTextMap[diffInfo.status]);
-                            if (diffInfo.status === 'changed') {
-                                const changeTypeParts = [];
-                                if (diffInfo.renamed) {
-                                    changeTypeParts.push(t('重命名'));
-                                }
-                                if (diffInfo.fieldsChanged.length) {
-                                    changeTypeParts.push(t('字段'));
-                                }
-                                if (diffInfo.orderChanged) {
-                                    changeTypeParts.push(t('顺序'));
-                                }
-                                if (changeTypeParts.length) {
-                                    const typesText = changeTypeParts.join(isNonChineseLocale() ? ', ' : '、');
-                                    badgeLabel = t('变更：{{types}}', { types: typesText });
-                                }
+                    if (diffInfo && diffInfo.status !== 'unchanged') {
+                        const statusVariant = statusVariantMap[diffInfo.status] || 'neutral';
+                        let badgeLabel = t(statusTextMap[diffInfo.status]);
+                        if (diffInfo.status === 'changed') {
+                            const changeTypeParts = [];
+                            if (diffInfo.renamed) {
+                                changeTypeParts.push(t('重命名'));
                             }
-                            rowRight.appendChild(createBadge(badgeLabel, statusVariant));
+                            if (diffInfo.fieldsChanged.length) {
+                                changeTypeParts.push(t('字段'));
+                            }
+                            if (diffInfo.orderChanged) {
+                                changeTypeParts.push(t('顺序'));
+                            }
+                            if (changeTypeParts.length) {
+                                const typesText = changeTypeParts.join(isNonChineseLocale() ? ', ' : '、');
+                                badgeLabel = t('变更：{{types}}', { types: typesText });
+                            }
                         }
+                        rowRight.appendChild(createBadge(badgeLabel, statusVariant));
+                    }
 
                     row.appendChild(rowLeft);
                     row.appendChild(rowRight);
@@ -6645,8 +7434,8 @@
             const currentButtons = folderData.current && folderData.current.buttons ? folderData.current.buttons : {};
             const importedButtons = folderData.imported && folderData.imported.buttons ? folderData.imported.buttons : {};
 
-            columnsContainer.appendChild(createColumn(t('当前配置'), currentButtons, folderData.buttonOrder.current || [], 'current'));
-            columnsContainer.appendChild(createColumn(t('导入配置'), importedButtons, folderData.buttonOrder.imported || [], 'imported'));
+            columnsContainer.appendChild(createColumn(currentLabel, currentButtons, folderData.buttonOrder.current || [], 'current'));
+            columnsContainer.appendChild(createColumn(importedLabel, importedButtons, folderData.buttonOrder.imported || [], 'imported'));
         };
 
         renderFolderList();
@@ -7215,45 +8004,26 @@
             </div>
         `;
         const driveSyncSection = `
-            <div style="
-                display:flex;
-                flex-direction:column;
-                gap:12px;
-                padding:14px;
-                border:1px solid var(--border-color, #e5e7eb);
-                border-radius:8px;
-                background-color: var(--input-bg, var(--button-bg, #f3f4f6));
-            ">
-                <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;flex-direction:column;gap:6px;">
                     <div style="
                         display:flex;
                         align-items:center;
-                        gap:6px;
-                        font-size:15px;
-                        font-weight:600;
-                        color: var(--text-color, #333333);
+                        justify-content:space-between;
+                        gap:10px;
                     ">
-                        ${t('☁️ Google Drive 同步')}
-                        <span style="
-                            font-size:12px;
-                            color: var(--muted-text-color, #6b7280);
-                            border: 1px solid var(--border-color, #e5e7eb);
-                            padding: 2px 8px;
-                            border-radius: 999px;
-                            background: var(--button-bg, #f3f4f6);
-                        ">${t('外置模块')}</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">
                         <div style="
-                            flex:1;
-                            font-size:13px;
-                            color: var(--muted-text-color, #6b7280);
-                            line-height:1.4;
+                            display:flex;
+                            align-items:center;
+                            gap:6px;
+                            font-size:15px;
+                            font-weight:600;
+                            color: var(--text-color, #333333);
                         ">
-                            ${t('默认不加载 Drive 同步模块。开启后将通过 require 载入外置脚本，并显示同步配置。')}
+                            ${t('☁️ Google Drive 同步')}
                         </div>
                         <div class="cttf-switch-wrapper">
-                            <label class="cttf-switch" title="${t('开启后加载 Drive 同步模块')}">
+                            <label class="cttf-switch" title="${t('开启后启用 Drive 同步配置')}">
                                 <input id="driveSyncEnableToggle" type="checkbox" />
                                 <span class="cttf-switch-slider"></span>
                             </label>
@@ -7262,68 +8032,133 @@
                     <div id="driveModuleStatus" style="
                         font-size: 12px;
                         color: var(--muted-text-color, #6b7280);
-                        min-height: 18px;
+                        min-height: 0;
+                        margin-top: 0;
                     "></div>
                 </div>
-                <div id="driveControlsContainer" style="
+                <div id="driveControlsWrapper" style="
                     display:none;
+                    border:1px solid var(--border-color, #e5e7eb);
+                    border-radius:8px;
+                    background-color: var(--input-bg, var(--button-bg, #f3f4f6));
+                    padding:12px;
                     flex-direction:column;
-                    gap:12px;
-                    padding-top:6px;
+                    gap:8px;
                 ">
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                        <label style="display:flex;flex-direction:column;gap:6px;">
-                            <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端 ID')}</span>
-                            <div class="cttf-sync-field" data-secret="false" data-visible="true">
-                                <textarea id="driveClientIdInput" class="cttf-sync-textarea" rows="3" data-min-rows="3" autocomplete="off" spellcheck="false" placeholder="xxx.apps.googleusercontent.com"></textarea>
+                    <div id="driveControlsContainer" style="
+                        display:flex;
+                        flex-direction:column;
+                        gap:4px;
+                        padding-top:0;
+                        margin-top:0;
+                    ">
+                        <div style="display:flex;flex-direction:column;gap:4px;margin-top:0; margin-bottom:10px;">
+                            <div style="
+                                display:flex;
+                                align-items:center;
+                                justify-content:space-between;
+                                gap:10px;
+                            ">
+                                <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+                                    <div style="
+                                        display:flex;
+                                        align-items:center;
+                                        gap:8px;
+                                        width:100%;
+                                        justify-content:space-between;
+                                    ">
+                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('读取方式')}</span>
+                                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-left:auto;">
+                                            <button type="button" data-drive-request-mode="default" style="
+                                                padding:6px 12px;
+                                                border-radius:18px;
+                                                border:1px solid var(--border-color, #d1d5db);
+                                                background: transparent;
+                                                color: var(--text-color, #333333);
+                                                cursor: pointer;
+                                            " title="${t('优先 GM 请求')}">${t('默认')}</button>
+                                            <button type="button" data-drive-request-mode="adguard" style="
+                                                padding:6px 12px;
+                                                border-radius:18px;
+                                                border:1px solid var(--border-color, #d1d5db);
+                                                background: transparent;
+                                                color: var(--text-color, #333333);
+                                                cursor: pointer;
+                                            " title="${t('优先 fetch')}">${t('适配：AdGuard')}</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </label>
-                        <label style="display:flex;flex-direction:column;gap:6px;">
-                            <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端密钥')}</span>
-                            <div class="cttf-sync-field" data-secret="true" data-visible="false">
-                                <textarea id="driveClientSecretInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="your_client_secret"></textarea>
-                                <button type="button" class="cttf-sync-toggle" data-target="driveClientSecretInput" aria-label="Toggle visibility">👁</button>
+                        </div>
+                        <div style="height:1px;background:var(--border-color, #e5e7eb);margin:6px 0 2px 0;"></div>
+                        <div id="driveConfigFold" style="display:flex;flex-direction:column;gap:6px;">
+                            <div style="display:flex;align-items:center;gap:6px;cursor:pointer;" id="driveConfigFoldToggle">
+                                <span style="font-size:13px;color:var(--text-color, #333333);font-weight:600;">${t('配置信息')}</span>
+                                <span id="driveConfigFoldArrow" style="font-size:12px;color:var(--muted-text-color, #6b7280);">▼</span>
                             </div>
-                        </label>
-                        <label style="display:flex;flex-direction:column;gap:6px;">
-                            <span style="font-size:13px;color:var(--text-color, #333333);">${t('Refresh Token')}</span>
-                            <div class="cttf-sync-field" data-secret="true" data-visible="false">
-                                <textarea id="driveRefreshTokenInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="ya29...."></textarea>
-                                <button type="button" class="cttf-sync-toggle" data-target="driveRefreshTokenInput" aria-label="Toggle visibility">👁</button>
+                            <div id="driveConfigFields" style="display:flex;flex-direction:column;gap:6px;">
+                                    <label style="display:flex;flex-direction:column;gap:6px;">
+                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端 ID')}</span>
+                                        <div class="cttf-sync-field" data-secret="false" data-visible="true">
+                                            <textarea id="driveClientIdInput" class="cttf-sync-textarea" rows="3" data-min-rows="3" autocomplete="off" spellcheck="false" placeholder="xxx.apps.googleusercontent.com"></textarea>
+                                        </div>
+                                    </label>
+                                    <label style="display:flex;flex-direction:column;gap:6px;">
+                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('客户端密钥')}</span>
+                                        <div class="cttf-sync-field" data-secret="true" data-visible="false">
+                                            <textarea id="driveClientSecretInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="your_client_secret"></textarea>
+                                            <button type="button" class="cttf-sync-toggle" data-target="driveClientSecretInput" aria-label="Toggle visibility">👁</button>
+                                        </div>
+                                    </label>
+                                    <label style="display:flex;flex-direction:column;gap:6px;">
+                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('Refresh Token')}</span>
+                                        <div class="cttf-sync-field" data-secret="true" data-visible="false">
+                                            <textarea id="driveRefreshTokenInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="ya29...."></textarea>
+                                            <button type="button" class="cttf-sync-toggle" data-target="driveRefreshTokenInput" aria-label="Toggle visibility">👁</button>
+                                        </div>
+                                    </label>
+                                    <label style="display:flex;flex-direction:column;gap:6px;">
+                                        <span style="font-size:13px;color:var(--text-color, #333333);">${t('目标文件名')}</span>
+                                        <div class="cttf-sync-field" data-secret="false" data-visible="true">
+                                            <textarea id="driveFileNameInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="[Chat] Template Text Folders.backup.json"></textarea>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                        </label>
-                        <label style="display:flex;flex-direction:column;gap:6px;">
-                            <span style="font-size:13px;color:var(--text-color, #333333);">${t('目标文件名')}</span>
-                            <div class="cttf-sync-field" data-secret="false" data-visible="true">
-                                <textarea id="driveFileNameInput" class="cttf-sync-textarea" rows="1" autocomplete="off" spellcheck="false" placeholder="[Chat] Template Text Folders.backup.json"></textarea>
+                        </div>
+                        <div id="driveSaveRow" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <button id="saveDriveSettingsBtn" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--primary-color, #3B82F6);
+                                color: white;
+                                border-radius:4px;
+                            ">${t('保存 Drive 设置')}</button>
+                        </div>
+                        <div style="height:1px;background:var(--border-color, #e5e7eb);margin:4px 0 8px 0;"></div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <div style="display:flex;flex:1;gap:8px;min-width:220px;">
+                                <button id="uploadDriveConfigBtn" style="
+                                ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                background-color: var(--success-color, #22c55e);
+                                color: white;
+                                border-radius:4px;
+                                flex:1;
+                                ">${t('上传配置')}</button>
+                                <button id="downloadDriveConfigBtn" style="
+                                    ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                                    background-color: var(--info-color, #4F46E5);
+                                    color: white;
+                                    border-radius:4px;
+                                    flex:1;
+                                ">${t('拉取配置')}</button>
                             </div>
-                        </label>
-                    </div>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                        <button id="saveDriveSettingsBtn" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            background-color: var(--primary-color, #3B82F6);
-                            color: white;
-                            border-radius:4px;
-                        ">${t('保存 Drive 设置')}</button>
-                        <button id="uploadDriveConfigBtn" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            background-color: var(--success-color, #22c55e);
-                            color: white;
-                            border-radius:4px;
-                        ">${t('上传配置到 Drive')}</button>
-                        <button id="downloadDriveConfigBtn" style="
-                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
-                            background-color: var(--info-color, #4F46E5);
-                            color: white;
-                            border-radius:4px;
-                        ">${t('从 Drive 拉取配置')}</button>
-                        <span id="driveSyncStatus" style="
-                            font-size: 13px;
-                            color: var(--muted-text-color, #6b7280);
-                            min-height: 18px;
-                            flex: 1;
-                        "></span>
+                            <span id="driveSyncStatus" style="
+                                font-size: 13px;
+                                color: var(--muted-text-color, #6b7280);
+                                min-height: 18px;
+                                flex: 1;
+                            "></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -7625,15 +8460,23 @@
 
         const driveSyncToggle = dialog.querySelector('#driveSyncEnableToggle');
         const driveModuleStatusEl = dialog.querySelector('#driveModuleStatus');
+        const driveControlsWrapper = dialog.querySelector('#driveControlsWrapper');
         const driveControlsContainer = dialog.querySelector('#driveControlsContainer');
+        const driveConfigFields = dialog.querySelector('#driveConfigFields');
+        const driveConfigFoldToggle = dialog.querySelector('#driveConfigFoldToggle');
+        const driveConfigFoldArrow = dialog.querySelector('#driveConfigFoldArrow');
+        const driveSaveRow = dialog.querySelector('#driveSaveRow');
         const driveClientIdInput = dialog.querySelector('#driveClientIdInput');
         const driveClientSecretInput = dialog.querySelector('#driveClientSecretInput');
         const driveRefreshTokenInput = dialog.querySelector('#driveRefreshTokenInput');
         const driveFileNameInput = dialog.querySelector('#driveFileNameInput');
+        const driveRequestModeButtons = Array.from(dialog.querySelectorAll('[data-drive-request-mode]'));
         const driveStatusEl = dialog.querySelector('#driveSyncStatus');
         const driveSaveBtn = dialog.querySelector('#saveDriveSettingsBtn');
         const driveUploadBtn = dialog.querySelector('#uploadDriveConfigBtn');
         const driveDownloadBtn = dialog.querySelector('#downloadDriveConfigBtn');
+        let driveConfigCollapsed = false;
+        let driveRequestModeValue = 'default';
 
         const syncFields = Array.from(dialog.querySelectorAll('.cttf-sync-field'));
         const getFieldTextarea = (field) => field ? field.querySelector('.cttf-sync-textarea') : null;
@@ -7750,6 +8593,9 @@
         };
 
         const setDriveControlsVisibility = (visible) => {
+            if (driveControlsWrapper) {
+                driveControlsWrapper.style.display = visible ? 'flex' : 'none';
+            }
             if (driveControlsContainer) {
                 driveControlsContainer.style.display = visible ? 'flex' : 'none';
             }
@@ -7768,11 +8614,35 @@
         };
 
         const hydrateDriveInputs = (settings) => {
-            const source = settings || driveSettingsSnapshot || {};
+            const source = settings || cachedDriveSettings || {
+                clientId: '',
+                clientSecret: '',
+                refreshToken: '',
+                fileName: DEFAULT_DRIVE_FILE_NAME,
+                requestMode: 'default',
+                configCollapsed: false
+            };
             if (driveClientIdInput) driveClientIdInput.value = source.clientId || '';
             if (driveClientSecretInput) driveClientSecretInput.value = source.clientSecret || '';
             if (driveRefreshTokenInput) driveRefreshTokenInput.value = source.refreshToken || '';
             if (driveFileNameInput) driveFileNameInput.value = (source.fileName || DEFAULT_DRIVE_FILE_NAME);
+            driveRequestModeValue = source.requestMode === 'adguard' ? 'adguard' : 'default';
+            if (driveRequestModeButtons.length) {
+                driveRequestModeButtons.forEach((btn) => {
+                    const active = btn.dataset.driveRequestMode === driveRequestModeValue;
+                    btn.style.background = active ? 'var(--primary-color, #3B82F6)' : 'transparent';
+                    btn.style.color = active ? '#ffffff' : 'var(--text-color, #333333)';
+                    btn.style.borderColor = active ? 'var(--primary-color, #3B82F6)' : 'var(--border-color, #d1d5db)';
+                });
+            }
+            if (driveConfigFields && driveConfigFoldArrow) {
+                driveConfigCollapsed = source.configCollapsed === true;
+                driveConfigFields.style.display = driveConfigCollapsed ? 'none' : 'flex';
+                driveConfigFoldArrow.textContent = driveConfigCollapsed ? '▶' : '▼';
+            }
+            if (driveSaveRow) {
+                driveSaveRow.style.display = driveConfigCollapsed ? 'none' : 'flex';
+            }
             syncFields.forEach((field) => {
                 const textarea = getFieldTextarea(field);
                 if (field.dataset.secret === 'true') {
@@ -7790,7 +8660,7 @@
 
         const applyDriveInputChanges = () => {
             if (!driveSyncService || typeof driveSyncService.updateSettings !== 'function') {
-                return;
+                return null;
             }
             const nextSettings = {
                 enabled: true,
@@ -7799,9 +8669,12 @@
                 refreshToken: driveRefreshTokenInput ? driveRefreshTokenInput.value.trim() : '',
                 fileName: driveFileNameInput
                     ? (driveFileNameInput.value.trim() || DEFAULT_DRIVE_FILE_NAME)
-                    : DEFAULT_DRIVE_FILE_NAME
+                    : DEFAULT_DRIVE_FILE_NAME,
+                requestMode: driveRequestModeValue,
+                configCollapsed: driveConfigCollapsed === true
             };
-            driveSettingsSnapshot = driveSyncService.updateSettings(nextSettings);
+            cachedDriveSettings = driveSyncService.updateSettings(nextSettings);
+            return cachedDriveSettings;
         };
 
         const ensureDriveModuleEnabled = async () => {
@@ -7811,7 +8684,7 @@
                 return null;
             }
             toggleDriveButtons(true);
-            setDriveModuleStatus('info', t('正在通过 require 加载 Drive 同步模块…'));
+            setDriveModuleStatus('info', t('正在初始化 Drive 同步模块…'));
             try {
                 const service = await ensureDriveSyncService();
                 driveSyncService = service;
@@ -7820,12 +8693,12 @@
                 }
                 const updatedSettings = service && typeof service.updateSettings === 'function'
                     ? service.updateSettings({ enabled: true })
-                    : (service && typeof service.getSettings === 'function' ? service.getSettings() : persistDriveSettingsSnapshot({ enabled: true }));
-                driveSettingsSnapshot = updatedSettings || driveSettingsSnapshot;
+                    : (service && typeof service.getSettings === 'function' ? service.getSettings() : cachedDriveSettings);
+                cachedDriveSettings = updatedSettings || cachedDriveSettings;
                 setDriveControlsVisibility(true);
-                hydrateDriveInputs(driveSettingsSnapshot);
+                hydrateDriveInputs(cachedDriveSettings);
                 toggleDriveButtons(false);
-                setDriveModuleStatus('success', t('Drive 同步模块已加载。'));
+                setDriveModuleStatus('info', '');
                 return service;
             } catch (error) {
                 console.error('Drive module load failed:', error);
@@ -7842,35 +8715,314 @@
             return formatDriveModuleLoadError;
         };
 
+        const parseDriveConfigContent = (content) => {
+            try {
+                const parsed = JSON.parse(content || '{}');
+                if (!parsed || typeof parsed !== 'object') {
+                    throw new Error(t('云端配置格式无效！'));
+                }
+                return parsed;
+            } catch (error) {
+                const err = new Error(t('云端配置格式无效！'));
+                err.original = error;
+                throw err;
+            }
+        };
+
+        const fetchRemoteDriveConfig = async (service) => {
+            try {
+                const result = await service.syncDownloadConfigFromDrive();
+                const parsedConfig = parseDriveConfigContent(result?.content ?? '');
+                return {
+                    parsedConfig,
+                    meta: result,
+                    notFound: false
+                };
+            } catch (error) {
+                if (error && error.code === 'NOT_FOUND') {
+                    return { parsedConfig: null, meta: null, notFound: true };
+                }
+                throw error;
+            }
+        };
+
+        const showDriveDiffChoiceDialog = ({ remoteConfig, mode = 'download' }) => new Promise((resolve) => {
+            if (currentConfirmOverlay) {
+                closeExistingOverlay(currentConfirmOverlay);
+            }
+
+            const overlay = document.createElement('div');
+            overlay.classList.add('drive-diff-choice-overlay');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: var(--overlay-bg, rgba(0, 0, 0, 0.5));
+                backdrop-filter: blur(2px);
+                z-index: 13500;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            `;
+
+            const dialog = document.createElement('div');
+            dialog.classList.add('drive-diff-choice-dialog');
+            dialog.style.cssText = `
+                background-color: var(--dialog-bg, #ffffff);
+                color: var(--text-color, #333333);
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 12px 28px var(--shadow-color, rgba(15, 23, 42, 0.28));
+                border: 1px solid var(--border-color, #e5e7eb);
+                transition: transform 0.3s ease, opacity 0.3s ease;
+                width: 560px;
+                max-width: 94vw;
+                transform: scale(0.96);
+                position: relative;
+            `;
+
+            const statsOf = (config) => {
+                const folderCount = Object.keys(config?.folders || {}).length;
+                const buttonCount = Object.values(config?.folders || {}).reduce((sum, folder) => {
+                    return sum + Object.keys(folder.buttons || {}).length;
+                }, 0);
+                return { folderCount, buttonCount };
+            };
+
+            const localStats = statsOf(buttonConfig);
+            const remoteStats = statsOf(remoteConfig);
+            const actionLabel = mode === 'upload'
+                ? t('当前操作：上传到 Drive')
+                : t('当前操作：从 Drive 拉取');
+
+            setTrustedHTML(dialog, `
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px;">
+                    <h3 style="
+                        margin: 0;
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: var(--text-color, #333333);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    ">
+                        ☁️ ${t('检测到云端与本地配置存在差异')}
+                    </h3>
+                    <span style="
+                        font-size: 12px;
+                        padding: 4px 8px;
+                        border-radius: 999px;
+                        background-color: rgba(59, 130, 246, 0.12);
+                        color: var(--info-color, #4F46E5);
+                        border: 1px solid rgba(59, 130, 246, 0.25);
+                    ">${actionLabel}</span>
+                </div>
+
+                <p style="
+                    margin: 0 0 14px 0;
+                    font-size: 13px;
+                    color: var(--muted-text-color, #6b7280);
+                    line-height: 1.5;
+                ">
+                    ${t('请选择以本地或云端配置为准，点击“查看差异”可展开详细对比。')}
+                </p>
+
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 12px;
+                    margin-bottom: 16px;
+                ">
+                    <div style="
+                        border: 1px solid var(--border-color, #e5e7eb);
+                        border-radius: 8px;
+                        padding: 12px;
+                        background-color: var(--button-bg, #f3f4f6);
+                    ">
+                        <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-color, #333333);">
+                            ${t('当前配置')}
+                        </div>
+                        <div style="font-size: 12px; color: var(--muted-text-color, #6b7280);">
+                            ${localStats.folderCount} ${t('个文件夹')} · ${localStats.buttonCount} ${t('个按钮')}
+                        </div>
+                    </div>
+                    <div style="
+                        border: 1px solid var(--info-color, #4F46E5);
+                        border-radius: 8px;
+                        padding: 12px;
+                        background-color: rgba(79, 70, 229, 0.06);
+                    ">
+                        <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--info-color, #4F46E5);">
+                            ${t('云端配置')}
+                        </div>
+                        <div style="font-size: 12px; color: var(--info-color, #4F46E5);">
+                            ${remoteStats.folderCount} ${t('个文件夹')} · ${remoteStats.buttonCount} ${t('个按钮')}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                ">
+                    <button id="driveViewDiffBtn" style="
+                        ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                        background-color: var(--button-bg, #f3f4f6);
+                        color: var(--text-color, #333333);
+                        border: 1px solid var(--border-color, #e5e7eb);
+                        border-radius: 6px;
+                    ">${t('查看差异')}</button>
+                    <div style="display:flex; gap: 8px; align-items:center; flex-wrap: wrap; justify-content: flex-end;">
+                        <button id="driveUseLocalBtn" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            background-color: var(--success-color, #22c55e);
+                            color: white;
+                            border-radius:6px;
+                        ">${t('以本地为准（上传到云端）')}</button>
+                        <button id="driveUseRemoteBtn" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            background-color: var(--info-color, #4F46E5);
+                            color: white;
+                            border-radius:6px;
+                        ">${t('以云端为准（覆盖本地）')}</button>
+                        <button id="cancelDriveSyncBtn" style="
+                            ${Object.entries(styles.button).map(([key, value]) => `${key}:${value}`).join(';')};
+                            background-color: var(--cancel-color, #6B7280);
+                            color: white;
+                            border-radius:6px;
+                        ">${t('取消')}</button>
+                    </div>
+                </div>
+            `);
+
+            overlay.appendChild(dialog);
+            overlay.style.pointerEvents = 'auto';
+            appendToOverlayLayer(overlay);
+            currentConfirmOverlay = overlay;
+
+            const closeDialog = (result) => {
+                if (currentDiffOverlay) {
+                    if (typeof currentDiffOverlay.__cttfCloseDiff === 'function') {
+                        currentDiffOverlay.__cttfCloseDiff();
+                    } else {
+                        closeExistingOverlay(currentDiffOverlay);
+                        currentDiffOverlay = null;
+                    }
+                }
+                closeExistingOverlay(overlay);
+                if (currentConfirmOverlay === overlay) {
+                    currentConfirmOverlay = null;
+                }
+                resolve(result);
+            };
+
+            const diffBtn = dialog.querySelector('#driveViewDiffBtn');
+            if (diffBtn) {
+                diffBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    try {
+                        showImportDiffPreview(buttonConfig, remoteConfig, {
+                            currentLabel: t('当前配置'),
+                            importedLabel: t('云端配置')
+                        });
+                    } catch (error) {
+                        console.error('[CTTF] Drive diff preview failed:', error);
+                    }
+                });
+            }
+
+            const useLocalBtn = dialog.querySelector('#driveUseLocalBtn');
+            if (useLocalBtn) {
+                useLocalBtn.addEventListener('click', () => closeDialog('local'));
+            }
+            const useRemoteBtn = dialog.querySelector('#driveUseRemoteBtn');
+            if (useRemoteBtn) {
+                useRemoteBtn.addEventListener('click', () => closeDialog('remote'));
+            }
+            const cancelBtn = dialog.querySelector('#cancelDriveSyncBtn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => closeDialog('cancel'));
+            }
+
+            overlay.addEventListener('click', (event) => {
+                if (event.target === overlay) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+            });
+
+            setTimeout(() => {
+                overlay.style.opacity = '1';
+                dialog.style.transform = 'scale(1)';
+            }, 10);
+        });
+
         const initializeDriveToggle = () => {
             if (!driveSyncToggle) return;
-            driveSyncToggle.checked = driveSettingsSnapshot.enabled === true;
+            driveSyncToggle.checked = driveHostPrefs.enabled === true;
             if (driveSyncToggle.checked) {
                 ensureDriveModuleEnabled();
             } else {
                 setDriveControlsVisibility(false);
-                setDriveModuleStatus('info', t('Drive 同步默认关闭，开启后再加载。'));
+                setDriveModuleStatus('info', t('Drive 同步默认关闭，开启后再启用。'));
             }
             driveSyncToggle.addEventListener('change', async () => {
                 const enabled = driveSyncToggle.checked;
-                persistDriveSettingsSnapshot({ enabled });
+                persistDriveHostPrefs({ enabled });
                 if (enabled) {
                     await ensureDriveModuleEnabled();
                 } else {
                     if (driveSyncService && typeof driveSyncService.updateSettings === 'function') {
-                        driveSettingsSnapshot = driveSyncService.updateSettings({ enabled: false });
+                        cachedDriveSettings = driveSyncService.updateSettings({ enabled: false });
                     } else {
-                        driveSettingsSnapshot.enabled = false;
-                        persistDriveSettingsSnapshot({ enabled: false });
+                        cachedDriveSettings = { ...(cachedDriveSettings || {}), enabled: false };
                     }
                     setDriveControlsVisibility(false);
-                    setDriveModuleStatus('info', t('已关闭 Drive 同步模块。'));
+                    setDriveModuleStatus('info', '');
                     setDriveStatus('info', '');
                 }
             });
         };
 
         initializeDriveToggle();
+
+        if (driveRequestModeButtons.length) {
+            driveRequestModeButtons.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const val = btn.dataset.driveRequestMode === 'adguard' ? 'adguard' : 'default';
+                    driveRequestModeValue = val;
+                    if (driveRequestModeButtons.length) {
+                        driveRequestModeButtons.forEach((b) => {
+                            const active = b.dataset.driveRequestMode === driveRequestModeValue;
+                            b.style.background = active ? 'var(--primary-color, #3B82F6)' : 'transparent';
+                            b.style.color = active ? '#ffffff' : 'var(--text-color, #333333)';
+                            b.style.borderColor = active ? 'var(--primary-color, #3B82F6)' : 'var(--border-color, #d1d5db)';
+                        });
+                    }
+                    applyDriveInputChanges();
+                });
+            });
+        }
+
+        if (driveConfigFoldToggle && driveConfigFields && driveConfigFoldArrow) {
+            driveConfigFoldToggle.addEventListener('click', () => {
+                driveConfigCollapsed = !driveConfigCollapsed;
+                driveConfigFields.style.display = driveConfigCollapsed ? 'none' : 'flex';
+                driveConfigFoldArrow.textContent = driveConfigCollapsed ? '▶' : '▼';
+                if (driveSaveRow) {
+                    driveSaveRow.style.display = driveConfigCollapsed ? 'none' : 'flex';
+                }
+                applyDriveInputChanges();
+            });
+        }
 
         if (driveSaveBtn) {
             driveSaveBtn.addEventListener('click', async () => {
@@ -7894,17 +9046,51 @@
                     setDriveStatus('error', t('请先填写完整的 Drive 凭据。'));
                     return;
                 }
+                const formatter = formatterFromService(service);
                 toggleDriveButtons(true);
-                setDriveStatus('info', t('正在上传到 Drive…'));
+                setDriveStatus('info', t('正在检查云端配置…'));
                 try {
+                    const remote = await fetchRemoteDriveConfig(service);
+                    if (remote.notFound) {
+                        setDriveStatus('info', t('未找到云端配置文件。'));
+                        await service.syncUploadConfigToDrive(JSON.stringify(buttonConfig, null, 2));
+                        cachedDriveSettings = service.getSettings ? service.getSettings() : cachedDriveSettings;
+                        hydrateDriveInputs(cachedDriveSettings);
+                        setDriveStatus('success', t('已将本地配置上传到 Drive。'));
+                        return;
+                    }
+                    const remoteConfig = remote.parsedConfig;
+                    if (configsStructurallyEqual(buttonConfig, remoteConfig)) {
+                        setDriveStatus('success', t('云端配置与本地完全相同，无需更新。'));
+                        return;
+                    }
+
+                    const decision = await showDriveDiffChoiceDialog({
+                        remoteConfig,
+                        mode: 'upload'
+                    });
+
+                    if (decision === 'cancel') {
+                        setDriveStatus('info', t('操作已取消，配置保持不变。'));
+                        return;
+                    }
+
+                    if (decision === 'remote') {
+                        applyConfigFromRemote(remoteConfig);
+                        cachedDriveSettings = (remote.meta && remote.meta.settings) || (service.getSettings ? service.getSettings() : cachedDriveSettings);
+                        hydrateDriveInputs(cachedDriveSettings);
+                        setDriveStatus('success', t('已使用云端配置覆盖本地，未上传本地修改。'));
+                        return;
+                    }
+
                     await service.syncUploadConfigToDrive(JSON.stringify(buttonConfig, null, 2));
-                    driveSettingsSnapshot = service.getSettings ? service.getSettings() : driveSettingsSnapshot;
-                    hydrateDriveInputs(driveSettingsSnapshot);
-                    setDriveStatus('success', t('配置已与 Drive 同步。'));
+                    cachedDriveSettings = service.getSettings ? service.getSettings() : cachedDriveSettings;
+                    hydrateDriveInputs(cachedDriveSettings);
+                    setDriveStatus('success', t('已将本地配置上传到 Drive。'));
                 } catch (error) {
                     console.error('Drive upload failed:', error);
-                    const formatter = formatterFromService(service);
-                    setDriveStatus('error', formatter(error));
+                    const message = error?.message || formatter(error);
+                    setDriveStatus('error', message);
                 } finally {
                     toggleDriveButtons(false);
                 }
@@ -7924,25 +9110,47 @@
                     setDriveStatus('error', t('请先填写完整的 Drive 凭据。'));
                     return;
                 }
+                const formatter = formatterFromService(service);
                 toggleDriveButtons(true);
-                setDriveStatus('info', t('正在从 Drive 下载配置…'));
+                setDriveStatus('info', t('正在检查云端配置…'));
                 try {
-                    const result = await service.syncDownloadConfigFromDrive();
-                    const content = result?.content ?? '';
-                    let parsedConfig;
-                    try {
-                        parsedConfig = JSON.parse(content || '{}');
-                    } catch (error) {
-                        throw new Error(t('云端配置格式无效！'));
+                    const remote = await fetchRemoteDriveConfig(service);
+                    if (remote.notFound) {
+                        setDriveStatus('error', t('未找到云端配置文件。'));
+                        return;
                     }
-                    applyConfigFromRemote(parsedConfig);
-                    driveSettingsSnapshot = (result && result.settings) || (service.getSettings ? service.getSettings() : driveSettingsSnapshot);
-                    hydrateDriveInputs(driveSettingsSnapshot);
-                    setDriveStatus('success', t('配置已与 Drive 同步。'));
+                    const remoteConfig = remote.parsedConfig;
+                    if (configsStructurallyEqual(buttonConfig, remoteConfig)) {
+                        setDriveStatus('success', t('云端配置与本地完全相同，无需更新。'));
+                        return;
+                    }
+
+                    const decision = await showDriveDiffChoiceDialog({
+                        remoteConfig,
+                        mode: 'download'
+                    });
+
+                    if (decision === 'cancel') {
+                        setDriveStatus('info', t('操作已取消，配置保持不变。'));
+                        return;
+                    }
+
+                    if (decision === 'local') {
+                        await service.syncUploadConfigToDrive(JSON.stringify(buttonConfig, null, 2));
+                        cachedDriveSettings = service.getSettings ? service.getSettings() : cachedDriveSettings;
+                        hydrateDriveInputs(cachedDriveSettings);
+                        setDriveStatus('success', t('已将本地配置上传到 Drive。'));
+                        return;
+                    }
+
+                    applyConfigFromRemote(remoteConfig);
+                    cachedDriveSettings = (remote.meta && remote.meta.settings) || (service.getSettings ? service.getSettings() : cachedDriveSettings);
+                    hydrateDriveInputs(cachedDriveSettings);
+                    setDriveStatus('success', t('已使用云端配置覆盖本地，并完成同步。'));
                 } catch (error) {
                     console.error('Drive download failed:', error);
-                    const formatter = formatterFromService(service);
-                    setDriveStatus('error', formatter(error));
+                    const message = error?.message || formatter(error);
+                    setDriveStatus('error', message);
                 } finally {
                     toggleDriveButtons(false);
                 }
@@ -8057,7 +9265,7 @@
         });
     };
 /* -------------------------------------------------------------------------- *
- * Module 05 · Automation rules dialogs and submission helpers
+ * Module 06 · Automation rules dialogs and submission helpers
  * -------------------------------------------------------------------------- */
 
 let currentAutomationOverlay = null;
@@ -9211,7 +10419,7 @@ function showStyleSettingsDialog() {
 
 }
 /* -------------------------------------------------------------------------- *
- * Module 06 · Domain-specific style configuration & runtime helpers
+ * Module 07 · Domain-specific style configuration & runtime helpers
  * -------------------------------------------------------------------------- */
 
     // Domain style helpers shared across modules --------------------------------
@@ -10474,7 +11682,7 @@ function isValidDomainInput(str) {
     return true;
 }
 /* -------------------------------------------------------------------------- *
- * Module 07 · Initialization workflow and runtime observers
+ * Module 08 · Initialization workflow and runtime observers
  * -------------------------------------------------------------------------- */
 
     const initialize = () => {
