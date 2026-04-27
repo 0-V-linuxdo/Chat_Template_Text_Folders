@@ -22,13 +22,6 @@
 
 </details>
 
-<details open>
-<summary>安装步骤</summary>
-  
-用户脚本 userscript 安装：
-[点击安装 用户脚本](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.user.js)
-</details>
-
 <details>
 <summary>支持的浏览器</summary>
   
