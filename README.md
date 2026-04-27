@@ -65,7 +65,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=claude.ai&amp;sz=32" width="20" height="20" alt="Claude"> | Claude | `https://claude.*/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=gemini.google.com&amp;sz=32" width="20" height="20" alt="Gemini"> | Gemini | `https://gemini.google.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=aistudio.google.com&amp;sz=32" width="20" height="20" alt="Google AI Studio"> | Google AI Studio | `https://aistudio.google.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=business.gemini.google&amp;sz=32" width="20" height="20" alt="Gemini Business"> | Gemini Business | `https://business.gemini.google/*` | ❌ |  |
+| <img src="https://auth.business.gemini.google/favicon.ico" width="20" height="20" alt="Gemini Business"> | Gemini Business | `https://business.gemini.google/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=copilot.microsoft.com&amp;sz=32" width="20" height="20" alt="Microsoft Copilot"> | Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=grok.com&amp;sz=32" width="20" height="20" alt="Grok"> | Grok | `https://grok.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=grok.dairoot.cn&amp;sz=32" width="20" height="20" alt="Grok 镜像"> | Grok 镜像 | `https://grok.dairoot.cn/*` | ✅ |  |
@@ -80,8 +80,8 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=arena.ai&amp;sz=32" width="20" height="20" alt="Arena"> | Arena | `https://arena.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=manus.im&amp;sz=32" width="20" height="20" alt="Manus"> | Manus | `https://manus.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=kagi.com&amp;sz=32" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://kagi.com/assistant*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=app.chathub.gg&amp;sz=32" width="20" height="20" alt="ChatHub"> | ChatHub | `https://app.chathub.gg/*` | ✅ | 存在模型掺水问题 |
+| <img src="./assets/kagi-assistant-icon.svg" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://kagi.com/assistant*` | ✅ |  |
+| <img src="https://www.google.com/s2/favicons?domain=app.chathub.gg&amp;sz=32" width="20" height="20" alt="ChatHub"> | ChatHub | `https://app.chathub.gg/*` | ✅ | ⚠️ 不推荐订阅！存在模型掺水问题！ |
 | <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=web.tabbitbrowser.com&amp;sz=32" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |
