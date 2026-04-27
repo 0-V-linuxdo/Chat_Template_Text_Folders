@@ -626,10 +626,10 @@
   };
 
   // src/features/domain-style/official-style-bundle.generated.js
-  var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
+  var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
     "version": "[20260427] v1.0.2",
-    "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
+    "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
       {
