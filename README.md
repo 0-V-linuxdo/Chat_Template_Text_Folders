@@ -80,7 +80,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=arena.ai&amp;sz=32" width="20" height="20" alt="Arena"> | Arena | `https://arena.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=manus.im&amp;sz=32" width="20" height="20" alt="Manus"> | Manus | `https://manus.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
-| <img src="./assets/kagi-assistant-icon.svg" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://kagi.com/assistant*` | ✅ |  |
+| <img src="https://kagi.com/favicon-assistant-32x32.png" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://kagi.com/assistant*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=app.chathub.gg&amp;sz=32" width="20" height="20" alt="ChatHub"> | ChatHub | `https://app.chathub.gg/*` | ✅ | ⚠️ 不推荐订阅！存在模型掺水问题！ |
 | <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
