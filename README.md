@@ -60,35 +60,35 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 <details>
 <summary>支持的AI网页</summary>
   
-| 名称 | 网址 | 是否内置样式 |
-|---|---|:---:|
-| ChatGPT | `https://chatgpt.com/*` | ✅ |
-| Chat01 | `https://chat01.ai/*` | ✅ |
-| Claude | `https://claude.*/*` | ✅ |
-| Gemini | `https://gemini.google.com/*` | ✅ |
-| Google AI Studio | `https://aistudio.google.com/*` | ✅ |
-| Gemini Business | `https://business.gemini.google/*` | ❌ |
-| Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |
-| Grok | `https://grok.com/*` | ✅ |
-| Grok 镜像 | `https://grok.dairoot.cn/*` | ✅ |
-| X Grok | `https://x.com/i/grok*` | ✅ |
-| DeepSeek | `https://chat.deepseek.com/*` | ❌ |
-| Z.ai | `https://chat.z.ai/*` | ❌ |
-| Qwen | `https://chat.qwen.ai/*` | ❌ |
-| Anuneko | `https://anuneko.com/*` | ❌ |
-| Cerebr | `https://cerebr.yym68686.top/*` | ✅ |
-| Mistral | `https://chat.mistral.ai/*` | ❌ |
-| Perplexity | `https://*.perplexity.ai/*` | ✅ |
-| Arena | `https://arena.ai/*` | ✅ |
-| Manus | `https://manus.im/*` | ✅ |
-| Poe | `https://poe.com/*` | ✅ |
-| Kagi Assistant | `https://kagi.com/assistant*` | ✅ |
-| ChatHub | `https://app.chathub.gg/*` | ✅ |
-| Monica | `https://monica.im/*` | ✅ |
-| Meta AI | `https://meta.ai/*` | ❌ |
-| Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ |
-| TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |
-| Notion | `https://www.notion.so/*` | ✅ |
+| 名称 | 网址 | 内置样式 | 备注 |
+|---|---|:---:|---|
+| ChatGPT | `https://chatgpt.com/*` | ✅ |  |
+| Chat01 | `https://chat01.ai/*` | ✅ |  |
+| Claude | `https://claude.*/*` | ✅ |  |
+| Gemini | `https://gemini.google.com/*` | ✅ |  |
+| Google AI Studio | `https://aistudio.google.com/*` | ✅ |  |
+| Gemini Business | `https://business.gemini.google/*` | ❌ |  |
+| Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |  |
+| Grok | `https://grok.com/*` | ✅ |  |
+| Grok 镜像 | `https://grok.dairoot.cn/*` | ✅ |  |
+| X Grok | `https://x.com/i/grok*` | ✅ |  |
+| DeepSeek | `https://chat.deepseek.com/*` | ❌ |  |
+| Z.ai | `https://chat.z.ai/*` | ❌ |  |
+| Qwen | `https://chat.qwen.ai/*` | ❌ | 不支持 AdGuard 注入，因为网页严格限制 JS 来源 |
+| Anuneko | `https://anuneko.com/*` | ❌ |  |
+| Cerebr | `https://cerebr.yym68686.top/*` | ✅ |  |
+| Mistral | `https://chat.mistral.ai/*` | ❌ |  |
+| Perplexity | `https://*.perplexity.ai/*` | ✅ |  |
+| Arena | `https://arena.ai/*` | ✅ |  |
+| Manus | `https://manus.im/*` | ✅ |  |
+| Poe | `https://poe.com/*` | ✅ |  |
+| Kagi Assistant | `https://kagi.com/assistant*` | ✅ |  |
+| ChatHub | `https://app.chathub.gg/*` | ✅ | 存在模型掺水问题 |
+| Monica | `https://monica.im/*` | ✅ |  |
+| Meta AI | `https://meta.ai/*` | ❌ |  |
+| Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |
+| TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
+| Notion | `https://www.notion.so/*` | ✅ |  |
 
 提示：
 在脚本管理器中，修改： `// @match` 
