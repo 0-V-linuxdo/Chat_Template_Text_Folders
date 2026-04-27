@@ -7,8 +7,6 @@
   </a>
 </h1>
 
-完整源码请查看 [`dev` 分支](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/tree/dev)。
-
 <details open>
 <summary>简介</summary>
   
@@ -89,7 +87,6 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |
 | TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
 | Notion | `https://www.notion.so/*` | ✅ |  |
-
-提示：
-在脚本管理器中，修改： `// @match` 
 </details>
+
+完整源码请查看 [`dev` 分支](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/tree/dev)。
