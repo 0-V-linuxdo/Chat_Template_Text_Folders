@@ -16,7 +16,7 @@ const entryPath = path.join(rootDir, 'src', 'main.js');
 const officialUserStylePath = path.join(rootDir, 'userstyle', '[Chat] Template Text Folders.user.css');
 const generatedOfficialStyleBundlePath = path.join(rootDir, 'src', 'features', 'domain-style', 'official-style-bundle.generated.js');
 
-const OFFICIAL_STYLE_SOURCE_URL = 'https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css';
+const OFFICIAL_STYLE_SOURCE_URL = 'https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css';
 
 const NOTE_BANNER_WIDTH = 70;
 
