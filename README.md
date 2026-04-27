@@ -2,6 +2,8 @@
 
 # [Chat] Template Text Folders
 
+完整源码请查看 [`dev` 分支](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/tree/dev)。
+
 <details open>
 <summary>简介</summary>
   
