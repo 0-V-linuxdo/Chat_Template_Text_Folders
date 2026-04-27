@@ -89,4 +89,6 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | Notion | `https://www.notion.so/*` | ✅ |  |
 </details>
 
+---
+
 完整源码请查看 [`dev` 分支](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/tree/dev)。
