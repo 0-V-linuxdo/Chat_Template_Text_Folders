@@ -60,7 +60,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
   
 | 图标 | 名称 | 网址 | 内置样式 | 备注 |
 |:---:|---|---|:---:|---|
-| <img src="https://www.google.com/s2/favicons?domain=chatgpt.com&amp;sz=32" width="20" height="20" alt="ChatGPT"> | ChatGPT | `https://chatgpt.com/*` | ✅ |  |
+| <img src="https://chatgpt.com/favicon.ico" width="20" height="20" alt="ChatGPT"> | ChatGPT | `https://chatgpt.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=chat01.ai&amp;sz=32" width="20" height="20" alt="Chat01"> | Chat01 | `https://chat01.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=claude.ai&amp;sz=32" width="20" height="20" alt="Claude"> | Claude | `https://claude.*/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=gemini.google.com&amp;sz=32" width="20" height="20" alt="Gemini"> | Gemini | `https://gemini.google.com/*` | ✅ |  |
