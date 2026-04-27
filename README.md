@@ -1,8 +1,8 @@
-<a href="https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.user.js">
-  <img align="right" src="https://img.shields.io/badge/一键安装-userscript-2ea44f?style=for-the-badge" alt="一键安装 userscript"/>
-</a>
-
 <img src="https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg" alt="图标" width="60" height="60"/>
+
+<a href="https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.user.js">
+  <img align="right" src="https://img.shields.io/badge/%E2%AC%87-userscript-2ea44f?style=for-the-badge" alt="安装 userscript"/>
+</a>
 
 # [Chat] Template Text Folders
 
