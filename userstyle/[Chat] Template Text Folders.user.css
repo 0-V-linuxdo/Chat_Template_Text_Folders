@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260427] v1.0.2
+@version        [20260514] v1.0.0
 @license        MIT
 ==/UserStyle== */
 
@@ -109,10 +109,37 @@ div[data-placement="top-start"] .w-sideBarWidth {
 }
 /* @cttf-rule-id: official-monica-toolbar-space */
 /* @cttf-name: Monica - Reserve toolbar space */
+/* @cttf-toolbar-height: 40 */
+/* @cttf-toolbar-bottom-spacing: 6 */
 @-moz-document domain("monica.im") {
-/* Type 3️⃣: 为脚本按钮栏留出空间 */
-#root {
-    padding-bottom: 40px !important;
+/* [Monica] 按实际聊天页结构为底部脚本栏留出空间 */
+body[monica-version] {
+    --cttf-monica-toolbar-reserve: calc(52px + env(safe-area-inset-bottom, 0px));
+}
+
+body[monica-version] #root {
+    padding-bottom: 0 !important;
+}
+
+body[monica-version] div[class*="home-page--"],
+body[monica-version] div[class*="horizontal-view--"][class*="is-chat-tab-page--"],
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"] {
+    min-height: 0 !important;
+}
+
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"] {
+    padding-bottom: var(--cttf-monica-toolbar-reserve) !important;
+    box-sizing: border-box !important;
+}
+
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="scrollable"],
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="scroll-content"],
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="chat-list"] {
+    scroll-padding-bottom: var(--cttf-monica-toolbar-reserve) !important;
+}
+
+body[monica-version] #cttf-ui-host {
+    z-index: 1200 !important;
 }
 }
 /* @cttf-rule-id: official-monica-input-z-index */
@@ -120,14 +147,16 @@ div[data-placement="top-start"] .w-sideBarWidth {
 @-moz-document domain("monica.im") {
 /* [Monica] 辅助 */
 /* 显示层级 */
-div[class^="chat-input-v2--"][class^="chat-input--"],
-div[class^="chat-input-v2-"][class^="chat-input-"] {
-    z-index: 100 !important;
+body[monica-version] div[class*="chat-input-v2--"][class*="chat-input--"],
+body[monica-version] div[class*="chat-input-v2-"][class*="chat-input-"],
+body[monica-version] div[class*="chat-input--"] {
+    position: relative;
+    z-index: 110 !important;
 }
 }
 /* @cttf-rule-id: official-monica-search-hide-toolbar */
 /* @cttf-name: Monica - Hide toolbar on home search */
-@-moz-document url("https://monica.im/home/search") {
+@-moz-document url-prefix("https://monica.im/home/search") {
 /* [Monica] 辅助 */
 /* 在特定页面隐藏 */
 #cttf-ui-host {
@@ -137,6 +166,15 @@ div[class^="chat-input-v2-"][class^="chat-input-"] {
 
 #root {
     padding-bottom: 0px !important;
+}
+
+body[monica-version] {
+    --cttf-monica-toolbar-reserve: 0px;
+}
+
+body[monica-version] div[class*="view-wrapper--"][data-key="chat"],
+body[monica-version] div[class*="view-wrapper--"][data-key="search"] {
+    padding-bottom: 0 !important;
 }
 }
 /* @cttf-rule-id: official-chat01-account-hide-toolbar */

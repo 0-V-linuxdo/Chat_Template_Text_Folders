@@ -29,7 +29,7 @@ import {
 } from '../features/domain-style/style-format.js';
 import { cloneSerializable } from '../shared/common.js';
 
-console.log('🎉 [Chat] Template Text Folders [20260427] v1.0.2 🎉');
+console.log('🎉 [Chat] Template Text Folders [20260514] v1.0.0 🎉');
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {

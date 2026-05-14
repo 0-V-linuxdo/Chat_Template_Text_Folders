@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260427] v1.0.2
+// @name         [Chat] Template Text Folders [20260514] v1.0.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260427] v1.0.2
-// @update-log   新增 ChatHub 窄屏/移动端默认适配，使用位移抬升输入区，避免遮挡和布局空档。
+// @version      [20260514] v1.0.0
+// @update-log   更新 Monica 页面内置样式，按实际聊天页结构为底部脚本栏预留空间。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
