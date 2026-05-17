@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260514] v1.0.0
+@version        [20260517] v1.0.0
 @license        MIT
 ==/UserStyle== */
 
@@ -66,6 +66,34 @@ main {
     div[class*="h-full"][class*="overflow-y-auto"] > div[class*="relative"][class*="flex"][class*="flex-col"][class*="pb-14"] {
         padding-bottom: var(--cttf-chathub-mobile-scroll-space) !important;
     }
+}
+}
+/* @cttf-rule-id: official-lobehub-toolbar-space */
+/* @cttf-name: LobeHub - Reserve toolbar space */
+/* @cttf-toolbar-height: 40 */
+/* @cttf-toolbar-bottom-spacing: 6 */
+@-moz-document domain("app.lobehub.com") {
+/* [LobeHub] 辅助 */
+/* 为首页和对话页底部输入区预留脚本栏空间 */
+:root {
+    --cttf-lobehub-toolbar-reserve: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
+/* 首页：放大滚动容器底部留白，避免输入区和脚本栏贴得太近。 */
+div[style*="overflow-y: auto"][style*="padding-block: 44px 16vh"]:has(div[data-testid="chat-input"]) {
+    padding-bottom: calc(16vh + var(--cttf-lobehub-toolbar-reserve)) !important;
+    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;
+}
+
+/* 对话页：主滚动列需要额外底部空间，保证最后一条消息和输入框可见。 */
+div[style*="overflow-y: auto"][style*="position: relative"]:has(div[data-testid="chat-input"]) {
+    padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;
+    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;
+}
+
+/* 提高脚本栏层级，避免被 LobeHub 的浮层或底栏盖住。 */
+#cttf-ui-host {
+    z-index: 2147483647 !important;
 }
 }
 /* @cttf-rule-id: official-perplexity-toolbar-space */
