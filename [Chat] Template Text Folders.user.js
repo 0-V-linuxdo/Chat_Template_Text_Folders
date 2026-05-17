@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260514] v1.0.0
+// @name         [Chat] Template Text Folders [20260517] v1.0.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260514] v1.0.0
-// @update-log   更新 Monica 页面内置样式，按实际聊天页结构为底部脚本栏预留空间。
+// @version      [20260517] v1.0.0
+// @update-log   适配 LobeHub，新增 app.lobehub.com 匹配，并为首页与聊天页预留底部脚本栏空间。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -36,6 +36,7 @@
 // @match        https://poe.com/*
 // @match        https://kagi.com/assistant*
 // @match        https://app.chathub.gg/*
+// @match        https://app.lobehub.com/*
 // @match        https://monica.im/*
 // @match        https://meta.ai/*
 // @match        https://web.tabbitbrowser.com/*
@@ -628,7 +629,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260514] v1.0.0",
+    "version": "[20260517] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -705,6 +706,24 @@
         ],
         "cssCode": '@media (max-width: 639px) {\n    :root {\n        --cttf-chathub-mobile-input-shift: calc(28px + env(safe-area-inset-bottom));\n        --cttf-chathub-mobile-scroll-space: calc(84px + env(safe-area-inset-bottom));\n    }\n\n    /* 只做视觉位移，不使用 margin 重排 flex 面板，避免底部出现额外空档。 */\n    div[class*="group/panel"][class*="h-full"][class*="overflow-hidden"] > div[class*="relative"][class*="mt-3"][class*="mx-4"] {\n        transform: translateY(calc(-1 * var(--cttf-chathub-mobile-input-shift))) !important;\n        will-change: transform;\n    }\n\n    /* 输入区被视觉抬升后，给消息区补滚动余量，避免末尾内容被输入区/脚本栏遮住。 */\n    div[class*="h-full"][class*="overflow-y-auto"] > div[class*="relative"][class*="flex"][class*="flex-col"][class*="pb-14"] {\n        padding-bottom: var(--cttf-chathub-mobile-scroll-space) !important;\n    }\n}',
         "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-lobehub-toolbar-space",
+        "name": "LobeHub - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "app.lobehub.com"
+          }
+        ],
+        "cssCode": ':root {\n    --cttf-lobehub-toolbar-reserve: calc(88px + env(safe-area-inset-bottom, 0px));\n}\n\n/* 首页：放大滚动容器底部留白，避免输入区和脚本栏贴得太近。 */\ndiv[style*="overflow-y: auto"][style*="padding-block: 44px 16vh"]:has(div[data-testid="chat-input"]) {\n    padding-bottom: calc(16vh + var(--cttf-lobehub-toolbar-reserve)) !important;\n    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n}\n\n/* 对话页：主滚动列需要额外底部空间，保证最后一条消息和输入框可见。 */\ndiv[style*="overflow-y: auto"][style*="position: relative"]:has(div[data-testid="chat-input"]) {\n    padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n}\n\n/* 提高脚本栏层级，避免被 LobeHub 的浮层或底栏盖住。 */\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}',
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
         "favicon": ""
       },
       {
