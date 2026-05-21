@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260517] v1.0.0
+// @name         [Chat] Template Text Folders [20260521] v1.0.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260517] v1.0.0
-// @update-log   适配 LobeHub，新增 app.lobehub.com 匹配，并为首页与聊天页预留底部脚本栏空间。
+// @version      [20260521] v1.0.0
+// @update-log   适配 Google AI Studio prompts 页面，修复底部脚本按钮栏不可见问题。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -629,7 +629,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260517] v1.0.0",
+    "version": "[20260521] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -961,6 +961,24 @@
         "favicon": ""
       },
       {
+        "id": "official-aistudio-prompts-toolbar-space",
+        "name": "AI Studio - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "^https://aistudio\\.google\\.com/(?:app/)?prompts(?:$|[/?#]).*"
+          }
+        ],
+        "cssCode": ":root {\n    --cttf-aistudio-toolbar-reserve: calc(54px + env(safe-area-inset-bottom, 0px));\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}\n\nbody:has(ms-prompt-input-wrapper) main,\nbody:has(.prompt-input-wrapper-container) main {\n    padding-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nfooter:has(ms-prompt-input-wrapper),\nfooter:has(.prompt-input-wrapper-container),\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    scroll-margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}",
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
+        "favicon": ""
+      },
+      {
         "id": "official-aistudio-non-prompts-hide-toolbar",
         "name": "AI Studio - Hide toolbar outside prompts",
         "source": "official",
@@ -968,7 +986,7 @@
         "matchers": [
           {
             "type": "regexp",
-            "value": "https://aistudio\\.google\\.com/(?!prompts(?:$|[/?#])).*"
+            "value": "^https://aistudio\\.google\\.com/(?!app/prompts(?:$|[/?#])|prompts(?:$|[/?#])).*"
           }
         ],
         "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
