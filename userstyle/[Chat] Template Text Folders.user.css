@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260517] v1.0.0
+@version        [20260521] v1.0.0
 @license        MIT
 ==/UserStyle== */
 
@@ -235,9 +235,41 @@ body[monica-version] div[class*="view-wrapper--"][data-key="search"] {
     pointer-events: none !important;
 }
 }
+/* @cttf-rule-id: official-aistudio-prompts-toolbar-space */
+/* @cttf-name: AI Studio - Reserve toolbar space */
+/* @cttf-toolbar-height: 40 */
+/* @cttf-toolbar-bottom-spacing: 6 */
+@-moz-document regexp("^https://aistudio\\.google\\.com/(?:app/)?prompts(?:$|[/?#]).*") {
+/* [AI Studio] 辅助 */
+/* 为 prompts 页面底部脚本栏留出空间，并避免被输入区覆盖 */
+:root {
+    --cttf-aistudio-toolbar-reserve: calc(54px + env(safe-area-inset-bottom, 0px));
+}
+
+#cttf-ui-host {
+    z-index: 2147483647 !important;
+}
+
+body:has(ms-prompt-input-wrapper) main,
+body:has(.prompt-input-wrapper-container) main {
+    padding-bottom: var(--cttf-aistudio-toolbar-reserve) !important;
+}
+
+footer:has(ms-prompt-input-wrapper),
+footer:has(.prompt-input-wrapper-container),
+ms-prompt-input-wrapper,
+.prompt-input-wrapper-container {
+    margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;
+}
+
+ms-prompt-input-wrapper,
+.prompt-input-wrapper-container {
+    scroll-margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;
+}
+}
 /* @cttf-rule-id: official-aistudio-non-prompts-hide-toolbar */
 /* @cttf-name: AI Studio - Hide toolbar outside prompts */
-@-moz-document regexp("https://aistudio\\.google\\.com/(?!prompts(?:$|[/?#])).*") {
+@-moz-document regexp("^https://aistudio\\.google\\.com/(?!app/prompts(?:$|[/?#])|prompts(?:$|[/?#])).*") {
 /* [AI Studio] 辅助 */
 /* 在非 prompts 页面隐藏 */
 #cttf-ui-host {

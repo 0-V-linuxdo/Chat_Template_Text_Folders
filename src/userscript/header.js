@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260517] v1.0.0
+// @name         [Chat] Template Text Folders [20260521] v1.0.0
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260517] v1.0.0
-// @update-log   适配 LobeHub，新增 app.lobehub.com 匹配，并为首页与聊天页预留底部脚本栏空间。
+// @version      [20260521] v1.0.0
+// @update-log   适配 Google AI Studio prompts 页面，修复底部脚本按钮栏不可见问题。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*

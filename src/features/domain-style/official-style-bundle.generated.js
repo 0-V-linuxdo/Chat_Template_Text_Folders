@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260517] v1.0.0",
+    "version": "[20260521] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -335,6 +335,24 @@ const OFFICIAL_STYLE_BUNDLE = {
             "favicon": ""
         },
         {
+            "id": "official-aistudio-prompts-toolbar-space",
+            "name": "AI Studio - Reserve toolbar space",
+            "source": "official",
+            "enabled": true,
+            "matchers": [
+                {
+                    "type": "regexp",
+                    "value": "^https://aistudio\\.google\\.com/(?:app/)?prompts(?:$|[/?#]).*"
+                }
+            ],
+            "cssCode": ":root {\n    --cttf-aistudio-toolbar-reserve: calc(54px + env(safe-area-inset-bottom, 0px));\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}\n\nbody:has(ms-prompt-input-wrapper) main,\nbody:has(.prompt-input-wrapper-container) main {\n    padding-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nfooter:has(ms-prompt-input-wrapper),\nfooter:has(.prompt-input-wrapper-container),\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    scroll-margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}",
+            "layout": {
+                "height": 40,
+                "bottomSpacing": 6
+            },
+            "favicon": ""
+        },
+        {
             "id": "official-aistudio-non-prompts-hide-toolbar",
             "name": "AI Studio - Hide toolbar outside prompts",
             "source": "official",
@@ -342,7 +360,7 @@ const OFFICIAL_STYLE_BUNDLE = {
             "matchers": [
                 {
                     "type": "regexp",
-                    "value": "https://aistudio\\.google\\.com/(?!prompts(?:$|[/?#])).*"
+                    "value": "^https://aistudio\\.google\\.com/(?!app/prompts(?:$|[/?#])|prompts(?:$|[/?#])).*"
                 }
             ],
             "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
