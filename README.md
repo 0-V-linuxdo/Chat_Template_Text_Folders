@@ -86,7 +86,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=web.tabbitbrowser.com&amp;sz=32" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |
 | <img src="https://www.google.com/s2/favicons?domain=setapp.typingcloud.com&amp;sz=32" width="20" height="20" alt="TypingCloud SetApp"> | TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=www.notion.so&amp;sz=32" width="20" height="20" alt="Notion"> | Notion | `https://www.notion.so/*` | ✅ |  |
+| <img src="https://www.google.com/s2/favicons?domain=www.notion.so&amp;sz=32" width="20" height="20" alt="Notion"> | Notion | `https://www.notion.so/*`<br>`https://app.notion.com/*` | ✅ |  |
 </details>
 
 ---
