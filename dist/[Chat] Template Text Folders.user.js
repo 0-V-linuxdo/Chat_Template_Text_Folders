@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260521] v1.0.0
+// @name         [Chat] Template Text Folders [20260601] v1.0.1
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260521] v1.0.0
-// @update-log   适配 Google AI Studio prompts 页面，修复底部脚本按钮栏不可见问题。
+// @version      [20260601] v1.0.1
+// @update-log   新增 Notion app 域名匹配，并同步适配 app.notion.com 站点规则。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
@@ -43,6 +43,7 @@
 //
 // @match        https://setapp.typingcloud.com/*
 //
+// @match        https://app.notion.com/*
 // @match        https://www.notion.so/*
 //
 // @grant        GM_xmlhttpRequest
@@ -629,7 +630,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260521] v1.0.0",
+    "version": "[20260601] v1.0.1",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -1159,6 +1160,10 @@
           {
             "type": "regexp",
             "value": "https://www\\.notion\\.so/(?!ai|chat).*"
+          },
+          {
+            "type": "regexp",
+            "value": "https://app\\.notion\\.com/(?!ai|chat).*"
           }
         ],
         "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
@@ -1865,7 +1870,7 @@
   };
 
   // src/core/runtime-services.js
-  console.log("🎉 [Chat] Template Text Folders [20260514] v1.0.0 🎉");
+  console.log("🎉 [Chat] Template Text Folders [20260601] v1.0.1 🎉");
   var trustedHTMLPolicy = null;
   var resolveTrustedTypes = () => {
     if (trustedHTMLPolicy) {

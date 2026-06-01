@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260521] v1.0.0
+@version        [20260601] v1.0.1
 @license        MIT
 ==/UserStyle== */
 
@@ -357,7 +357,7 @@ ms-prompt-input-wrapper,
 }
 /* @cttf-rule-id: official-notion-non-ai-hide-toolbar */
 /* @cttf-name: Notion - Hide toolbar outside AI pages */
-@-moz-document regexp("https://www\\.notion\\.so/(?!ai|chat).*") {
+@-moz-document regexp("https://www\\.notion\\.so/(?!ai|chat).*"), regexp("https://app\\.notion\\.com/(?!ai|chat).*") {
 /* 在特定页面隐藏 */
 #cttf-ui-host {
     visibility: hidden !important;

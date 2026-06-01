@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260521] v1.0.0",
+    "version": "[20260601] v1.0.1",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/main/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -533,6 +533,10 @@ const OFFICIAL_STYLE_BUNDLE = {
                 {
                     "type": "regexp",
                     "value": "https://www\\.notion\\.so/(?!ai|chat).*"
+                },
+                {
+                    "type": "regexp",
+                    "value": "https://app\\.notion\\.com/(?!ai|chat).*"
                 }
             ],
             "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
