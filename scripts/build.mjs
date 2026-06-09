@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = path.join(rootDir, 'dist');
 const outputPath = path.join(outputDir, '[Chat] Template Text Folders.user.js');
-const legacyOutputPath = path.join(rootDir, '[Chat] Template Text Folders.user.js');
+const releaseOutputPath = path.join(rootDir, '[Chat] Template Text Folders.user.js');
 const legacyConfigOutputDir = path.join(outputDir, 'config');
 const legacyDriveOutputPath = path.join(outputDir, '[Chat] Template Text Folders.drive-sync.js');
 
@@ -128,7 +128,6 @@ async function generateOfficialStyleBundleArtifact() {
 
 function removeLegacyArtifacts() {
     const removablePaths = [
-        legacyOutputPath,
         legacyDriveOutputPath,
         legacyConfigOutputDir,
     ];
@@ -145,6 +144,11 @@ function removeLegacyArtifacts() {
         }
         console.log(`ℹ️ Removed legacy artifact: ${path.relative(rootDir, targetPath)}`);
     });
+}
+
+function syncReleaseArtifact() {
+    fs.copyFileSync(outputPath, releaseOutputPath);
+    console.log(`ℹ️ Synced release artifact: ${path.relative(rootDir, releaseOutputPath)}`);
 }
 
 async function runBuild() {
@@ -181,6 +185,7 @@ async function runBuild() {
     });
 
     removeLegacyArtifacts();
+    syncReleaseArtifact();
     console.log(`✅ Build complete: ${path.relative(rootDir, outputPath)}`);
 }
 

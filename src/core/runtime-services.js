@@ -972,6 +972,16 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                     name: 'Cerebr',
                     method: AUTO_SUBMIT_METHODS.ENTER,
                     favicon: generateDomainFavicon('cerebr.yym68686.top')
+                },
+                {
+                    domain: 'assistant.kagi.com',
+                    name: 'Kagi Assistant',
+                    method: AUTO_SUBMIT_METHODS.CLICK_SUBMIT,
+                    methodAdvanced: {
+                        variant: 'selector',
+                        selector: 'button[aria-label="Send message"], button[title="Send message"], button#submit[type="submit"], button[aria-label="Submit"][type="submit"]',
+                    },
+                    favicon: generateDomainFavicon('assistant.kagi.com')
                 }
             ],
             officialStyleBundle: createDefaultOfficialStyleBundle(),
@@ -1443,6 +1453,7 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
 
     const DEFAULT_DOMAIN_AUTO_SUBMIT_BACKFILL_DOMAINS = new Set([
         'cerebr.yym68686.top',
+        'assistant.kagi.com',
     ]);
 
     const normalizeDomainAutoSubmitDomain = (domain) => {
