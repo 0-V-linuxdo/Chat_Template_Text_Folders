@@ -62,7 +62,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 |:---:|---|---|:---:|---|
 | <img src="https://chatgpt.com/favicon.ico" width="20" height="20" alt="ChatGPT"> | ChatGPT | `https://chatgpt.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=chat01.ai&amp;sz=32" width="20" height="20" alt="Chat01"> | Chat01 | `https://chat01.ai/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=claude.ai&amp;sz=32" width="20" height="20" alt="Claude"> | Claude | `https://claude.*/*` | ✅ |  |
+| <img src="https://www.google.com/s2/favicons?domain=claude.ai&amp;sz=32" width="20" height="20" alt="Claude"> | Claude | `https://claude.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=gemini.google.com&amp;sz=32" width="20" height="20" alt="Gemini"> | Gemini | `https://gemini.google.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=aistudio.google.com&amp;sz=32" width="20" height="20" alt="Google AI Studio"> | Google AI Studio | `https://aistudio.google.com/*` | ✅ |  |
 | <img src="https://auth.business.gemini.google/favicon.ico" width="20" height="20" alt="Gemini Business"> | Gemini Business | `https://business.gemini.google/*` | ❌ |  |
@@ -74,7 +74,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=chat.z.ai&amp;sz=32" width="20" height="20" alt="Z.ai"> | Z.ai | `https://chat.z.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=chat.qwen.ai&amp;sz=32" width="20" height="20" alt="Qwen"> | Qwen | `https://chat.qwen.ai/*` | ❌ | 不支持 AdGuard 注入，因为网页严格限制 JS 来源 |
 | <img src="https://www.google.com/s2/favicons?domain=anuneko.com&amp;sz=32" width="20" height="20" alt="Anuneko"> | Anuneko | `https://anuneko.com/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=cerebr.yym68686.top&amp;sz=32" width="20" height="20" alt="Cerebr"> | Cerebr | `https://cerebr.yym68686.top/*` | ✅ | 暂只支持网页版，插件版没有适配最新的插件系统 |
+| <img src="https://www.google.com/s2/favicons?domain=cerebr.yym68686.top&amp;sz=32" width="20" height="20" alt="Cerebr"> | Cerebr | `https://cerebr.fugue.pro/*`<br>`https://cerebr.vercel.app/*`<br>`https://cerebr.yym68686.top/*`<br>`https://cerebr.pages.dev/*` | ✅ | 暂只支持网页版，插件版没有适配最新的插件系统 |
 | <img src="https://www.google.com/s2/favicons?domain=chat.mistral.ai&amp;sz=32" width="20" height="20" alt="Mistral"> | Mistral | `https://chat.mistral.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=perplexity.ai&amp;sz=32" width="20" height="20" alt="Perplexity"> | Perplexity | `https://*.perplexity.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=arena.ai&amp;sz=32" width="20" height="20" alt="Arena"> | Arena | `https://arena.ai/*` | ✅ |  |
