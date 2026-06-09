@@ -935,6 +935,13 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
         rules: [],
     };
 
+    const CEREBR_DOMAINS = [
+        'cerebr.fugue.pro',
+        'cerebr.vercel.app',
+        'cerebr.yym68686.top',
+        'cerebr.pages.dev',
+    ];
+
     const buildDefaultConfig = (locale = getLocale()) => {
         const defaultFolderName = t(DEFAULT_FOLDER_NAME_ID, null, locale);
         const toolButtons = createDefaultToolButtons(locale);
@@ -967,12 +974,12 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                     method: AUTO_SUBMIT_METHODS.ENTER,
                     favicon: generateDomainFavicon('chathub.gg')
                 },
-                {
-                    domain: 'cerebr.yym68686.top',
+                ...CEREBR_DOMAINS.map((domain) => ({
+                    domain,
                     name: 'Cerebr',
                     method: AUTO_SUBMIT_METHODS.ENTER,
-                    favicon: generateDomainFavicon('cerebr.yym68686.top')
-                },
+                    favicon: generateDomainFavicon(domain)
+                })),
                 {
                     domain: 'assistant.kagi.com',
                     name: 'Kagi Assistant',
@@ -1452,7 +1459,7 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
     };
 
     const DEFAULT_DOMAIN_AUTO_SUBMIT_BACKFILL_DOMAINS = new Set([
-        'cerebr.yym68686.top',
+        ...CEREBR_DOMAINS,
         'assistant.kagi.com',
     ]);
 

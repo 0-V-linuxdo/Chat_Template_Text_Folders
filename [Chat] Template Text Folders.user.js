@@ -1,15 +1,15 @@
 // ==UserScript==
-// @name         [Chat] Template Text Folders [20260609] v1.0.0
+// @name         [Chat] Template Text Folders [20260609] v1.0.1
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version      [20260609] v1.0.0
-// @update-log   适配 Kagi Assistant 新 UI（assistant.kagi.com），保留旧 kagi.com/assistant 兼容，并同步自动提交与内置样式规则。
+// @version      [20260609] v1.0.1
+// @update-log   修复 Claude 匹配规则语法，扩展 Cerebr 多域名支持，并同步内置样式与默认自动提交规则。
 //
 // @match        https://chatgpt.com/*
 // @match        https://chat01.ai/*
 //
-// @match        https://claude.*/*
+// @match        https://claude.ai/*
 //
 // @match        https://gemini.google.com/*
 // @match        https://aistudio.google.com/*
@@ -17,15 +17,18 @@
 //
 // @match        https://copilot.microsoft.com/*
 //
+// @match        https://x.com/i/grok*
 // @match        https://grok.com/*
 // @match        https://grok.dairoot.cn/*
-// @match        https://x.com/i/grok*
 //
 // @match        https://chat.deepseek.com/*
 // @match        https://chat.z.ai/*
 // @match        https://chat.qwen.ai/*
 // @match        https://anuneko.com/*
+// @match        https://cerebr.fugue.pro/*
+// @match        https://cerebr.vercel.app/*
 // @match        https://cerebr.yym68686.top/*
+// @match        https://cerebr.pages.dev/*
 //
 // @match        https://chat.mistral.ai/*
 //
@@ -631,7 +634,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260609] v1.0.0",
+    "version": "[20260609] v1.0.1",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -692,7 +695,19 @@
         "matchers": [
           {
             "type": "domain",
+            "value": "cerebr.fugue.pro"
+          },
+          {
+            "type": "domain",
+            "value": "cerebr.vercel.app"
+          },
+          {
+            "type": "domain",
             "value": "cerebr.yym68686.top"
+          },
+          {
+            "type": "domain",
+            "value": "cerebr.pages.dev"
           }
         ],
         "cssCode": "#chat-container {\n    padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}\n\n#input-container {\n    bottom: 40px !important;\n}\n\n#scroll-to-bottom {\n    bottom: calc(112px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}",
@@ -2696,6 +2711,12 @@
     lastFetchedAt: 0,
     rules: []
   };
+  var CEREBR_DOMAINS = [
+    "cerebr.fugue.pro",
+    "cerebr.vercel.app",
+    "cerebr.yym68686.top",
+    "cerebr.pages.dev"
+  ];
   var buildDefaultConfig = (locale = getLocale()) => {
     const defaultFolderName = t(DEFAULT_FOLDER_NAME_ID, null, locale);
     const toolButtons = createDefaultToolButtons(locale);
@@ -2728,12 +2749,12 @@
           method: AUTO_SUBMIT_METHODS.ENTER,
           favicon: generateDomainFavicon("chathub.gg")
         },
-        {
-          domain: "cerebr.yym68686.top",
+        ...CEREBR_DOMAINS.map((domain) => ({
+          domain,
           name: "Cerebr",
           method: AUTO_SUBMIT_METHODS.ENTER,
-          favicon: generateDomainFavicon("cerebr.yym68686.top")
-        },
+          favicon: generateDomainFavicon(domain)
+        })),
         {
           domain: "assistant.kagi.com",
           name: "Kagi Assistant",
@@ -3125,7 +3146,7 @@
     return updated;
   };
   var DEFAULT_DOMAIN_AUTO_SUBMIT_BACKFILL_DOMAINS = /* @__PURE__ */ new Set([
-    "cerebr.yym68686.top",
+    ...CEREBR_DOMAINS,
     "assistant.kagi.com"
   ]);
   var normalizeDomainAutoSubmitDomain = (domain) => {

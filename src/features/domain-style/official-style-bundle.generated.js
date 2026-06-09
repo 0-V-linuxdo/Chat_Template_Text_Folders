@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260609] v1.0.0",
+    "version": "[20260609] v1.0.1",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -64,7 +64,19 @@ const OFFICIAL_STYLE_BUNDLE = {
             "matchers": [
                 {
                     "type": "domain",
+                    "value": "cerebr.fugue.pro"
+                },
+                {
+                    "type": "domain",
+                    "value": "cerebr.vercel.app"
+                },
+                {
+                    "type": "domain",
                     "value": "cerebr.yym68686.top"
+                },
+                {
+                    "type": "domain",
+                    "value": "cerebr.pages.dev"
                 }
             ],
             "cssCode": "#chat-container {\n    padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}\n\n#input-container {\n    bottom: 40px !important;\n}\n\n#scroll-to-bottom {\n    bottom: calc(112px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}",
