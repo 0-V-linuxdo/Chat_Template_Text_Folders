@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260620] v1.0.0
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260620] v1.0.0
+// @name               [Chat] Template Text Folders [20260620] v1.0.1
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260620] v1.0.1
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260620] v1.0.0
-// @update-log         Migrate Dairoot mirror URL to gk.dairoot.cn and remove ChatHub support.
-// @update-log:zh-CN   迁移 Dairoot 镜像站 URL 至 gk.dairoot.cn，并移除 ChatHub 适配。
+// @version            [20260620] v1.0.1
+// @update-log         Remove outdated https://kagi.com/assistant* compatibility and keep assistant.kagi.com support.
+// @update-log:zh-CN   移除过时的 https://kagi.com/assistant* 适配，并保留 assistant.kagi.com 支持。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*
@@ -34,7 +34,6 @@
 //
 // [Group 6 | Search / perplexity kagi]
 // @match              https://*.perplexity.ai/*
-// @match              https://kagi.com/assistant*
 // @match              https://assistant.kagi.com/*
 //
 // [Group 7 | 聚合]
@@ -650,7 +649,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260620] v1.0.0",
+    "version": "[20260620] v1.0.1",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -675,10 +674,6 @@
         "source": "official",
         "enabled": true,
         "matchers": [
-          {
-            "type": "url-prefix",
-            "value": "https://kagi.com/assistant"
-          },
           {
             "type": "domain",
             "value": "assistant.kagi.com"
