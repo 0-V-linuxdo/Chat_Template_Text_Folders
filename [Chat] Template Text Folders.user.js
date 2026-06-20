@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260609] v1.0.7
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260609] v1.0.7
+// @name               [Chat] Template Text Folders [20260620] v1.0.0
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260620] v1.0.0
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260609] v1.0.7
-// @update-log         Use English fallback for default metadata, keep zh-CN localization for Chinese environments, and keep only two @update-log lines.
-// @update-log:zh-CN   默认 metadata 使用英文 fallback，中文环境保留 zh-CN 本地化，并且 @update-log 仅保留中英文两行。
+// @version            [20260620] v1.0.0
+// @update-log         Migrate Dairoot mirror URL to gk.dairoot.cn and remove ChatHub support.
+// @update-log:zh-CN   迁移 Dairoot 镜像站 URL 至 gk.dairoot.cn，并移除 ChatHub 适配。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*
@@ -23,7 +23,7 @@
 //
 // [Group 4 | xAI/Grok]
 // @match              https://grok.com/*
-// @match              https://grok.dairoot.cn/*
+// @match              https://gk.dairoot.cn/*
 // @match              https://x.com/i/grok*
 //
 // [Group 5 | China / deepseek GLM qwen anuneko]
@@ -41,7 +41,6 @@
 // @match              https://arena.ai/*
 // @match              https://manus.im/*
 // @match              https://poe.com/*
-// @match              https://app.chathub.gg/*
 // @match              https://app.lobehub.com/*
 // @match              https://monica.im/*
 // @match              https://web.tabbitbrowser.com/*
@@ -651,7 +650,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260609] v1.0.2",
+    "version": "[20260620] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -728,21 +727,6 @@
           }
         ],
         "cssCode": "#chat-container {\n    padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}\n\n#input-container {\n    bottom: 40px !important;\n}\n\n#scroll-to-bottom {\n    bottom: calc(112px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}",
-        "layout": {},
-        "favicon": ""
-      },
-      {
-        "id": "official-chathub-mobile-toolbar-space",
-        "name": "ChatHub - Mobile toolbar space",
-        "source": "official",
-        "enabled": true,
-        "matchers": [
-          {
-            "type": "domain",
-            "value": "app.chathub.gg"
-          }
-        ],
-        "cssCode": '@media (max-width: 639px) {\n    :root {\n        --cttf-chathub-mobile-input-shift: calc(28px + env(safe-area-inset-bottom));\n        --cttf-chathub-mobile-scroll-space: calc(84px + env(safe-area-inset-bottom));\n    }\n\n    /* 只做视觉位移，不使用 margin 重排 flex 面板，避免底部出现额外空档。 */\n    div[class*="group/panel"][class*="h-full"][class*="overflow-hidden"] > div[class*="relative"][class*="mt-3"][class*="mx-4"] {\n        transform: translateY(calc(-1 * var(--cttf-chathub-mobile-input-shift))) !important;\n        will-change: transform;\n    }\n\n    /* 输入区被视觉抬升后，给消息区补滚动余量，避免末尾内容被输入区/脚本栏遮住。 */\n    div[class*="h-full"][class*="overflow-y-auto"] > div[class*="relative"][class*="flex"][class*="flex-col"][class*="pb-14"] {\n        padding-bottom: var(--cttf-chathub-mobile-scroll-space) !important;\n    }\n}',
         "layout": {},
         "favicon": ""
       },
@@ -1100,19 +1084,19 @@
         "matchers": [
           {
             "type": "url-prefix",
-            "value": "https://grok.dairoot.cn/admin"
+            "value": "https://gk.dairoot.cn/admin"
           },
           {
             "type": "regexp",
-            "value": "^https://grok\\.dairoot\\.cn/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
+            "value": "^https://gk\\.dairoot\\.cn/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
           },
           {
             "type": "url-prefix",
-            "value": "https://grok.dairoot.cn/files"
+            "value": "https://gk.dairoot.cn/files"
           },
           {
             "type": "url-prefix",
-            "value": "https://grok.dairoot.cn/share-links"
+            "value": "https://gk.dairoot.cn/share-links"
           }
         ],
         "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
@@ -2759,12 +2743,6 @@
           name: "ChatGPT",
           method: AUTO_SUBMIT_METHODS.CLICK_SUBMIT,
           favicon: generateDomainFavicon("chatgpt.com")
-        },
-        {
-          domain: "chathub.gg",
-          name: "ChatHub",
-          method: AUTO_SUBMIT_METHODS.ENTER,
-          favicon: generateDomainFavicon("chathub.gg")
         },
         ...CEREBR_DOMAINS.map((domain) => ({
           domain,

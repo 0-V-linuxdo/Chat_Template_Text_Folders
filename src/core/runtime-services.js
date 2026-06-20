@@ -968,12 +968,6 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                     method: AUTO_SUBMIT_METHODS.CLICK_SUBMIT,
                     favicon: generateDomainFavicon('chatgpt.com')
                 },
-                {
-                    domain: 'chathub.gg',
-                    name: 'ChatHub',
-                    method: AUTO_SUBMIT_METHODS.ENTER,
-                    favicon: generateDomainFavicon('chathub.gg')
-                },
                 ...CEREBR_DOMAINS.map((domain) => ({
                     domain,
                     name: 'Cerebr',

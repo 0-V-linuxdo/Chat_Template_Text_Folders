@@ -18,11 +18,6 @@
     <img width="1462" height="1083" alt="image" src="https://github.com/user-attachments/assets/b7d417c7-5235-42de-8e70-ed3edac3cb31" />
   </details>
 
-  <details>
-  <summary>示例2：ChatHub网页</summary>
-    <img width="1462" height="1060" alt="image" src="https://github.com/user-attachments/assets/7f370227-8864-4d31-bdeb-b57b2a56df98" />
-  </details>
-
 </details>
 
 <details>
@@ -45,11 +40,6 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 
 其他：
 - Arc Boost
-  
-  <details>
-  <summary>示例：ChatHub插件</summary>
-  <img width="1445" height="1060" alt="image" src="https://github.com/user-attachments/assets/c717cdf0-5504-402b-bdc3-d7de0cd5f879" />
-  </details>
 
 提示：
 脚本数据存储在 本地 - 浏览器localstorage 中！
@@ -68,7 +58,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://auth.business.gemini.google/favicon.ico" width="20" height="20" alt="Gemini Business"> | Gemini Business | `https://business.gemini.google/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=copilot.microsoft.com&amp;sz=32" width="20" height="20" alt="Microsoft Copilot"> | Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=grok.com&amp;sz=32" width="20" height="20" alt="Grok"> | Grok | `https://grok.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=grok.dairoot.cn&amp;sz=32" width="20" height="20" alt="Grok 镜像"> | Grok 镜像 | `https://grok.dairoot.cn/*` | ✅ |  |
+| <img src="https://www.google.com/s2/favicons?domain=gk.dairoot.cn&amp;sz=32" width="20" height="20" alt="Grok 镜像"> | Grok 镜像 | `https://gk.dairoot.cn/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=x.com&amp;sz=32" width="20" height="20" alt="X Grok"> | X Grok | `https://x.com/i/grok*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=chat.deepseek.com&amp;sz=32" width="20" height="20" alt="DeepSeek"> | DeepSeek | `https://chat.deepseek.com/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=chat.z.ai&amp;sz=32" width="20" height="20" alt="Z.ai"> | Z.ai | `https://chat.z.ai/*` | ❌ |  |
@@ -81,7 +71,6 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=manus.im&amp;sz=32" width="20" height="20" alt="Manus"> | Manus | `https://manus.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
 | <img src="https://kagi.com/favicon-assistant-32x32.png" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://assistant.kagi.com/*`<br>`https://kagi.com/assistant*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=app.chathub.gg&amp;sz=32" width="20" height="20" alt="ChatHub"> | ChatHub | `https://app.chathub.gg/*` | ✅ | ⚠️ 不推荐订阅！存在模型掺水问题！ |
 | <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=web.tabbitbrowser.com&amp;sz=32" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |

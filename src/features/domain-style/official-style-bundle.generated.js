@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260609] v1.0.2",
+    "version": "[20260620] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -80,21 +80,6 @@ const OFFICIAL_STYLE_BUNDLE = {
                 }
             ],
             "cssCode": "#chat-container {\n    padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}\n\n#input-container {\n    bottom: 40px !important;\n}\n\n#scroll-to-bottom {\n    bottom: calc(112px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}",
-            "layout": {},
-            "favicon": ""
-        },
-        {
-            "id": "official-chathub-mobile-toolbar-space",
-            "name": "ChatHub - Mobile toolbar space",
-            "source": "official",
-            "enabled": true,
-            "matchers": [
-                {
-                    "type": "domain",
-                    "value": "app.chathub.gg"
-                }
-            ],
-            "cssCode": "@media (max-width: 639px) {\n    :root {\n        --cttf-chathub-mobile-input-shift: calc(28px + env(safe-area-inset-bottom));\n        --cttf-chathub-mobile-scroll-space: calc(84px + env(safe-area-inset-bottom));\n    }\n\n    /* 只做视觉位移，不使用 margin 重排 flex 面板，避免底部出现额外空档。 */\n    div[class*=\"group/panel\"][class*=\"h-full\"][class*=\"overflow-hidden\"] > div[class*=\"relative\"][class*=\"mt-3\"][class*=\"mx-4\"] {\n        transform: translateY(calc(-1 * var(--cttf-chathub-mobile-input-shift))) !important;\n        will-change: transform;\n    }\n\n    /* 输入区被视觉抬升后，给消息区补滚动余量，避免末尾内容被输入区/脚本栏遮住。 */\n    div[class*=\"h-full\"][class*=\"overflow-y-auto\"] > div[class*=\"relative\"][class*=\"flex\"][class*=\"flex-col\"][class*=\"pb-14\"] {\n        padding-bottom: var(--cttf-chathub-mobile-scroll-space) !important;\n    }\n}",
             "layout": {},
             "favicon": ""
         },
@@ -452,19 +437,19 @@ const OFFICIAL_STYLE_BUNDLE = {
             "matchers": [
                 {
                     "type": "url-prefix",
-                    "value": "https://grok.dairoot.cn/admin"
+                    "value": "https://gk.dairoot.cn/admin"
                 },
                 {
                     "type": "regexp",
-                    "value": "^https://grok\\.dairoot\\.cn/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
+                    "value": "^https://gk\\.dairoot\\.cn/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
                 },
                 {
                     "type": "url-prefix",
-                    "value": "https://grok.dairoot.cn/files"
+                    "value": "https://gk.dairoot.cn/files"
                 },
                 {
                     "type": "url-prefix",
-                    "value": "https://grok.dairoot.cn/share-links"
+                    "value": "https://gk.dairoot.cn/share-links"
                 }
             ],
             "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
