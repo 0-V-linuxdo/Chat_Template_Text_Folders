@@ -68,7 +68,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=arena.ai&amp;sz=32" width="20" height="20" alt="Arena"> | Arena | `https://arena.ai/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=manus.im&amp;sz=32" width="20" height="20" alt="Manus"> | Manus | `https://manus.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=app.lobehub.com&amp;sz=32" width="20" height="20" alt="LobeHub"> | LobeHub | `https://app.lobehub.com/*` | ✅ |  |
+| <img src="https://app.lobehub.com/favicon.ico" width="20" height="20" alt="LobeHub"> | LobeHub | `https://app.lobehub.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=web.tabbitbrowser.com&amp;sz=32" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbitbrowser.com/*` | ❌ | 不支持注入，需要魔改 .app |
 | <img src="https://www.google.com/s2/favicons?domain=setapp.typingcloud.com&amp;sz=32" width="20" height="20" alt="TypingCloud SetApp"> | TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
