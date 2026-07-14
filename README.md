@@ -70,7 +70,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
 | <img src="https://app.lobehub.com/favicon.ico" width="20" height="20" alt="LobeHub"> | LobeHub | `https://app.lobehub.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=web.tabbit.ai&amp;sz=32" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbit.ai/*` | ❌ | 不支持注入，需要魔改 .app |
+| <img src="https://web.tabbit.ai/favicon.ico" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbit.ai/*` | ❌ | 脚本功能正常 |
 | <img src="https://www.google.com/s2/favicons?domain=setapp.typingcloud.com&amp;sz=32" width="20" height="20" alt="TypingCloud SetApp"> | TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
 | <img src="https://www.google.com/s2/favicons?domain=cerebr.yym68686.top&amp;sz=32" width="20" height="20" alt="Cerebr"> | Cerebr | `https://cerebr.fugue.pro/*`<br>`https://cerebr.vercel.app/*`<br>`https://cerebr.yym68686.top/*`<br>`https://cerebr.pages.dev/*` | ✅ | 暂只支持网页版，插件版没有适配最新的插件系统 |
 | <img src="https://www.google.com/s2/favicons?domain=www.notion.so&amp;sz=32" width="20" height="20" alt="Notion"> | Notion | `https://app.notion.com/*`<br>`https://www.notion.so/*` | ✅ |  |
