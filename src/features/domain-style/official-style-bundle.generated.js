@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260620] v1.0.0",
+    "version": "[20260714] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -28,10 +28,6 @@ const OFFICIAL_STYLE_BUNDLE = {
             "source": "official",
             "enabled": true,
             "matchers": [
-                {
-                    "type": "url-prefix",
-                    "value": "https://kagi.com/assistant"
-                },
                 {
                     "type": "domain",
                     "value": "assistant.kagi.com"

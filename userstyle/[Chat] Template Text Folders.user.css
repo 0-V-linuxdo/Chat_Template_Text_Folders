@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260620] v1.0.0
+@version        [20260714] v1.0.0
 @license        MIT
 ==/UserStyle== */
 
@@ -16,7 +16,7 @@ main {
 }
 /* @cttf-rule-id: official-kagi-assistant-toolbar-space */
 /* @cttf-name: Kagi Assistant - Reserve toolbar space */
-@-moz-document url-prefix("https://kagi.com/assistant"), domain("assistant.kagi.com") {
+@-moz-document domain("assistant.kagi.com") {
 /* 为底部脚本栏留出空间 */
 main.main-center-box {
     padding-bottom: 20px !important;
