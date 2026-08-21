@@ -3,7 +3,7 @@
 const OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
 
 const OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260821] v1.1.0",
+    "version": "[20260822] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -541,8 +541,8 @@ const OFFICIAL_STYLE_BUNDLE = {
             "favicon": ""
         },
         {
-            "id": "official-telegram-weba-toolbar-space",
-            "name": "Telegram Web A - Reserve toolbar space",
+            "id": "official-telegram-weba-hide-toolbar-special-pages",
+            "name": "Telegram Web A - Hide toolbar by default",
             "source": "official",
             "enabled": true,
             "matchers": [
@@ -551,30 +551,26 @@ const OFFICIAL_STYLE_BUNDLE = {
                     "value": "https://web.telegram.org/a/"
                 }
             ],
-            "cssCode": ".middle-column-footer {\n    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;\n    box-sizing: border-box !important;\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}",
-            "layout": {
-                "height": 40,
-                "bottomSpacing": 6
-            },
+            "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+            "layout": {},
             "favicon": ""
         },
         {
-            "id": "official-telegram-weba-hide-toolbar-special-pages",
-            "name": "Telegram Web A - Hide toolbar on settings and login",
+            "id": "official-telegram-weba-toolbar-space",
+            "name": "Telegram Web A - Reserve toolbar space",
             "source": "official",
             "enabled": true,
             "matchers": [
                 {
                     "type": "url-prefix",
-                    "value": "https://web.telegram.org/a/#settings"
-                },
-                {
-                    "type": "url-prefix",
-                    "value": "https://web.telegram.org/a/#login"
+                    "value": "https://web.telegram.org/a/#YOUR-CHAT-ID"
                 }
             ],
-            "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}\n\n.middle-column-footer {\n    padding-bottom: 0 !important;\n}",
-            "layout": {},
+            "cssCode": ".middle-column-footer {\n    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;\n    box-sizing: border-box !important;\n}\n\n#cttf-ui-host {\n    visibility: visible !important;\n    pointer-events: auto !important;\n    z-index: 2147483647 !important;\n}",
+            "layout": {
+                "height": 40,
+                "bottomSpacing": 6
+            },
             "favicon": ""
         }
     ]

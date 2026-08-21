@@ -24,12 +24,13 @@ import {
     ensureStyleRule,
     getPrimaryHostFromMatchers,
     migrateLegacyDomainStyleSettings,
+    mergePreservedOfficialRuleMatchers,
     STYLE_RULE_SOURCE,
     summarizeMatchers,
 } from '../features/domain-style/style-format.js';
 import { cloneSerializable } from '../shared/common.js';
 
-console.log('🎉 [Chat] Template Text Folders [20260601] v1.0.1 🎉');
+console.log('🎉 [Chat] Template Text Folders [20260822] v1.0.0 🎉');
 
     let trustedHTMLPolicy = null;
     const resolveTrustedTypes = () => {
@@ -1257,12 +1258,15 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                 normalizedOfficialBundle.rules.map((rule) => [rule.id, rule.enabled !== false]),
             );
             const migratedOfficialBundle = normalizeOfficialStyleBundle(nextDefaultBundle, nextDefaultBundle);
-            migratedOfficialBundle.rules = migratedOfficialBundle.rules.map((rule) => ({
-                ...rule,
-                enabled: enabledStateById.has(rule.id)
-                    ? enabledStateById.get(rule.id)
-                    : (rule.enabled !== false),
-            }));
+            migratedOfficialBundle.rules = mergePreservedOfficialRuleMatchers(
+                migratedOfficialBundle.rules.map((rule) => ({
+                    ...rule,
+                    enabled: enabledStateById.has(rule.id)
+                        ? enabledStateById.get(rule.id)
+                        : (rule.enabled !== false),
+                })),
+                normalizedOfficialBundle.rules,
+            );
             nextOfficialBundle = migratedOfficialBundle;
         }
 

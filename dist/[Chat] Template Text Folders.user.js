@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260821] v1.1.0
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260821] v1.1.0
+// @name               [Chat] Template Text Folders [20260822] v1.0.0
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260822] v1.0.0
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260821] v1.1.0
-// @update-log         Add Telegram Web A composer support (https://web.telegram.org/a/).
-// @update-log:zh-CN   新增 Telegram Web A 输入框适配（https://web.telegram.org/a/）。
+// @version            [20260822] v1.0.0
+// @update-log         Telegram Web A bottom-space style now uses an empty whitelist (placeholder URL); add chat URLs as needed.
+// @update-log:zh-CN   Telegram Web A 底部留白改为空白名单（占位 URL），可按需自行添加聊天页 URL。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*
@@ -652,7 +652,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260821] v1.1.0",
+    "version": "[20260822] v1.0.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -1190,8 +1190,8 @@
         "favicon": ""
       },
       {
-        "id": "official-telegram-weba-toolbar-space",
-        "name": "Telegram Web A - Reserve toolbar space",
+        "id": "official-telegram-weba-hide-toolbar-special-pages",
+        "name": "Telegram Web A - Hide toolbar by default",
         "source": "official",
         "enabled": true,
         "matchers": [
@@ -1200,30 +1200,26 @@
             "value": "https://web.telegram.org/a/"
           }
         ],
-        "cssCode": ".middle-column-footer {\n    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;\n    box-sizing: border-box !important;\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}",
-        "layout": {
-          "height": 40,
-          "bottomSpacing": 6
-        },
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
         "favicon": ""
       },
       {
-        "id": "official-telegram-weba-hide-toolbar-special-pages",
-        "name": "Telegram Web A - Hide toolbar on settings and login",
+        "id": "official-telegram-weba-toolbar-space",
+        "name": "Telegram Web A - Reserve toolbar space",
         "source": "official",
         "enabled": true,
         "matchers": [
           {
             "type": "url-prefix",
-            "value": "https://web.telegram.org/a/#settings"
-          },
-          {
-            "type": "url-prefix",
-            "value": "https://web.telegram.org/a/#login"
+            "value": "https://web.telegram.org/a/#YOUR-CHAT-ID"
           }
         ],
-        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}\n\n.middle-column-footer {\n    padding-bottom: 0 !important;\n}",
-        "layout": {},
+        "cssCode": ".middle-column-footer {\n    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;\n    box-sizing: border-box !important;\n}\n\n#cttf-ui-host {\n    visibility: visible !important;\n    pointer-events: auto !important;\n    z-index: 2147483647 !important;\n}",
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
         "favicon": ""
       }
     ]
@@ -1881,6 +1877,41 @@
     return `${headerLines.join("\n")}${body}
 `;
   };
+  var TELEGRAM_TOOLBAR_SPACE_RULE_ID = "official-telegram-weba-toolbar-space";
+  var LEGACY_TELEGRAM_TOOLBAR_SPACE_PREFIX = "https://web.telegram.org/a/";
+  var TELEGRAM_WHITELIST_PLACEHOLDER_SUFFIX = "#YOUR-CHAT-ID";
+  var isLegacyTelegramGlobalSpaceMatchers = (matchers = []) => Array.isArray(matchers) && matchers.length === 1 && matchers[0]?.type === "url-prefix" && matchers[0]?.value === LEGACY_TELEGRAM_TOOLBAR_SPACE_PREFIX;
+  var isTelegramWhitelistPlaceholderMatchers = (matchers = []) => Array.isArray(matchers) && matchers.length > 0 && matchers.every((matcher) => matcher?.type === "url-prefix" && String(matcher.value || "").endsWith(TELEGRAM_WHITELIST_PLACEHOLDER_SUFFIX));
+  var shouldPreserveTelegramWhitelistMatchers = (bundledRule, previousMatchers) => {
+    if (!bundledRule || bundledRule.id !== TELEGRAM_TOOLBAR_SPACE_RULE_ID) {
+      return false;
+    }
+    if (!Array.isArray(previousMatchers) || !previousMatchers.length) {
+      return false;
+    }
+    if (!isTelegramWhitelistPlaceholderMatchers(bundledRule.matchers)) {
+      return false;
+    }
+    if (isLegacyTelegramGlobalSpaceMatchers(previousMatchers)) {
+      return false;
+    }
+    return JSON.stringify(previousMatchers) !== JSON.stringify(bundledRule.matchers);
+  };
+  var mergePreservedOfficialRuleMatchers = (nextRules = [], previousRules = []) => {
+    const previousMatchersById = new Map(
+      (Array.isArray(previousRules) ? previousRules : []).map((rule) => [rule.id, rule.matchers])
+    );
+    return (Array.isArray(nextRules) ? nextRules : []).map((rule) => {
+      const previousMatchers = previousMatchersById.get(rule.id);
+      if (!shouldPreserveTelegramWhitelistMatchers(rule, previousMatchers)) {
+        return rule;
+      }
+      return {
+        ...rule,
+        matchers: previousMatchers
+      };
+    });
+  };
   var buildOfficialStyleBundleFromUserCss = (source, options = {}) => {
     const parsed = parseUserStyleFile(source, {
       defaultSource: STYLE_RULE_SOURCE.OFFICIAL
@@ -1926,7 +1957,7 @@
   };
 
   // src/core/runtime-services.js
-  console.log("🎉 [Chat] Template Text Folders [20260601] v1.0.1 🎉");
+  console.log("🎉 [Chat] Template Text Folders [20260822] v1.0.0 🎉");
   var trustedHTMLPolicy = null;
   var resolveTrustedTypes = () => {
     if (trustedHTMLPolicy) {
@@ -3001,10 +3032,13 @@
         normalizedOfficialBundle.rules.map((rule) => [rule.id, rule.enabled !== false])
       );
       const migratedOfficialBundle = normalizeOfficialStyleBundle(nextDefaultBundle, nextDefaultBundle);
-      migratedOfficialBundle.rules = migratedOfficialBundle.rules.map((rule) => ({
-        ...rule,
-        enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : rule.enabled !== false
-      }));
+      migratedOfficialBundle.rules = mergePreservedOfficialRuleMatchers(
+        migratedOfficialBundle.rules.map((rule) => ({
+          ...rule,
+          enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : rule.enabled !== false
+        })),
+        normalizedOfficialBundle.rules
+      );
       nextOfficialBundle = migratedOfficialBundle;
     }
     const previousCustomJson = JSON.stringify(targetConfig.customStyleRules || []);
@@ -7035,13 +7069,23 @@
     const {
       activeTab: initialActiveTab = "basic",
       draft = null,
-      onSaved
+      onSaved,
+      officialRuleId = null
     } = options;
     if (currentAddDomainOverlay) {
       closeExistingOverlay(currentAddDomainOverlay);
     }
-    const isEdit = typeof index === "number";
-    const styleItem = draft ? cloneDraftRule(draft) : isEdit ? cloneDraftRule(buttonConfig.customStyleRules[index]) : createDefaultDraftRule();
+    const isOfficialEdit = Boolean(officialRuleId);
+    const isCustomEdit = typeof index === "number";
+    const isEdit = isOfficialEdit || isCustomEdit;
+    const officialRule = isOfficialEdit ? (buttonConfig.officialStyleBundle?.rules || []).find((rule) => rule.id === officialRuleId) : null;
+    const styleItem = draft ? cloneDraftRule(draft) : isCustomEdit ? cloneDraftRule(buttonConfig.customStyleRules[index]) : isOfficialEdit ? cloneDraftRule(officialRule || {}) : createDefaultDraftRule();
+    if (isOfficialEdit) {
+      styleItem.source = STYLE_RULE_SOURCE.OFFICIAL;
+      if (!styleItem.id) {
+        styleItem.id = officialRuleId;
+      }
+    }
     if (!Array.isArray(styleItem.matchers) || !styleItem.matchers.length) {
       styleItem.matchers = createDefaultDraftRule().matchers;
     }
@@ -7370,8 +7414,9 @@
     addMatcherBtn.style.backgroundColor = "var(--dialog-bg, #ffffff)";
     addMatcherBtn.style.color = "var(--primary-color, #3B82F6)";
     addMatcherBtn.addEventListener("click", () => {
+      const lastMatcherType = matcherRowRecords[matcherRowRecords.length - 1]?.typeSelect?.value;
       addMatcherRow({
-        type: STYLE_MATCHER_TYPE.DOMAIN,
+        type: lastMatcherType || STYLE_MATCHER_TYPE.DOMAIN,
         value: ""
       });
     });
@@ -7483,7 +7528,7 @@
     const createCurrentDraft = () => ({
       id: styleItem.id,
       name: nameInput.value.trim(),
-      source: STYLE_RULE_SOURCE.CUSTOM,
+      source: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM,
       enabled: styleItem.enabled !== false,
       matchers: matcherRowRecords.map((record) => ({
         type: record.typeSelect.value,
@@ -7514,9 +7559,9 @@
           return;
         }
         const normalizedRule = ensureStyleRule({
-          id: currentDraft.id,
+          id: currentDraft.id || officialRuleId || void 0,
           name: createDraftName(currentDraft.name, normalizedMatchers),
-          source: STYLE_RULE_SOURCE.CUSTOM,
+          source: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM,
           enabled: currentDraft.enabled,
           matchers: normalizedMatchers,
           cssCode: currentDraft.cssCode,
@@ -7526,13 +7571,29 @@
           },
           favicon: currentDraft.favicon || generateDomainFavicon(getPrimaryHostFromMatchers(normalizedMatchers) || "")
         }, {
-          fallbackSource: STYLE_RULE_SOURCE.CUSTOM
+          fallbackSource: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM
         });
         if (!normalizedRule) {
           alert(t("style.editor.no_matcher"));
           return;
         }
-        if (isEdit) {
+        if (isOfficialEdit) {
+          const officialRules = buttonConfig.officialStyleBundle?.rules;
+          if (!Array.isArray(officialRules)) {
+            alert(t("style.editor.no_matcher"));
+            return;
+          }
+          const existingIndex = officialRules.findIndex((item) => item.id === (normalizedRule.id || officialRuleId));
+          if (existingIndex < 0) {
+            alert(t("style.editor.no_matcher"));
+            return;
+          }
+          officialRules[existingIndex] = {
+            ...normalizedRule,
+            id: officialRules[existingIndex].id,
+            source: STYLE_RULE_SOURCE.OFFICIAL
+          };
+        } else if (isCustomEdit) {
           buttonConfig.customStyleRules[index] = normalizedRule;
         } else {
           buttonConfig.customStyleRules.push(normalizedRule);
@@ -7560,10 +7621,11 @@
         return;
       }
       const activeTabId = tabButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.tabId || "basic";
-      showEditDomainStyleDialog(isEdit ? index : void 0, {
+      showEditDomainStyleDialog(isCustomEdit ? index : void 0, {
         onSaved,
         activeTab: activeTabId,
-        draft: createCurrentDraft()
+        draft: createCurrentDraft(),
+        officialRuleId: isOfficialEdit ? styleItem.id || officialRuleId : null
       });
     });
   }
@@ -8289,7 +8351,49 @@
       headerLeft.appendChild(titleWrap);
       headerLine.appendChild(headerLeft);
       let actions = null;
-      if (!isOfficial) {
+      if (isOfficial) {
+        actions = document.createElement("div");
+        actions.style.display = "flex";
+        actions.style.alignItems = "center";
+        actions.style.gap = "6px";
+        actions.style.flexShrink = "0";
+        actions.addEventListener("click", (event) => {
+          event.stopPropagation();
+        });
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.textContent = "✏️";
+        editBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--primary-color, #3B82F6);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+            `;
+        editBtn.title = t("style.editor.matchers");
+        editBtn.addEventListener("click", () => {
+          showEditDomainStyleDialog(void 0, {
+            draft: rule,
+            officialRuleId: rule.id,
+            onSaved: (savedRule) => {
+              const nextSiteKey = resolveRuleSiteInfo(savedRule).key || siteKey;
+              currentSiteRulesState = {
+                key: nextSiteKey,
+                activeTab: "official"
+              };
+              afterChange();
+            }
+          });
+        });
+        actions.appendChild(editBtn);
+        headerLine.appendChild(actions);
+      } else {
         actions = document.createElement("div");
         actions.style.display = "flex";
         actions.style.alignItems = "center";
@@ -9140,14 +9244,18 @@
         const enabledStateById = new Map(
           (buttonConfig.officialStyleBundle?.rules || []).map((rule) => [rule.id, rule.enabled !== false])
         );
+        const previousOfficialRules = buttonConfig.officialStyleBundle?.rules || [];
         const nextOfficialBundle = buildOfficialStyleBundleFromUserCss(text, {
           sourceUrl: url,
           lastFetchedAt: Date.now()
         });
-        nextOfficialBundle.rules = nextOfficialBundle.rules.map((rule) => ({
-          ...rule,
-          enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : rule.enabled !== false
-        }));
+        nextOfficialBundle.rules = mergePreservedOfficialRuleMatchers(
+          nextOfficialBundle.rules.map((rule) => ({
+            ...rule,
+            enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : rule.enabled !== false
+          })),
+          previousOfficialRules
+        );
         buttonConfig.officialStyleBundle = nextOfficialBundle;
         applyCurrentStyleConfig();
         refreshAllOpenDialogs();

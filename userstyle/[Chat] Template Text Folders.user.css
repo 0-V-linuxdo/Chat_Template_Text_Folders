@@ -2,7 +2,7 @@
 @name           [Chat] Template Text Folders
 @namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 @description    为脚本按钮栏预留底部空间，并为部分 AI 聊天页面提供界面兼容调整。
-@version        [20260821] v1.1.0
+@version        [20260822] v1.0.0
 @license        MIT
 ==/UserStyle== */
 
@@ -347,32 +347,29 @@ ms-prompt-input-wrapper,
     pointer-events: none !important;
 }
 }
+/* @cttf-rule-id: official-telegram-weba-hide-toolbar-special-pages */
+/* @cttf-name: Telegram Web A - Hide toolbar by default */
+@-moz-document url-prefix("https://web.telegram.org/a/") {
+/* [Telegram Web A] 默认隐藏底部脚本栏；仅白名单聊天页再显示 */
+#cttf-ui-host {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+}
 /* @cttf-rule-id: official-telegram-weba-toolbar-space */
 /* @cttf-name: Telegram Web A - Reserve toolbar space */
 /* @cttf-toolbar-height: 40 */
 /* @cttf-toolbar-bottom-spacing: 6 */
-@-moz-document url-prefix("https://web.telegram.org/a/") {
-/* [Telegram Web A] 为底部脚本栏留出空间，避免遮挡 composer */
+@-moz-document url-prefix("https://web.telegram.org/a/#YOUR-CHAT-ID") {
+/* [Telegram Web A] 底部留白白名单。默认为占位 URL，不会匹配真实会话；请自行添加聊天页 URL，例如 https://web.telegram.org/a/#-1002286688159 */
 .middle-column-footer {
     padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;
     box-sizing: border-box !important;
 }
 
 #cttf-ui-host {
+    visibility: visible !important;
+    pointer-events: auto !important;
     z-index: 2147483647 !important;
-}
-}
-/* @cttf-rule-id: official-telegram-weba-hide-toolbar-special-pages */
-/* @cttf-name: Telegram Web A - Hide toolbar on settings and login */
-@-moz-document url-prefix("https://web.telegram.org/a/#settings"), url-prefix("https://web.telegram.org/a/#login") {
-/* [Telegram Web A] 辅助 */
-/* 在设置 / 登录页隐藏 */
-#cttf-ui-host {
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
-
-.middle-column-footer {
-    padding-bottom: 0 !important;
 }
 }

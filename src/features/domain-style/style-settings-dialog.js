@@ -17,6 +17,7 @@ import {
     ensureStyleBundle,
     ensureStyleRule,
     getPrimaryHostFromMatchers,
+    mergePreservedOfficialRuleMatchers,
     splitRulesBySource,
     STYLE_MATCHER_TYPE,
     STYLE_RULE_SOURCE,
@@ -846,7 +847,50 @@ function showStyleSettingsDialog() {
         headerLine.appendChild(headerLeft);
 
         let actions = null;
-        if (!isOfficial) {
+        if (isOfficial) {
+            actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.alignItems = 'center';
+            actions.style.gap = '6px';
+            actions.style.flexShrink = '0';
+            actions.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.textContent = '✏️';
+            editBtn.style.cssText = `
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--primary-color, #3B82F6);
+                font-size: 14px;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+            `;
+            editBtn.title = t('style.editor.matchers');
+            editBtn.addEventListener('click', () => {
+                showEditDomainStyleDialog(undefined, {
+                    draft: rule,
+                    officialRuleId: rule.id,
+                    onSaved: (savedRule) => {
+                        const nextSiteKey = resolveRuleSiteInfo(savedRule).key || siteKey;
+                        currentSiteRulesState = {
+                            key: nextSiteKey,
+                            activeTab: 'official',
+                        };
+                        afterChange();
+                    },
+                });
+            });
+            actions.appendChild(editBtn);
+            headerLine.appendChild(actions);
+        } else {
             actions = document.createElement('div');
             actions.style.display = 'flex';
             actions.style.alignItems = 'center';
@@ -1793,14 +1837,18 @@ function showStyleSettingsDialog() {
             const enabledStateById = new Map(
                 (buttonConfig.officialStyleBundle?.rules || []).map((rule) => [rule.id, rule.enabled !== false]),
             );
+            const previousOfficialRules = buttonConfig.officialStyleBundle?.rules || [];
             const nextOfficialBundle = buildOfficialStyleBundleFromUserCss(text, {
                 sourceUrl: url,
                 lastFetchedAt: Date.now(),
             });
-            nextOfficialBundle.rules = nextOfficialBundle.rules.map((rule) => ({
-                ...rule,
-                enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : (rule.enabled !== false),
-            }));
+            nextOfficialBundle.rules = mergePreservedOfficialRuleMatchers(
+                nextOfficialBundle.rules.map((rule) => ({
+                    ...rule,
+                    enabled: enabledStateById.has(rule.id) ? enabledStateById.get(rule.id) : (rule.enabled !== false),
+                })),
+                previousOfficialRules,
+            );
             buttonConfig.officialStyleBundle = nextOfficialBundle;
             applyCurrentStyleConfig();
             refreshAllOpenDialogs();

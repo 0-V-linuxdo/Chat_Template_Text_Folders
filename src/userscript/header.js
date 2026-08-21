@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260821] v1.1.0
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260821] v1.1.0
+// @name               [Chat] Template Text Folders [20260822] v1.0.0
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260822] v1.0.0
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260821] v1.1.0
-// @update-log         Add Telegram Web A composer support (https://web.telegram.org/a/).
-// @update-log:zh-CN   新增 Telegram Web A 输入框适配（https://web.telegram.org/a/）。
+// @version            [20260822] v1.0.0
+// @update-log         Telegram Web A bottom-space style now uses an empty whitelist (placeholder URL); add chat URLs as needed.
+// @update-log:zh-CN   Telegram Web A 底部留白改为空白名单（占位 URL），可按需自行添加聊天页 URL。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*

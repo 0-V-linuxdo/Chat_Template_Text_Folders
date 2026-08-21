@@ -753,6 +753,52 @@ const serializeStylePackageToUserCss = (options = {}) => {
     return `${headerLines.join('\n')}${body}\n`;
 };
 
+const TELEGRAM_TOOLBAR_SPACE_RULE_ID = 'official-telegram-weba-toolbar-space';
+const LEGACY_TELEGRAM_TOOLBAR_SPACE_PREFIX = 'https://web.telegram.org/a/';
+const TELEGRAM_WHITELIST_PLACEHOLDER_SUFFIX = '#YOUR-CHAT-ID';
+
+const isLegacyTelegramGlobalSpaceMatchers = (matchers = []) => Array.isArray(matchers)
+    && matchers.length === 1
+    && matchers[0]?.type === 'url-prefix'
+    && matchers[0]?.value === LEGACY_TELEGRAM_TOOLBAR_SPACE_PREFIX;
+
+const isTelegramWhitelistPlaceholderMatchers = (matchers = []) => Array.isArray(matchers)
+    && matchers.length > 0
+    && matchers.every((matcher) => matcher?.type === 'url-prefix'
+        && String(matcher.value || '').endsWith(TELEGRAM_WHITELIST_PLACEHOLDER_SUFFIX));
+
+const shouldPreserveTelegramWhitelistMatchers = (bundledRule, previousMatchers) => {
+    if (!bundledRule || bundledRule.id !== TELEGRAM_TOOLBAR_SPACE_RULE_ID) {
+        return false;
+    }
+    if (!Array.isArray(previousMatchers) || !previousMatchers.length) {
+        return false;
+    }
+    if (!isTelegramWhitelistPlaceholderMatchers(bundledRule.matchers)) {
+        return false;
+    }
+    if (isLegacyTelegramGlobalSpaceMatchers(previousMatchers)) {
+        return false;
+    }
+    return JSON.stringify(previousMatchers) !== JSON.stringify(bundledRule.matchers);
+};
+
+const mergePreservedOfficialRuleMatchers = (nextRules = [], previousRules = []) => {
+    const previousMatchersById = new Map(
+        (Array.isArray(previousRules) ? previousRules : []).map((rule) => [rule.id, rule.matchers]),
+    );
+    return (Array.isArray(nextRules) ? nextRules : []).map((rule) => {
+        const previousMatchers = previousMatchersById.get(rule.id);
+        if (!shouldPreserveTelegramWhitelistMatchers(rule, previousMatchers)) {
+            return rule;
+        }
+        return {
+            ...rule,
+            matchers: previousMatchers,
+        };
+    });
+};
+
 const buildOfficialStyleBundleFromUserCss = (source, options = {}) => {
     const parsed = parseUserStyleFile(source, {
         defaultSource: STYLE_RULE_SOURCE.OFFICIAL,
@@ -783,6 +829,7 @@ export {
     ensureStyleRule,
     getPrimaryHostFromMatchers,
     migrateLegacyDomainStyleSettings,
+    mergePreservedOfficialRuleMatchers,
     normalizeStyleMatcher,
     parseUserStyleFile,
     serializeStylePackageToUserCss,

@@ -77,7 +77,7 @@ Firefox/Safari 获取剪切板内容，需要手动确认！
 | <img src="https://www.google.com/s2/favicons?domain=chat.mistral.ai&amp;sz=32" width="20" height="20" alt="Mistral"> | Mistral | `https://chat.mistral.ai/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=copilot.microsoft.com&amp;sz=32" width="20" height="20" alt="Microsoft Copilot"> | Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |  |
 | <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=web.telegram.org&sz=32" width="20" height="20" alt="Telegram Web A"> | Telegram Web A | `https://web.telegram.org/a/*` | ✅ | 适配 `#editable-message-text` composer；设置页隐藏工具栏 |
+| <img src="https://www.google.com/s2/favicons?domain=web.telegram.org&sz=32" width="20" height="20" alt="Telegram Web A"> | Telegram Web A | `https://web.telegram.org/a/*` | ✅ | 适配 `#editable-message-text` composer；底部留白默认为空白名单（占位 URL），可自行添加聊天页 URL |
 </details>
 
 ---

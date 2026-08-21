@@ -76,18 +76,33 @@ function showEditDomainStyleDialog(index, options = {}) {
         activeTab: initialActiveTab = 'basic',
         draft = null,
         onSaved,
+        officialRuleId = null,
     } = options;
 
     if (currentAddDomainOverlay) {
         closeExistingOverlay(currentAddDomainOverlay);
     }
 
-    const isEdit = typeof index === 'number';
+    const isOfficialEdit = Boolean(officialRuleId);
+    const isCustomEdit = typeof index === 'number';
+    const isEdit = isOfficialEdit || isCustomEdit;
+    const officialRule = isOfficialEdit
+        ? (buttonConfig.officialStyleBundle?.rules || []).find((rule) => rule.id === officialRuleId)
+        : null;
     const styleItem = draft
         ? cloneDraftRule(draft)
-        : isEdit
+        : isCustomEdit
             ? cloneDraftRule(buttonConfig.customStyleRules[index])
-            : createDefaultDraftRule();
+            : isOfficialEdit
+                ? cloneDraftRule(officialRule || {})
+                : createDefaultDraftRule();
+
+    if (isOfficialEdit) {
+        styleItem.source = STYLE_RULE_SOURCE.OFFICIAL;
+        if (!styleItem.id) {
+            styleItem.id = officialRuleId;
+        }
+    }
 
     if (!Array.isArray(styleItem.matchers) || !styleItem.matchers.length) {
         styleItem.matchers = createDefaultDraftRule().matchers;
@@ -458,8 +473,9 @@ function showEditDomainStyleDialog(index, options = {}) {
     addMatcherBtn.style.backgroundColor = 'var(--dialog-bg, #ffffff)';
     addMatcherBtn.style.color = 'var(--primary-color, #3B82F6)';
     addMatcherBtn.addEventListener('click', () => {
+        const lastMatcherType = matcherRowRecords[matcherRowRecords.length - 1]?.typeSelect?.value;
         addMatcherRow({
-            type: STYLE_MATCHER_TYPE.DOMAIN,
+            type: lastMatcherType || STYLE_MATCHER_TYPE.DOMAIN,
             value: '',
         });
     });
@@ -580,7 +596,7 @@ function showEditDomainStyleDialog(index, options = {}) {
     const createCurrentDraft = () => ({
         id: styleItem.id,
         name: nameInput.value.trim(),
-        source: STYLE_RULE_SOURCE.CUSTOM,
+        source: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM,
         enabled: styleItem.enabled !== false,
         matchers: matcherRowRecords.map((record) => ({
             type: record.typeSelect.value,
@@ -614,9 +630,9 @@ function showEditDomainStyleDialog(index, options = {}) {
             }
 
             const normalizedRule = ensureStyleRule({
-                id: currentDraft.id,
+                id: currentDraft.id || officialRuleId || undefined,
                 name: createDraftName(currentDraft.name, normalizedMatchers),
-                source: STYLE_RULE_SOURCE.CUSTOM,
+                source: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM,
                 enabled: currentDraft.enabled,
                 matchers: normalizedMatchers,
                 cssCode: currentDraft.cssCode,
@@ -626,7 +642,7 @@ function showEditDomainStyleDialog(index, options = {}) {
                 },
                 favicon: currentDraft.favicon || generateDomainFavicon(getPrimaryHostFromMatchers(normalizedMatchers) || ''),
             }, {
-                fallbackSource: STYLE_RULE_SOURCE.CUSTOM,
+                fallbackSource: isOfficialEdit ? STYLE_RULE_SOURCE.OFFICIAL : STYLE_RULE_SOURCE.CUSTOM,
             });
 
             if (!normalizedRule) {
@@ -634,7 +650,23 @@ function showEditDomainStyleDialog(index, options = {}) {
                 return;
             }
 
-            if (isEdit) {
+            if (isOfficialEdit) {
+                const officialRules = buttonConfig.officialStyleBundle?.rules;
+                if (!Array.isArray(officialRules)) {
+                    alert(t('style.editor.no_matcher'));
+                    return;
+                }
+                const existingIndex = officialRules.findIndex((item) => item.id === (normalizedRule.id || officialRuleId));
+                if (existingIndex < 0) {
+                    alert(t('style.editor.no_matcher'));
+                    return;
+                }
+                officialRules[existingIndex] = {
+                    ...normalizedRule,
+                    id: officialRules[existingIndex].id,
+                    source: STYLE_RULE_SOURCE.OFFICIAL,
+                };
+            } else if (isCustomEdit) {
                 buttonConfig.customStyleRules[index] = normalizedRule;
             } else {
                 buttonConfig.customStyleRules.push(normalizedRule);
@@ -663,10 +695,11 @@ function showEditDomainStyleDialog(index, options = {}) {
             return;
         }
         const activeTabId = tabButtons.find((button) => button.getAttribute('aria-pressed') === 'true')?.dataset.tabId || 'basic';
-        showEditDomainStyleDialog(isEdit ? index : undefined, {
+        showEditDomainStyleDialog(isCustomEdit ? index : undefined, {
             onSaved,
             activeTab: activeTabId,
             draft: createCurrentDraft(),
+            officialRuleId: isOfficialEdit ? (styleItem.id || officialRuleId) : null,
         });
     });
 }
