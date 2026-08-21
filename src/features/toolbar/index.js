@@ -1784,6 +1784,13 @@ const setUpdateCountersHandler = (handler) => {
         if (attachTimeout) clearTimeout(attachTimeout);
         attachTimeout = setTimeout(() => {
             const textareas = getAllTextareas();
+            const telegramComposer = textareas.find((node) => (
+                node
+                && (node.id === 'editable-message-text'
+                    || node.id === 'editable-message-text-modal'
+                    || node.id === 'editable-story-input-text'
+                    || (node.closest && node.closest('#message-input-text')))
+            ));
             console.log(t('m_8d46f43f96e9', {
                 count: textareas.length
             }));
@@ -1791,7 +1798,7 @@ const setUpdateCountersHandler = (handler) => {
                 console.warn(t('m_ee15681d0604'));
                 return;
             }
-            attachButtonsToTextarea(textareas[textareas.length - 1]);
+            attachButtonsToTextarea(telegramComposer || textareas[textareas.length - 1]);
             console.log(t('m_f873f0136721'));
         }, 300);
     };

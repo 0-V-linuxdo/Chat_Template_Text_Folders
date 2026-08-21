@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260714] v1.0.0
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260714] v1.0.0
+// @name               [Chat] Template Text Folders [20260821] v1.1.0
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260821] v1.1.0
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260714] v1.0.0
-// @update-log         Update the Tabbit web app URL to https://web.tabbit.ai/.
-// @update-log:zh-CN   将 Tabbit 网页应用地址更新至 https://web.tabbit.ai/。
+// @version            [20260821] v1.1.0
+// @update-log         Add Telegram Web A composer support (https://web.telegram.org/a/).
+// @update-log:zh-CN   新增 Telegram Web A 输入框适配（https://web.telegram.org/a/）。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*
@@ -63,6 +63,9 @@
 //
 // [Group 12 | Meta/AI]
 // @match              https://meta.ai/*
+//
+// [Group 13 | Telegram Web A]
+// @match              https://web.telegram.org/a/*
 //
 // @grant              GM_xmlhttpRequest
 // @connect            oauth2.googleapis.com

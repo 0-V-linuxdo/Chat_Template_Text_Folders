@@ -983,6 +983,12 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                         selector: 'button[aria-label="Send message"], button[title="Send message"], button#submit[type="submit"], button[aria-label="Submit"][type="submit"]',
                     },
                     favicon: generateDomainFavicon('assistant.kagi.com')
+                },
+                {
+                    domain: 'web.telegram.org',
+                    name: 'Telegram Web A',
+                    method: AUTO_SUBMIT_METHODS.ENTER,
+                    favicon: generateDomainFavicon('web.telegram.org')
                 }
             ],
             officialStyleBundle: createDefaultOfficialStyleBundle(),
@@ -1455,6 +1461,7 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
     const DEFAULT_DOMAIN_AUTO_SUBMIT_BACKFILL_DOMAINS = new Set([
         ...CEREBR_DOMAINS,
         'assistant.kagi.com',
+        'web.telegram.org',
     ]);
 
     const normalizeDomainAutoSubmitDomain = (domain) => {
@@ -1645,10 +1652,81 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
     // 变量：防止重复提交
     let isSubmitting = false;
 
+    const TELEGRAM_COMPOSER_IDS = new Set([
+        'editable-message-text',
+        'editable-message-text-modal',
+        'editable-story-input-text',
+    ]);
+    const TELEGRAM_COMPOSER_SELECTORS = [
+        '.messages-layout .Transition_slide-active #editable-message-text',
+        '.messages-layout .Transition > .Transition_slide-to #editable-message-text',
+        '#editable-message-text',
+        '#editable-message-text-modal',
+        '#editable-story-input-text',
+    ];
+    const TELEGRAM_SEND_BUTTON_SELECTORS = [
+        'button.Button.send',
+        '.middle-column-footer button.Button.send',
+        '.Composer button.Button.send',
+        'button.send.default',
+        'button[class~="send"]',
+    ].join(', ');
+
+    const isContentEditableNode = (node) => {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+            return false;
+        }
+        return node.isContentEditable || node.getAttribute('contenteditable') === 'true';
+    };
+
+    const isTelegramComposer = (target) => {
+        if (!target || target.nodeType !== Node.ELEMENT_NODE) {
+            return false;
+        }
+        if (TELEGRAM_COMPOSER_IDS.has(target.id)) {
+            return true;
+        }
+        return Boolean(target.closest('#message-input-text'));
+    };
+
+    const getTelegramComposer = (root = document) => {
+        if (!root || typeof root.querySelector !== 'function') {
+            return null;
+        }
+        for (const selector of TELEGRAM_COMPOSER_SELECTORS) {
+            let candidate = null;
+            try {
+                candidate = root.querySelector(selector);
+            } catch (_) {
+                candidate = null;
+            }
+            if (candidate && isContentEditableNode(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    };
+
+    const placeCaretAtEnd = (target) => {
+        if (!target) {
+            return;
+        }
+        try {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(target);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } catch (_) {
+            // Ignore selection errors in detached or restricted nodes.
+        }
+    };
+
     const isEditableElement = (node) => {
         if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
         const tag = node.tagName ? node.tagName.toLowerCase() : '';
-        return tag === 'textarea' || node.isContentEditable;
+        return tag === 'textarea' || node.isContentEditable || node.getAttribute('contenteditable') === 'true';
     };
 
     const getDeepActiveElement = (root = document) => {
@@ -1677,8 +1755,43 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
         return null;
     };
 
+    const resolveTelegramComposerFromNode = (node) => {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+            return null;
+        }
+        if (isTelegramComposer(node) && isEditableElement(node)) {
+            return TELEGRAM_COMPOSER_IDS.has(node.id)
+                ? node
+                : (node.id === 'message-input-text'
+                    ? node.querySelector('#editable-message-text') || node
+                    : node.closest('#editable-message-text') || getTelegramComposer(node) || node);
+        }
+        const nested = node.closest
+            ? (node.closest('#editable-message-text')
+                || node.closest('#editable-message-text-modal')
+                || node.closest('#editable-story-input-text')
+                || node.closest('#message-input-text'))
+            : null;
+        if (nested) {
+            if (TELEGRAM_COMPOSER_IDS.has(nested.id) && isEditableElement(nested)) {
+                return nested;
+            }
+            const composer = nested.querySelector
+                ? nested.querySelector('#editable-message-text, #editable-message-text-modal, #editable-story-input-text')
+                : null;
+            if (composer && isEditableElement(composer)) {
+                return composer;
+            }
+        }
+        return null;
+    };
+
     const getFocusedEditableElement = () => {
         const activeElement = getDeepActiveElement();
+        const telegramFromActive = resolveTelegramComposerFromNode(activeElement);
+        if (telegramFromActive) {
+            return telegramFromActive;
+        }
         if (isEditableElement(activeElement)) {
             return activeElement;
         }
@@ -1691,23 +1804,40 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
             if (childEditable) return childEditable;
         }
         const selection = typeof window !== 'undefined' ? window.getSelection() : null;
-        const anchorElement = selection && selection.anchorNode ? selection.anchorNode.parentElement : null;
+        const anchorElement = selection && selection.anchorNode
+            ? (selection.anchorNode.nodeType === Node.ELEMENT_NODE
+                ? selection.anchorNode
+                : selection.anchorNode.parentElement)
+            : null;
+        const telegramFromAnchor = resolveTelegramComposerFromNode(anchorElement);
+        if (telegramFromAnchor) {
+            return telegramFromAnchor;
+        }
         if (isEditableElement(anchorElement)) {
             return anchorElement;
         }
-        return null;
+        return getTelegramComposer();
     };
 
     const getAllTextareas = (root = document) => {
         let textareas = [];
+        const telegramInput = getTelegramComposer(root);
+        if (telegramInput) {
+            textareas.push(telegramInput);
+        }
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
         let node = walker.nextNode();
         while (node) {
-            if (isEditableElement(node)) {
+            if (isEditableElement(node) && !textareas.includes(node)) {
                 textareas.push(node);
             }
             if (node.shadowRoot) {
-                textareas = textareas.concat(getAllTextareas(node.shadowRoot));
+                const shadowTextareas = getAllTextareas(node.shadowRoot);
+                shadowTextareas.forEach((shadowNode) => {
+                    if (!textareas.includes(shadowNode)) {
+                        textareas.push(shadowNode);
+                    }
+                });
             }
             node = walker.nextNode();
         }
@@ -1724,6 +1854,9 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
         }
         if (element.tagName.toLowerCase() === 'textarea') {
             return normalizeEditableText(element.value);
+        }
+        if (isTelegramComposer(element)) {
+            return normalizeEditableText(element.textContent || '');
         }
         const text = typeof element.innerText === 'string'
             ? element.innerText
@@ -1795,21 +1928,22 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
      * @param {boolean} replaceAll - 是否替换全部内容
      */
     const insertIntoContentEditable = (target, text, replaceAll) => {
-        // 检测编辑器类型
         const editorType = detectEditorType(target);
 
         target.focus();
 
+        if (editorType === 'telegram') {
+            insertIntoTelegramComposer(target, text, replaceAll);
+            triggerEditorEvents(target, text, replaceAll, editorType);
+            return;
+        }
+
         if (replaceAll) {
-            // 替换全部内容
             clearContentEditable(target, editorType);
         }
 
-        // 插入文本
         insertTextIntoEditor(target, text, editorType);
-
-        // 触发事件和调整高度
-        triggerEditorEvents(target, text, replaceAll);
+        triggerEditorEvents(target, text, replaceAll, editorType);
         adjustEditorHeight(target, editorType);
     };
 
@@ -1819,6 +1953,10 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
      * @returns {string} 编辑器类型
      */
     const detectEditorType = (target) => {
+        if (isTelegramComposer(target)) {
+            return 'telegram';
+        }
+
         // 检测ProseMirror
         if (target.classList.contains('ProseMirror') ||
             target.closest('.ProseMirror') ||
@@ -1840,6 +1978,37 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
 
         // 默认简单contenteditable
         return 'simple';
+    };
+
+    /**
+     * Telegram Web A 输入框：用 textContent / 文本节点写入，保留 \\n。
+     * 这是已验证的 Telegram composer 路径，不能改成 BR fragment。
+     */
+    const insertIntoTelegramComposer = (target, text, replaceAll) => {
+        if (replaceAll) {
+            target.textContent = text;
+            placeCaretAtEnd(target);
+            return;
+        }
+
+        const selection = window.getSelection();
+        const hasValidSelection = selection
+            && selection.rangeCount > 0
+            && target.contains(selection.getRangeAt(0).startContainer)
+            && target.contains(selection.getRangeAt(0).endContainer);
+
+        if (hasValidSelection) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(text));
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return;
+        }
+
+        target.appendChild(document.createTextNode(text));
+        placeCaretAtEnd(target);
     };
 
     /**
@@ -2031,7 +2200,7 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
      * @param {string} text
      * @param {boolean} replaceAll
      */
-    const triggerEditorEvents = (target, text, replaceAll) => {
+    const triggerEditorEvents = (target, text, replaceAll, editorType) => {
         // 触发多种事件确保兼容性
         const events = [
             new InputEvent('beforeinput', {
@@ -2059,6 +2228,15 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                 console.warn(t('m_fda475caeb26'), e);
             }
         });
+
+        // Telegram Web A 旧适配依赖 textInput + 普通 input/keyup
+        if (editorType === 'telegram') {
+            ['input', 'textInput', 'keyup'].forEach((eventType) => {
+                try {
+                    target.dispatchEvent(new Event(eventType, { bubbles: true, cancelable: true }));
+                } catch (_) {}
+            });
+        }
 
         // 特殊处理：触发compositionend事件（某些框架需要）
         try {
@@ -2140,7 +2318,9 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
                 elapsed += interval;
                 const currentVal = (element.tagName.toLowerCase() === 'textarea')
                     ? element.value
-                    : element.innerText; // contenteditable时用innerText
+                    : (isTelegramComposer(element)
+                        ? normalizeEditableText(element.textContent || '')
+                        : element.innerText);
 
                 if (currentVal === expectedText) {
                     clearInterval(timer);
@@ -2155,8 +2335,9 @@ const closeUnifiedDialogOverlay = (overlay, options = {}) => {
 
     // 定义等待提交按钮的函数
     const waitForSubmitButton = async (maxAttempts = 10, delay = 300) => {
+        const selector = `button[type="submit"], button[data-testid="send-button"], ${TELEGRAM_SEND_BUTTON_SELECTORS}`;
         for (let i = 0; i < maxAttempts; i++) {
-            const submitButton = document.querySelector('button[type="submit"], button[data-testid="send-button"]');
+            const submitButton = document.querySelector(selector);
             if (submitButton && !submitButton.disabled && submitButton.offsetParent !== null) {
                 return submitButton;
             }

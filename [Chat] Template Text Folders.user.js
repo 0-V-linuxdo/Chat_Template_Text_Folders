@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name               [Chat] Template Text Folders [20260714] v1.0.0
-// @name:zh-CN         [聊天] 模板文本文件夹 [20260714] v1.0.0
+// @name               [Chat] Template Text Folders [20260821] v1.1.0
+// @name:zh-CN         [聊天] 模板文本文件夹 [20260821] v1.1.0
 // @namespace          https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
 // @description        Manage prompt folders and shortcut buttons across AI chat sites, with variable insertion, auto-submit, style customization, and Google Drive sync.
 // @description:zh-CN  在多个 AI 聊天网站中管理提示词文件夹与快捷按钮，支持变量插入、自动提交、样式定制和 Google Drive 同步。
 //
-// @version            [20260714] v1.0.0
-// @update-log         Update the Tabbit web app URL to https://web.tabbit.ai/.
-// @update-log:zh-CN   将 Tabbit 网页应用地址更新至 https://web.tabbit.ai/。
+// @version            [20260821] v1.1.0
+// @update-log         Add Telegram Web A composer support (https://web.telegram.org/a/).
+// @update-log:zh-CN   新增 Telegram Web A 输入框适配（https://web.telegram.org/a/）。
 //
 // [Group 1 | OpenAI/ChatGPT]
 // @match              https://chatgpt.com/*
@@ -63,6 +63,9 @@
 //
 // [Group 12 | Meta/AI]
 // @match              https://meta.ai/*
+//
+// [Group 13 | Telegram Web A]
+// @match              https://web.telegram.org/a/*
 //
 // @grant              GM_xmlhttpRequest
 // @connect            oauth2.googleapis.com
@@ -649,7 +652,7 @@
   // src/features/domain-style/official-style-bundle.generated.js
   var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
   var OFFICIAL_STYLE_BUNDLE = {
-    "version": "[20260714] v1.0.0",
+    "version": "[20260821] v1.1.0",
     "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
     "lastFetchedAt": 0,
     "rules": [
@@ -1183,6 +1186,43 @@
           }
         ],
         "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-telegram-weba-toolbar-space",
+        "name": "Telegram Web A - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://web.telegram.org/a/"
+          }
+        ],
+        "cssCode": ".middle-column-footer {\n    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;\n    box-sizing: border-box !important;\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}",
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
+        "favicon": ""
+      },
+      {
+        "id": "official-telegram-weba-hide-toolbar-special-pages",
+        "name": "Telegram Web A - Hide toolbar on settings and login",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://web.telegram.org/a/#settings"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://web.telegram.org/a/#login"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}\n\n.middle-column-footer {\n    padding-bottom: 0 !important;\n}",
         "layout": {},
         "favicon": ""
       }
@@ -2754,6 +2794,12 @@
             selector: 'button[aria-label="Send message"], button[title="Send message"], button#submit[type="submit"], button[aria-label="Submit"][type="submit"]'
           },
           favicon: generateDomainFavicon("assistant.kagi.com")
+        },
+        {
+          domain: "web.telegram.org",
+          name: "Telegram Web A",
+          method: AUTO_SUBMIT_METHODS.ENTER,
+          favicon: generateDomainFavicon("web.telegram.org")
         }
       ],
       officialStyleBundle: createDefaultOfficialStyleBundle(),
@@ -3137,7 +3183,8 @@
   };
   var DEFAULT_DOMAIN_AUTO_SUBMIT_BACKFILL_DOMAINS = /* @__PURE__ */ new Set([
     ...CEREBR_DOMAINS,
-    "assistant.kagi.com"
+    "assistant.kagi.com",
+    "web.telegram.org"
   ]);
   var normalizeDomainAutoSubmitDomain = (domain) => {
     const raw = typeof domain === "string" ? domain.trim() : "";
@@ -3297,10 +3344,75 @@
     persistButtonConfig(buttonConfig);
   }
   var isSubmitting = false;
+  var TELEGRAM_COMPOSER_IDS = /* @__PURE__ */ new Set([
+    "editable-message-text",
+    "editable-message-text-modal",
+    "editable-story-input-text"
+  ]);
+  var TELEGRAM_COMPOSER_SELECTORS = [
+    ".messages-layout .Transition_slide-active #editable-message-text",
+    ".messages-layout .Transition > .Transition_slide-to #editable-message-text",
+    "#editable-message-text",
+    "#editable-message-text-modal",
+    "#editable-story-input-text"
+  ];
+  var TELEGRAM_SEND_BUTTON_SELECTORS = [
+    "button.Button.send",
+    ".middle-column-footer button.Button.send",
+    ".Composer button.Button.send",
+    "button.send.default",
+    'button[class~="send"]'
+  ].join(", ");
+  var isContentEditableNode = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    return node.isContentEditable || node.getAttribute("contenteditable") === "true";
+  };
+  var isTelegramComposer = (target) => {
+    if (!target || target.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    if (TELEGRAM_COMPOSER_IDS.has(target.id)) {
+      return true;
+    }
+    return Boolean(target.closest("#message-input-text"));
+  };
+  var getTelegramComposer = (root = document) => {
+    if (!root || typeof root.querySelector !== "function") {
+      return null;
+    }
+    for (const selector of TELEGRAM_COMPOSER_SELECTORS) {
+      let candidate = null;
+      try {
+        candidate = root.querySelector(selector);
+      } catch (_) {
+        candidate = null;
+      }
+      if (candidate && isContentEditableNode(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  };
+  var placeCaretAtEnd = (target) => {
+    if (!target) {
+      return;
+    }
+    try {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (_) {
+    }
+  };
   var isEditableElement = (node) => {
     if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
     const tag = node.tagName ? node.tagName.toLowerCase() : "";
-    return tag === "textarea" || node.isContentEditable;
+    return tag === "textarea" || node.isContentEditable || node.getAttribute("contenteditable") === "true";
   };
   var getDeepActiveElement = (root = document) => {
     const active = root && root.activeElement ? root.activeElement : null;
@@ -3326,8 +3438,31 @@
     }
     return null;
   };
+  var resolveTelegramComposerFromNode = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+    if (isTelegramComposer(node) && isEditableElement(node)) {
+      return TELEGRAM_COMPOSER_IDS.has(node.id) ? node : node.id === "message-input-text" ? node.querySelector("#editable-message-text") || node : node.closest("#editable-message-text") || getTelegramComposer(node) || node;
+    }
+    const nested = node.closest ? node.closest("#editable-message-text") || node.closest("#editable-message-text-modal") || node.closest("#editable-story-input-text") || node.closest("#message-input-text") : null;
+    if (nested) {
+      if (TELEGRAM_COMPOSER_IDS.has(nested.id) && isEditableElement(nested)) {
+        return nested;
+      }
+      const composer = nested.querySelector ? nested.querySelector("#editable-message-text, #editable-message-text-modal, #editable-story-input-text") : null;
+      if (composer && isEditableElement(composer)) {
+        return composer;
+      }
+    }
+    return null;
+  };
   var getFocusedEditableElement = () => {
     const activeElement = getDeepActiveElement();
+    const telegramFromActive = resolveTelegramComposerFromNode(activeElement);
+    if (telegramFromActive) {
+      return telegramFromActive;
+    }
     if (isEditableElement(activeElement)) {
       return activeElement;
     }
@@ -3340,22 +3475,35 @@
       if (childEditable) return childEditable;
     }
     const selection = typeof window !== "undefined" ? window.getSelection() : null;
-    const anchorElement = selection && selection.anchorNode ? selection.anchorNode.parentElement : null;
+    const anchorElement = selection && selection.anchorNode ? selection.anchorNode.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection.anchorNode.parentElement : null;
+    const telegramFromAnchor = resolveTelegramComposerFromNode(anchorElement);
+    if (telegramFromAnchor) {
+      return telegramFromAnchor;
+    }
     if (isEditableElement(anchorElement)) {
       return anchorElement;
     }
-    return null;
+    return getTelegramComposer();
   };
   var getAllTextareas = (root = document) => {
     let textareas = [];
+    const telegramInput = getTelegramComposer(root);
+    if (telegramInput) {
+      textareas.push(telegramInput);
+    }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
     let node = walker.nextNode();
     while (node) {
-      if (isEditableElement(node)) {
+      if (isEditableElement(node) && !textareas.includes(node)) {
         textareas.push(node);
       }
       if (node.shadowRoot) {
-        textareas = textareas.concat(getAllTextareas(node.shadowRoot));
+        const shadowTextareas = getAllTextareas(node.shadowRoot);
+        shadowTextareas.forEach((shadowNode) => {
+          if (!textareas.includes(shadowNode)) {
+            textareas.push(shadowNode);
+          }
+        });
       }
       node = walker.nextNode();
     }
@@ -3368,6 +3516,9 @@
     }
     if (element.tagName.toLowerCase() === "textarea") {
       return normalizeEditableText(element.value);
+    }
+    if (isTelegramComposer(element)) {
+      return normalizeEditableText(element.textContent || "");
     }
     const text = typeof element.innerText === "string" ? element.innerText : element.textContent || "";
     return normalizeEditableText(text);
@@ -3421,14 +3572,22 @@
   var insertIntoContentEditable = (target, text, replaceAll) => {
     const editorType = detectEditorType(target);
     target.focus();
+    if (editorType === "telegram") {
+      insertIntoTelegramComposer(target, text, replaceAll);
+      triggerEditorEvents(target, text, replaceAll, editorType);
+      return;
+    }
     if (replaceAll) {
       clearContentEditable(target, editorType);
     }
     insertTextIntoEditor(target, text, editorType);
-    triggerEditorEvents(target, text, replaceAll);
+    triggerEditorEvents(target, text, replaceAll, editorType);
     adjustEditorHeight(target, editorType);
   };
   var detectEditorType = (target) => {
+    if (isTelegramComposer(target)) {
+      return "telegram";
+    }
     if (target.classList.contains("ProseMirror") || target.closest(".ProseMirror") || target.querySelector(".ProseMirror-trailingBreak")) {
       return "prosemirror";
     }
@@ -3439,6 +3598,26 @@
       return "modern";
     }
     return "simple";
+  };
+  var insertIntoTelegramComposer = (target, text, replaceAll) => {
+    if (replaceAll) {
+      target.textContent = text;
+      placeCaretAtEnd(target);
+      return;
+    }
+    const selection = window.getSelection();
+    const hasValidSelection = selection && selection.rangeCount > 0 && target.contains(selection.getRangeAt(0).startContainer) && target.contains(selection.getRangeAt(0).endContainer);
+    if (hasValidSelection) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode(text));
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+    target.appendChild(document.createTextNode(text));
+    placeCaretAtEnd(target);
   };
   var clearContentEditable = (target, editorType) => {
     if (editorType === "prosemirror") {
@@ -3563,7 +3742,7 @@
       target.appendChild(fragment);
     }
   };
-  var triggerEditorEvents = (target, text, replaceAll) => {
+  var triggerEditorEvents = (target, text, replaceAll, editorType) => {
     const events = [
       new InputEvent("beforeinput", {
         bubbles: true,
@@ -3589,6 +3768,14 @@
         console.warn(t("m_fda475caeb26"), e);
       }
     });
+    if (editorType === "telegram") {
+      ["input", "textInput", "keyup"].forEach((eventType) => {
+        try {
+          target.dispatchEvent(new Event(eventType, { bubbles: true, cancelable: true }));
+        } catch (_) {
+        }
+      });
+    }
     try {
       const compositionEvent = new CompositionEvent("compositionend", {
         bubbles: true,
@@ -3640,7 +3827,7 @@
       let elapsed = 0;
       const timer = setInterval(() => {
         elapsed += interval;
-        const currentVal = element.tagName.toLowerCase() === "textarea" ? element.value : element.innerText;
+        const currentVal = element.tagName.toLowerCase() === "textarea" ? element.value : isTelegramComposer(element) ? normalizeEditableText(element.textContent || "") : element.innerText;
         if (currentVal === expectedText) {
           clearInterval(timer);
           resolve();
@@ -3652,8 +3839,9 @@
     });
   }
   var waitForSubmitButton = async (maxAttempts = 10, delay = 300) => {
+    const selector = `button[type="submit"], button[data-testid="send-button"], ${TELEGRAM_SEND_BUTTON_SELECTORS}`;
     for (let i = 0; i < maxAttempts; i++) {
-      const submitButton = document.querySelector('button[type="submit"], button[data-testid="send-button"]');
+      const submitButton = document.querySelector(selector);
       if (submitButton && !submitButton.disabled && submitButton.offsetParent !== null) {
         return submitButton;
       }
@@ -5602,6 +5790,7 @@
     if (attachTimeout) clearTimeout(attachTimeout);
     attachTimeout = setTimeout(() => {
       const textareas = getAllTextareas();
+      const telegramComposer = textareas.find((node) => node && (node.id === "editable-message-text" || node.id === "editable-message-text-modal" || node.id === "editable-story-input-text" || node.closest && node.closest("#message-input-text")));
       console.log(t("m_8d46f43f96e9", {
         count: textareas.length
       }));
@@ -5609,7 +5798,7 @@
         console.warn(t("m_ee15681d0604"));
         return;
       }
-      attachButtonsToTextarea(textareas[textareas.length - 1]);
+      attachButtonsToTextarea(telegramComposer || textareas[textareas.length - 1]);
       console.log(t("m_f873f0136721"));
     }, 300);
   };
