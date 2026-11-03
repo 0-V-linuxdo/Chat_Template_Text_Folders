@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.17
+// @version      2.0.18
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.17" : "0.0.0";
+  var VERSION = true ? "2.0.18" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -642,7 +642,7 @@
     window.addEventListener("storage", on2);
     return () => window.removeEventListener("storage", on2);
   }
-  function createDocStore(key, normalize, makeDefault) {
+  function createDocStore(key, normalize2, makeDefault) {
     let doc = null;
     const listeners6 = /* @__PURE__ */ new Set();
     const emit6 = (source) => {
@@ -656,7 +656,7 @@
     };
     const load = () => {
       const raw2 = gmGet(key);
-      doc = raw2 && raw2.data ? { ...raw2, data: normalize(raw2.data) } : { schema: 1, updatedAt: 0, data: makeDefault() };
+      doc = raw2 && raw2.data ? { ...raw2, data: normalize2(raw2.data) } : { schema: 1, updatedAt: 0, data: makeDefault() };
       if (raw2 && raw2.data && JSON.stringify(raw2.data) !== JSON.stringify(doc.data)) {
         try {
           gmSet(key, doc);
@@ -669,7 +669,7 @@
         load();
         gmWatch(key, (v3) => {
           if (!v3 || !v3.data) return;
-          doc = { ...v3, data: normalize(v3.data) };
+          doc = { ...v3, data: normalize2(v3.data) };
           emit6("tab");
         });
         return this;
@@ -684,7 +684,7 @@
       },
       /** 整份替换;updatedAt 由 source 决定:本机修改用当前时间,拉取 / 导入沿用给定值 */
       set(data, { source = "local", updatedAt } = {}) {
-        doc = { schema: 1, updatedAt: updatedAt ?? Date.now(), data: normalize(data) };
+        doc = { schema: 1, updatedAt: updatedAt ?? Date.now(), data: normalize2(data) };
         gmSet(key, doc);
         emit6(source);
       },
@@ -1073,11 +1073,16 @@
 .uspp-cttf-dlg .uspp-cttf-modal-title { white-space: nowrap; }
 .uspp-cttf-dlg-head-extra { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .uspp-cttf-dlg .uspp-cttf-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
-.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 8px; }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 4px; }
+/* 插件效果预览(框架 preview 字段)里的演示 */
+.uspp-cttf-demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.uspp-cttf-demo-row .uspp-cttf-chip-btn { height: 28px; padding: 6px 12px; border-radius: 4px; border: none; font-size: 14px; line-height: 16px; display: inline-flex; align-items: center; gap: 4px; pointer-events: none; }
+.uspp-cttf-demo-row .uspp-cttf-demo-tool { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; color: var(--uspp-cttf-fg-secondary); }
+.uspp-cttf-demo-list { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.uspp-cttf-demo-list > div { display: flex; justify-content: space-between; gap: 12px; }
 .uspp-cttf-dlg .uspp-cttf-modal-footer { flex-wrap: wrap; }
 .uspp-cttf-dlg .uspp-cttf-setting { padding: 10px 0; }
 .uspp-cttf-dlg .uspp-cttf-btn-icon svg { width: 16px; height: 16px; }
-.uspp-cttf-chip[aria-checked="true"] { background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); border-color: transparent; }
 .uspp-cttf-mini-switch { display: flex; justify-content: center; }
 .uspp-cttf-mini-switch .uspp-cttf-switch { transform: scale(.8); }
 .uspp-cttf-dlg .uspp-cttf-textarea.uspp-cttf-ta { min-height: 150px; white-space: pre-wrap; }
@@ -1090,8 +1095,8 @@
 .uspp-cttf-field-err { color: var(--uspp-cttf-fg-danger); }
 .uspp-cttf-color-row { display: flex; gap: 8px; align-items: center; }
 .uspp-cttf-color { width: 100px; height: 40px; padding: 2px; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 12px; background: var(--uspp-cttf-surface-l2); cursor: pointer; flex: 0 0 auto; -webkit-appearance: auto !important; appearance: auto !important; opacity: 1 !important; }
-.uspp-cttf-preview { display: flex; justify-content: center; padding: 12px; border-radius: 16px; background: var(--uspp-cttf-surface-l2); }
-.uspp-cttf-preview .uspp-cttf-chip-btn { height: 32px; }
+.uspp-cttf-btn-preview { display: flex; justify-content: center; padding: 12px; border-radius: 16px; background: var(--uspp-cttf-surface-l2); }
+.uspp-cttf-btn-preview .uspp-cttf-chip-btn { height: 32px; }
 .uspp-cttf-row2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .uspp-cttf-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 /* 原生表单控件:站点(ChatGPT 的 Tailwind 重置等)会把 checkbox / radio / color 的外观清掉,这里强制恢复成浏览器原生外观 */
@@ -1422,6 +1427,11 @@
     folderButtonCount: '"{name}" 文件夹有 {n} 个按钮',
     automation: "⚡ 自动化",
     pluginsEntry: "🧩 插件",
+    previewToolbar: "页面底部的按钮栏(按当前配置实时显示)。",
+    previewManager: "文件夹与各自的按钮数;半透明的是已隐藏的文件夹。",
+    previewRules: "共 {n} 条自动发送规则。",
+    previewConfig: "当前配置与界面语言。",
+    previewSync: "WebDAV 同步状态(不显示服务器与账号)。",
     setRulesDesc: "按网站设置插入模板后自动发送的方式。",
     setConfigDesc: "语言与外观、导出 / 导入 / 重置配置。",
     setPanelDesc: "新增、修改、删除、隐藏与排序文件夹和按钮。",
@@ -1626,6 +1636,11 @@
     folderButtonCount: 'Folder "{name}" has {n} buttons',
     automation: "⚡ Automation",
     pluginsEntry: "🧩 Plugins",
+    previewToolbar: "The toolbar at the bottom of the page, live from the current config.",
+    previewManager: "Folders and their button counts; faded ones are hidden.",
+    previewRules: "{n} auto-submit rules.",
+    previewConfig: "Current config and interface language.",
+    previewSync: "WebDAV sync status (server and account are not shown).",
     setRulesDesc: "How the message is sent after a template is inserted, per site.",
     setConfigDesc: "Language and appearance; export / import / reset the config.",
     setPanelDesc: "Add, edit, delete, hide and reorder folders and buttons.",
@@ -1874,18 +1889,16 @@
   var Switch = (props) => h(U.components.Switch, props);
   var SettingRow = ({ title, description, children }) => h("div", { className: "uspp-cttf-setting" }, h(U.components.Row, { title, description }, children));
   var SwitchRow = ({ title, description, checked, onChange }) => h(SettingRow, { title, description }, h(Switch, { checked, onChange, label: typeof title === "string" ? title : void 0 }));
-  function Choices({ options, value, onChange, label }) {
-    return h("div", { className: "uspp-cttf-tabs", role: "radiogroup", "aria-label": label }, options.map((o3) => h("button", {
-      key: String(o3.value),
-      type: "button",
-      role: "radio",
-      className: "uspp-cttf-chip",
-      "aria-checked": String(o3.value === value),
-      "aria-selected": String(o3.value === value),
-      "data-value": String(o3.value),
-      onClick: () => onChange(o3.value)
-    }, o3.label)));
-  }
+  var Choices = ({ options, value, onChange, label }) => h(U.components.Select, { value, options, onChange, label });
+  var livePreview = (render, caption) => ({
+    component: function LivePreview() {
+      useLive();
+      return render();
+    },
+    get caption() {
+      return caption?.();
+    }
+  });
   var IconBtn = ({ icon, label, onClick, className }) => h(U.components.IconButton, { icon: U.icons[icon], label, onClick, className });
   var openerSetting = ({ description, label, onOpen }) => ({
     type: U.OptionType.COMPONENT,
@@ -2454,6 +2467,15 @@
       description: "Sends the message after a template is inserted, using per-site rules; includes the rule editor.",
       authors: ["0-V-linuxdo"],
       required: true,
+      preview: livePreview(() => {
+        const rules = config.data.domainAutoSubmitSettings;
+        return h(
+          "div",
+          { className: "uspp-cttf-demo-list" },
+          rules.slice(0, 5).map((r3, i3) => h("div", { key: i3 }, h("span", null, r3.name || r3.domain), h("span", { className: "uspp-cttf-muted" }, methodLabel(r3)))),
+          rules.length > 5 && h("div", { className: "uspp-cttf-muted" }, `+${rules.length - 5}`)
+        );
+      }, () => t("previewRules", { n: config.data.domainAutoSubmitSettings.length })),
       settings: U4.definePluginSettings({ rules: openerSetting({ description: () => t("setRulesDesc"), label: () => t("automation"), onOpen: open }) }),
       startAt: U4.StartAt.Init,
       slots: { managerHeader: { label: () => t("automation"), order: 10, onClick: open } },
@@ -2652,6 +2674,15 @@
       description: "Script config: language and appearance, export / import with preview, reset, and migration from the old version's local data.",
       authors: ["0-V-linuxdo"],
       required: true,
+      preview: livePreview(() => {
+        const st = stats(config.data);
+        return h(
+          "div",
+          { className: "uspp-cttf-demo-list" },
+          h("div", null, h("span", null, t("currentConfig")), h("span", { className: "uspp-cttf-muted" }, t("stats", { f: st.folders, b: st.buttons }))),
+          h("div", null, h("span", null, t("language")), h("span", { className: "uspp-cttf-muted" }, { auto: t("langAuto"), zh: t("langZh"), en: t("langEn") }[prefs.get().language] || t("langAuto")))
+        );
+      }, () => t("previewConfig")),
       settings: U4.definePluginSettings({
         language: liveSetting({ render: () => h(Choices, {
           label: t("language"),
@@ -2739,7 +2770,7 @@
         h(
           DialogBody,
           null,
-          h("div", { className: "uspp-cttf-preview" }, h(Chip, { name: name || "📁", folder: { color, textColor } })),
+          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || "📁", folder: { color, textColor } })),
           h(Field, { label: t("folderName"), error: err }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: name, autoFocus: true, onInput: (e3) => {
             setName(e3.target.value);
             setErr("");
@@ -2771,7 +2802,7 @@
           h("div", null, t("delFolderWarn")),
           name === TOOL_FOLDER && h("div", { className: "uspp-cttf-muted2" }, t("delToolFolderNote")),
           h("div", { className: "uspp-cttf-muted2" }, t("folderAppearance", { name, bg: f3.color, fg: f3.textColor })),
-          h("div", { className: "uspp-cttf-preview", style: { flexWrap: "wrap", gap: "6px" } }, Object.entries(f3.buttons).map(([bn2, b3]) => h(Chip, { key: bn2, name: bn2, btn: b3 })))
+          h("div", { className: "uspp-cttf-btn-preview", style: { flexWrap: "wrap", gap: "6px" } }, Object.entries(f3.buttons).map(([bn2, b3]) => h(Chip, { key: bn2, name: bn2, btn: b3 })))
         )
       });
       if (!ok) return;
@@ -2842,7 +2873,7 @@
         h(
           DialogBody,
           null,
-          h("div", { className: "uspp-cttf-preview" }, h(Chip, { name: name || "🔖", btn: preview, title: text })),
+          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || "🔖", btn: preview, title: text })),
           h(Tabs, { tabs, value: tab, onChange: setTab }),
           err && h("div", { className: "uspp-cttf-field-err" }, err),
           tab === "template" && h(
@@ -2892,7 +2923,7 @@
         body: () => h(
           Fragment,
           null,
-          h("div", { className: "uspp-cttf-preview" }, h(Chip, { name, btn: b3 })),
+          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name, btn: b3 })),
           h("div", { className: "uspp-cttf-muted2" }, t("folderAppearance", { name, bg: b3.color, fg: b3.textColor })),
           b3.type === "template" && h(Field, { label: t("template") }, h("textarea", { className: "uspp-cttf-textarea uspp-cttf-ta", style: { minHeight: "80px" }, readOnly: true, value: b3.text })),
           b3.type === "template" && h("div", { className: "uspp-cttf-muted2" }, `${t("colAutoSubmit")}: ${b3.autoSubmit ? t("yes") : t("no")}`),
@@ -3068,6 +3099,15 @@
       description: "Settings panel: add, edit, delete, hide and reorder folders and buttons.",
       authors: ["0-V-linuxdo"],
       required: true,
+      preview: livePreview(() => {
+        const c3 = config.data;
+        return h("div", { className: "uspp-cttf-demo-row" }, c3.folderOrder.filter((n2) => c3.folders[n2]).map((n2) => h(
+          "span",
+          { key: n2, style: { display: "inline-flex", alignItems: "center", gap: "6px", opacity: c3.folders[n2].hidden ? 0.45 : 1 } },
+          h(Chip, { name: n2, folder: c3.folders[n2], withIcon: true }),
+          h(Badge, { kind: "folder" }, Object.keys(c3.folders[n2].buttons || {}).length)
+        )));
+      }, () => t("previewManager")),
       settings: U4.definePluginSettings({ settingsPanel: openerSetting({ description: () => t("setPanelDesc"), label: () => t("openSettings"), onOpen: () => openManager() }) }),
       startAt: U4.StartAt.Init,
       // 插件入口:框架设置面板的 Plugins 页(启用 / 停用、插件设置)
@@ -3171,8 +3211,19 @@
       description: "Bottom toolbar with prompt template folders, tool buttons, and the settings / clear buttons.",
       authors: ["0-V-linuxdo"],
       required: true,
+      preview: livePreview(() => {
+        const c3 = config.data;
+        const names = c3.folderOrder.filter((n2) => c3.folders[n2] && !c3.folders[n2].hidden);
+        return h(
+          "div",
+          { className: "uspp-cttf-demo-row" },
+          names.map((name) => h(Chip, { key: name, name, folder: c3.folders[name], withIcon: true })),
+          h("span", { className: "uspp-cttf-demo-tool" }, h(GearIcon)),
+          h("span", { className: "uspp-cttf-demo-tool" }, h(EraseIcon))
+        );
+      }, () => t("previewToolbar")),
       settings: U4.definePluginSettings({
-        folderIcons: liveSetting({ description: () => t("folderIcons"), render: () => h(Switch, { checked: !!config.data.showFolderIcons, label: t("folderIcons"), onChange: (v3) => config.update((d3) => {
+        folderIcons: liveSetting({ render: () => h(Switch, { checked: !!config.data.showFolderIcons, label: t("folderIcons"), onChange: (v3) => config.update((d3) => {
           d3.showFolderIcons = v3;
         }) }) })
       }),
@@ -3641,6 +3692,17 @@
       description: "Sync the template config through WebDAV: test, upload, pull, conflict resolution, optional auto sync.",
       authors: ["0-V-linuxdo"],
       required: true,
+      // 只显示开关状态与上次同步时间,不显示服务器地址 / 账号 / 密码
+      preview: livePreview(() => {
+        const s3 = webdav.get();
+        return h(
+          "div",
+          { className: "uspp-cttf-demo-list" },
+          h("div", null, h("span", null, t("webdavEnable")), h("span", { className: "uspp-cttf-muted" }, s3.enabled ? t("yes") : t("no"))),
+          h("div", null, h("span", null, t("autoSync")), h("span", { className: "uspp-cttf-muted" }, s3.enabled && s3.autoSync ? t("yes") : t("no"))),
+          h("div", { className: "uspp-cttf-muted" }, t("lastSync", { t: s3.lastSyncedAt ? new Date(s3.lastSyncedAt).toLocaleString() : t("never") }))
+        );
+      }, () => t("previewSync")),
       settings: U4.definePluginSettings({ sync: openerSetting({ description: () => t("setSyncDesc"), label: () => t("tabSync"), onOpen: () => entry.openScriptConfig?.("WebDAVSync") }) }),
       startAt: U4.StartAt.SiteReady,
       slots: { configTabs: { label: () => t("tabSync"), order: 10, render: SyncTab } },
@@ -4560,7 +4622,7 @@
       }
       const before = code;
       const statuses = [];
-      let failed = false;
+      let failed2 = false;
       for (const r3 of p3.replacement) {
         if (!runPredicate(r3.predicate, p3.plugin)) {
           statuses.push({ match: String(r3.match), status: "skipped" });
@@ -4572,7 +4634,7 @@
           if (next === code) {
             statuses.push({ match: String(r3.match), status: "noEffect" });
             stats2.noEffect++;
-            failed = true;
+            failed2 = true;
             if (!p3.noWarn && !r3.noWarn) logger4.warn(`${p3.plugin}: 替换无效果(模块 ${moduleId})`, describeFind(p3.rawFind), String(r3.match));
           } else {
             code = next;
@@ -4581,11 +4643,11 @@
         } catch (e3) {
           statuses.push({ match: String(r3.match), status: "error", error: String(e3) });
           stats2.errors++;
-          failed = true;
+          failed2 = true;
           logger4.error(`${p3.plugin}: 替换出错(模块 ${moduleId})`, describeFind(p3.rawFind), e3);
         }
       }
-      if (p3.group && failed) {
+      if (p3.group && failed2) {
         code = before;
         for (const s3 of statuses) if (s3.status === "applied" || s3.status === "noEffect") s3.status = "reverted";
         if (!p3.noWarn) logger4.warn(`${p3.plugin}: 成组补丁未全部生效,已撤销(模块 ${moduleId})`, describeFind(p3.rawFind));
@@ -7117,13 +7179,13 @@ ${orphaned.join("\n")}`);
     if (PlainSettings.plugins.Settings && PlainSettings.plugins.Settings.enabled === false) Settings.plugins.Settings.enabled = true;
   }
   function startAllAt(stage) {
-    const failed = [];
+    const failed2 = [];
     for (const p3 of Object.values(plugins)) {
       if ((p3.startAt ?? StartAt.Init) !== stage) continue;
       if (!isPluginEnabled(p3.name) || p3.started) continue;
-      if (!startPlugin(p3)) failed.push(p3);
+      if (!startPlugin(p3)) failed2.push(p3);
     }
-    return failed;
+    return failed2;
   }
   function sensitiveKeys(name) {
     const def = plugins[name]?.settings?.def;
@@ -8237,10 +8299,12 @@ ${orphaned.join("\n")}`);
     CheckIcon: () => CheckIcon,
     ChevronRightIcon: () => ChevronRightIcon,
     ChromiumIcon: () => ChromiumIcon,
+    CircleAlertIcon: () => CircleAlertIcon,
     CloseIcon: () => CloseIcon,
     CodeIcon: () => CodeIcon,
     CopyIcon: () => CopyIcon,
     EditIcon: () => EditIcon,
+    EyeIcon: () => EyeIcon,
     InfoIcon: () => InfoIcon,
     LockIcon: () => LockIcon,
     LogoIcon: () => LogoIcon,
@@ -8295,6 +8359,8 @@ ${orphaned.join("\n")}`);
   var ReloadIcon = svg2(["M21 12a9 9 0 1 1-3-6.7", "M21 3v6h-6"]);
   var ChevronRightIcon = svg2(["M9 6l6 6-6 6"]);
   var LogoIcon = svg2(["M12 3l8 4.5v9L12 21l-8-4.5v-9z", "M12 8v8", "M8 12h8"]);
+  var CircleAlertIcon = svg2(["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 8v4", "M12 16h.01"]);
+  var EyeIcon = svg2(["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"]);
   var ArchiveIcon = svg2(["M3 4h18v4H3z", "M5 8v12h14V8", "M10 12h4"]);
 
   // ../Userscriptpp/core/ui/theme.js
@@ -8764,33 +8830,59 @@ uspp-cttf-root > * { pointer-events: auto; }
 .uspp-cttf-muted { color: var(--uspp-cttf-fg-secondary); }
 .uspp-cttf-small { font-size: 12px; }
 .uspp-cttf-section { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 16px; background: var(--uspp-cttf-surface-l1); }
-.uspp-cttf-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.uspp-cttf-chip { height: 30px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--uspp-cttf-border-l1); background: transparent; color: var(--uspp-cttf-fg-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.uspp-cttf-chip:hover { background: var(--uspp-cttf-button-ghost-hover); }
-.uspp-cttf-chip[aria-selected="true"] { background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); border-color: transparent; }
-.uspp-cttf-toolbar { display: flex; gap: 8px; align-items: center; }
-.uspp-cttf-toolbar .uspp-cttf-input { flex: 1; }
+.uspp-cttf-tabs { display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex-shrink: 0; border-bottom: 1px solid var(--uspp-cttf-border-l1); }
+.uspp-cttf-tabs::-webkit-scrollbar { display: none; }
+.uspp-cttf-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: 32px; padding: 0 10px; border: none; border-radius: 8px; background: transparent; color: var(--uspp-cttf-fg-secondary); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.uspp-cttf-chip:hover { background: var(--uspp-cttf-button-ghost-hover); color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-chip[aria-selected="true"] { color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-chip[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 8px; bottom: -1px; height: 2px; border-radius: 1px; background: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-toolbar { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
+.uspp-cttf-toolbar > :not(.uspp-cttf-input) { flex-shrink: 0; width: auto; }
+.uspp-cttf-toolbar .uspp-cttf-input { flex: 1; min-width: 0; }
 .uspp-cttf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-@media (max-width: 720px) { .uspp-cttf-grid { grid-template-columns: 1fr; } }
 .uspp-cttf-divider { display: flex; align-items: center; gap: 8px; color: var(--uspp-cttf-fg-tertiary); font-size: 12px; margin: 4px 0; }
 .uspp-cttf-divider::before, .uspp-cttf-divider::after { content: ""; flex: 1; height: 1px; background: var(--uspp-cttf-border-l1); }
-.uspp-cttf-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 16px; background: var(--uspp-cttf-surface-l1); min-width: 0; }
-.uspp-cttf-card[data-failed="true"] { border-color: var(--uspp-cttf-fg-danger); background: color-mix(in srgb, var(--uspp-cttf-fg-danger) 8%, transparent); }
-.uspp-cttf-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.uspp-cttf-card-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.uspp-cttf-card-controls { margin-left: auto; display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.uspp-cttf-card-desc { color: var(--uspp-cttf-fg-secondary); font-size: 13px; line-height: 1.4; }
-.uspp-cttf-card-authors { color: var(--uspp-cttf-fg-tertiary); font-size: 12px; }
-.uspp-cttf-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); }
-.uspp-cttf-icon-badge { display: inline-flex; color: var(--uspp-cttf-fg-secondary); }
+.uspp-cttf-card { display: flex; flex-direction: column; padding: 0; min-height: 120px; min-width: 0; overflow: hidden; contain: content; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 8px; background: var(--uspp-cttf-surface-l1); }
+.uspp-cttf-card[data-required="true"] { opacity: .4; }
+.uspp-cttf-card[data-failed="true"] { opacity: .5; border-color: color-mix(in srgb, var(--uspp-cttf-fg-danger) 45%, transparent); }
+.uspp-cttf-card-body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
+.uspp-cttf-card-head { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.uspp-cttf-card-title { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.uspp-cttf-card-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 8px; line-height: 0; color: var(--uspp-cttf-fg-primary); background: color-mix(in srgb, var(--uspp-cttf-fg-primary) 10%, transparent); }
+.uspp-cttf-card-icon svg { width: 14px; height: 14px; }
+.uspp-cttf-card-name { flex-shrink: 1; min-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
+.uspp-cttf-card-controls { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.uspp-cttf-card-btn { width: 28px; height: 28px; border-radius: 8px; color: var(--uspp-cttf-fg-tertiary); }
+.uspp-cttf-card-btn.uspp-cttf-active { color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-card-desc { margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--uspp-cttf-fg-secondary); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.uspp-cttf-card-sep { height: 1px; background: var(--uspp-cttf-border-l1); }
+.uspp-cttf-card-foot { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; padding: 6px 12px; min-height: 22px; }
+.uspp-cttf-card-authors { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--uspp-cttf-fg-tertiary); }
+.uspp-cttf-card-foot .uspp-cttf-sites { margin-top: 0; flex-shrink: 0; }
+.uspp-cttf-card-preview { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; border: none; background: transparent; color: var(--uspp-cttf-fg-tertiary); font: inherit; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+.uspp-cttf-card-preview:hover { color: var(--uspp-cttf-fg-primary); background: var(--uspp-cttf-button-ghost-hover); }
+.uspp-cttf-badge { flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); }
+.uspp-cttf-icon-badge { display: inline-flex; align-items: center; flex-shrink: 0; line-height: 0; color: var(--uspp-cttf-fg-tertiary); }
 .uspp-cttf-icon-badge.uspp-cttf-warn { color: var(--uspp-cttf-fg-danger); }
 .uspp-cttf-empty { padding: 32px 8px; text-align: center; color: var(--uspp-cttf-fg-secondary); }
 .uspp-cttf-banner { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--uspp-cttf-surface-l2); }
 .uspp-cttf-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 18px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--uspp-cttf-border-l1); }
 .uspp-cttf-backup-text { flex: 1 1 220px; display: flex; flex-direction: column; gap: 2px; }
-.uspp-cttf-sites { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.uspp-cttf-site-badge { font-size: 11px; padding: 0 6px; border-radius: 6px; color: var(--uspp-cttf-fg-secondary); border: 1px solid var(--uspp-cttf-border-l1); white-space: nowrap; }
-.uspp-cttf-panel { display: flex; flex-direction: column; gap: 14px; }
+.uspp-cttf-sites { white-space: nowrap; display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.uspp-cttf-site-badge { flex-shrink: 0; font-size: 11px; padding: 0 6px; border-radius: 6px; color: var(--uspp-cttf-fg-secondary); border: 1px solid var(--uspp-cttf-border-l1); white-space: nowrap; }
+.uspp-cttf-panel { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 20px; align-items: start; }
+.uspp-cttf-panel-nav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
+.uspp-cttf-panel-nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: none; border-radius: 10px; background: transparent; color: var(--uspp-cttf-fg-secondary); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; text-align: start; cursor: pointer; }
+.uspp-cttf-panel-nav-item:hover { background: var(--uspp-cttf-button-ghost-hover); color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-panel-nav-item[aria-selected="true"] { background: var(--uspp-cttf-surface-l2); color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-panel-nav-item span { overflow: hidden; text-overflow: ellipsis; }
+.uspp-cttf-panel-content { min-width: 0; }
+.uspp-cttf-modal:has(.uspp-cttf-panel) { container-type: inline-size; }
+@container (max-width: 760px) {
+  .uspp-cttf-panel { grid-template-columns: 44px minmax(0, 1fr); gap: 14px; }
+  .uspp-cttf-panel-nav-item { justify-content: center; padding: 0; }
+  .uspp-cttf-panel-nav-item span { display: none; }
+}
 .uspp-cttf-panel .uspp-cttf-page { padding-inline-end: 0; }
 .uspp-cttf-floating { position: fixed; z-index: 2147482000; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
 .uspp-cttf-floating[data-pos="bottom-right"] { right: 16px; bottom: 16px; }
@@ -8812,6 +8904,20 @@ uspp-cttf-root > * { pointer-events: auto; }
 .uspp-cttf-notice-msg { flex: 1; }
 
 .uspp-cttf-menu-icon { display: inline-flex; margin-inline-end: 8px; color: var(--uspp-cttf-fg-secondary); }
+.uspp-cttf-preview { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+.uspp-cttf-preview-head { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.uspp-cttf-preview-title { font-weight: 600; }
+.uspp-cttf-preview-nav { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.uspp-cttf-preview-img { display: block; max-width: 100%; max-height: 300px; margin: 0 auto; border-radius: 12px; border: 1px solid var(--uspp-cttf-border-l1); object-fit: contain; background: var(--uspp-cttf-surface-l2); }
+.uspp-cttf-preview-live { padding: 14px; border-radius: 14px; border: 1px dashed var(--uspp-cttf-border-l2); background: var(--uspp-cttf-surface-l2); overflow: auto; max-height: 320px; }
+.uspp-cttf-preview-empty { padding: 24px 8px; text-align: center; border-radius: 14px; background: var(--uspp-cttf-surface-l2); }
+.uspp-cttf-preview-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.uspp-cttf-preview-compare figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.uspp-cttf-preview-compare figcaption { text-align: center; font-size: 12px; color: var(--uspp-cttf-fg-secondary); }
+.uspp-cttf-preview-caption { text-align: center; }
+.uspp-cttf-preview-slots { display: flex; flex-direction: column; gap: 8px; border-style: solid; }
+.uspp-cttf-preview-slot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.uspp-cttf-preview-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--uspp-cttf-border-l2); background: var(--uspp-cttf-surface-l1); font-weight: 500; font-size: 13px; }
 `;
 
   // ../Userscriptpp/core/settings/index.js
@@ -8872,6 +8978,125 @@ uspp-cttf-root > * { pointer-events: auto; }
       removeSlotItem("menuCommand", MENU_COMMAND_ID);
     }
   });
+
+  // ../Userscriptpp/core/settings/PluginPreview.js
+  var SLOT_LABELS = {
+    toolbar: "Toolbar button",
+    menuCommand: "Script menu command",
+    floating: "Floating button",
+    chatBar: "Composer button",
+    conversationMenu: "Conversation menu item",
+    messageMenu: "Message menu item",
+    userMenu: "Avatar menu item",
+    "settings.pluginActions": "Plugin card button"
+  };
+  var toSrc = (s3) => typeof s3 === "string" && /^\s*<svg[\s>]/i.test(s3) ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s3.trim()) : s3;
+  function normalize(v3) {
+    if (v3 == null || v3 === false) return [];
+    if (Array.isArray(v3)) return v3.flatMap(normalize);
+    if (typeof v3 === "function") return [{ component: v3 }];
+    if (typeof v3 === "string") return v3.trim() ? [{ src: v3 }] : [];
+    if (typeof v3 === "object" && (v3.component || v3.src || v3.before || v3.after)) return [v3];
+    return [];
+  }
+  var declaredPreviews = (p3) => {
+    try {
+      return normalize(p3.preview);
+    } catch {
+      return [];
+    }
+  };
+  function slotSummary(p3) {
+    let slots2 = {};
+    try {
+      slots2 = pluginSlots(p3);
+    } catch {
+      slots2 = p3.slots || {};
+    }
+    const out = [];
+    for (const [slot, v3] of Object.entries(slots2 || {})) {
+      for (const def of [].concat(v3)) {
+        if (!def || typeof def !== "object") continue;
+        const label = typeof def.label === "string" ? def.label : typeof def.tooltip === "string" ? def.tooltip : typeof def["aria-label"] === "string" ? def["aria-label"] : def.id ?? p3.name;
+        out.push({ slot, label, icon: def.icon });
+      }
+    }
+    return out;
+  }
+  function hasPreview(p3) {
+    if (p3.preview === false) return false;
+    return declaredPreviews(p3).length > 0 || slotSummary(p3).length > 0;
+  }
+  var failed = () => h4("div", { className: "uspp-cttf-muted uspp-cttf-small uspp-cttf-preview-empty" }, "Preview failed to render.");
+  function Img({ src, alt }) {
+    const [bad, setBad] = useState2(false);
+    if (bad) return h4("div", { className: "uspp-cttf-muted uspp-cttf-small uspp-cttf-preview-empty" }, "Image could not be loaded.");
+    return h4("img", { className: "uspp-cttf-preview-img", src: toSrc(src), alt: alt || "", loading: "lazy", draggable: false, onError: () => setBad(true) });
+  }
+  function Frame({ item, plugin }) {
+    if (item.component) {
+      const ctx = { plugin, settings: Settings.plugins[plugin.name], enabled: isPluginEnabled(plugin.name) };
+      return h4("div", { className: "uspp-cttf-preview-live" }, h4(ErrorBoundary, { fallback: failed(), label: `preview:${plugin.name}` }, h4(item.component, ctx)));
+    }
+    if (item.before || item.after) {
+      return h4("div", { className: "uspp-cttf-preview-compare" }, [["Before", item.before], ["After", item.after]].filter(([, s3]) => s3).map(([label, s3]) => h4("figure", { key: label }, h4(Img, { src: s3, alt: `${plugin.name} ${label.toLowerCase()}` }), h4("figcaption", null, label))));
+    }
+    return h4(Img, { src: item.src, alt: item.alt || plugin.name });
+  }
+  function SlotSummary({ items }) {
+    return h4(
+      "div",
+      { className: "uspp-cttf-preview-live uspp-cttf-preview-slots" },
+      h4("div", { className: "uspp-cttf-muted uspp-cttf-small" }, "Adds to the page:"),
+      items.map((it, i3) => h4(
+        "div",
+        { key: i3, className: "uspp-cttf-preview-slot" },
+        h4(
+          "span",
+          { className: "uspp-cttf-preview-chip" },
+          typeof it.icon === "function" ? h4(ErrorBoundary, { fallback: null }, h4(it.icon, { size: 4 })) : null,
+          String(it.label)
+        ),
+        h4("span", { className: "uspp-cttf-muted uspp-cttf-small" }, SLOT_LABELS[it.slot] ?? humanizeKey(it.slot))
+      ))
+    );
+  }
+  function PluginPreview({ plugin }) {
+    const [idx, setIdx] = useState2(0);
+    if (plugin.preview === false) return null;
+    const items = declaredPreviews(plugin);
+    const summary = items.length ? [] : slotSummary(plugin);
+    if (!items.length && !summary.length) return null;
+    const n2 = items.length;
+    const i3 = n2 ? Math.min(idx, n2 - 1) : 0;
+    const item = items[i3];
+    return h4(
+      "section",
+      { className: "uspp-cttf-preview", "data-uspp-cttf-preview": plugin.name, "aria-label": "Preview" },
+      h4(
+        "div",
+        { className: "uspp-cttf-preview-head" },
+        h4("span", { className: "uspp-cttf-preview-title" }, "Preview"),
+        n2 > 1 && h4(
+          "div",
+          { className: "uspp-cttf-preview-nav" },
+          h4(
+            "button",
+            { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon", "aria-label": "Previous preview", onClick: () => setIdx((i3 - 1 + n2) % n2) },
+            h4(ChevronRightIcon, { size: 4, style: { transform: "rotate(180deg)" } })
+          ),
+          h4("span", { className: "uspp-cttf-muted uspp-cttf-small" }, `${i3 + 1} / ${n2}`),
+          h4(
+            "button",
+            { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon", "aria-label": "Next preview", onClick: () => setIdx((i3 + 1) % n2) },
+            h4(ChevronRightIcon, { size: 4 })
+          )
+        )
+      ),
+      item ? h4(Frame, { key: i3, item, plugin }) : h4(SlotSummary, { items: summary }),
+      item?.caption && h4("div", { className: "uspp-cttf-muted uspp-cttf-small uspp-cttf-preview-caption" }, item.caption)
+    );
+  }
 
   // ../Userscriptpp/core/settings/PluginModal.js
   function usePluginSettings(name) {
@@ -8999,7 +9224,35 @@ uspp-cttf-root > * { pointer-events: auto; }
         footer: visible2.length ? h4(Button, { variant: "danger", onClick: reset }, "Reset") : null
       },
       h4("div", { className: "uspp-cttf-muted uspp-cttf-small", style: { marginBottom: 8 } }, "Authors: ", (plugin.authors || []).join(", ") || "Unknown"),
-      visible2.length ? visible2.map(([key, s3]) => h4(ErrorBoundary, { key, fallback: null }, h4(SettingControl, { plugin, keyName: key, setting: s3, onRestartChange }))) : h4("div", { className: "uspp-cttf-empty" }, "No configurable settings.")
+      h4(ErrorBoundary, { fallback: null }, h4(PluginPreview, { plugin })),
+      visible2.length ? visible2.map(([key, s3]) => h4(ErrorBoundary, { key, fallback: null }, h4(SettingControl, { plugin, keyName: key, setting: s3, onRestartChange }))) : !hasPreview(plugin) && h4("div", { className: "uspp-cttf-empty" }, "No configurable settings.")
+    );
+  }
+
+  // ../Userscriptpp/core/settings/BaseCard.js
+  function BaseCard({ className, attrs, name, icon, badges, description, controls, footer }) {
+    return h4(
+      "div",
+      { ...attrs, className: classes("uspp-cttf-card", className) },
+      h4(
+        "div",
+        { className: "uspp-cttf-card-body" },
+        h4(
+          "div",
+          { className: "uspp-cttf-card-head" },
+          h4(
+            "div",
+            { className: "uspp-cttf-card-title" },
+            icon != null && h4("span", { className: "uspp-cttf-card-icon" }, icon),
+            h4("span", { className: "uspp-cttf-card-name", title: name }, name),
+            badges
+          ),
+          h4("div", { className: "uspp-cttf-card-controls" }, controls)
+        ),
+        description && h4("div", { className: "uspp-cttf-card-desc", title: description }, description)
+      ),
+      h4("div", { className: "uspp-cttf-card-sep" }),
+      h4("div", { className: "uspp-cttf-card-foot" }, footer)
     );
   }
 
@@ -9030,6 +9283,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     ["developer", "Developer"]
   ];
   var DAY = 864e5;
+  var MULTI_SITE = (typeof define_USPP_SITES_default !== "undefined" ? define_USPP_SITES_default : []).length > 1;
   function visiblePlugins() {
     return Object.values(plugins).filter((p3) => !p3.hidden && !(p3.chromiumOnly && !isChromium()));
   }
@@ -9095,11 +9349,12 @@ uspp-cttf-root > * { pointer-events: auto; }
   }
   function Badges({ p: p3 }) {
     const out = [];
-    const failed = !p3.required && isPluginEnabled(p3.name) && !p3.started;
-    if (p3.required) out.push(h4(Tooltip, { key: "req", content: `This plugin is required for ${SCRIPT_NAME} to work` }, h4("span", { className: "uspp-cttf-icon-badge" }, h4(LockIcon, { size: 3.5 }))));
-    if (failed) out.push(h4(Tooltip, { key: "fail", content: "This plugin failed to start" }, h4("span", { className: "uspp-cttf-icon-badge uspp-cttf-warn" }, h4(WarningIcon, { size: 3.5 }))));
-    if (p3.chromiumOnly) out.push(h4(Tooltip, { key: "chr", content: "Chromium only" }, h4("span", { className: "uspp-cttf-icon-badge" }, h4(ChromiumIcon, { size: 3.5 }))));
-    if (p3.dev) out.push(h4(Tooltip, { key: "dev", content: "Development build only" }, h4("span", { className: "uspp-cttf-icon-badge" }, h4(WrenchIcon, { size: 3.5 }))));
+    const failed2 = !p3.required && isPluginEnabled(p3.name) && !p3.started;
+    const icon = (key, tip, Icon2, cls) => h4(Tooltip, { key, content: tip }, h4("span", { className: classes("uspp-cttf-icon-badge", cls) }, h4(Icon2, { size: 3.5 })));
+    if (failed2) out.push(icon("fail", "This plugin failed to start", WarningIcon, "uspp-cttf-warn"));
+    if (p3.required) out.push(icon("req", `This plugin is required for ${SCRIPT_NAME} to work`, CircleAlertIcon));
+    if (p3.dev) out.push(icon("dev", "Development build only", WrenchIcon));
+    if (p3.chromiumOnly) out.push(icon("chr", "Chromium only", ChromiumIcon));
     const seen = sys().knownPlugins?.[p3.name];
     if (seen && Date.now() - seen < 2 * DAY) out.push(h4("span", { key: "new", className: "uspp-cttf-badge" }, "New"));
     return out;
@@ -9108,8 +9363,9 @@ uspp-cttf-root > * { pointer-events: auto; }
     const enabled = isPluginEnabled(p3.name);
     const starred = listSetting("starredPlugins").includes(p3.name);
     const pinned = listSetting("pinnedPlugins").includes(p3.name);
-    const failed = !p3.required && enabled && !p3.started;
+    const failed2 = !p3.required && enabled && !p3.started;
     const hasSettings = getVisibleSettings(p3).length > 0;
+    const showPreview = hasPreview(p3);
     const Icon2 = p3.icon || PlugIcon;
     const toggleStar = () => {
       const list = listSetting("starredPlugins").filter((n2) => n2 !== p3.name);
@@ -9124,37 +9380,40 @@ uspp-cttf-root > * { pointer-events: auto; }
       dispatch(Events.PLUGIN_PIN, { name: p3.name, pinned: !pinned });
     };
     const openConfig = () => openModal(({ onClose }) => h4(PluginModal, { plugin: p3, onClose, onRestartChange: tracker.onSettingRestart }), { modalKey: `uspp-cttf-plugin-${p3.name}` });
-    return h4(
-      "div",
-      { className: "uspp-cttf-card", "data-failed": String(failed), "data-uspp-cttf-plugin": p3.name },
-      h4(
-        "div",
-        { className: "uspp-cttf-card-head" },
-        h4("span", { className: "uspp-cttf-icon-badge" }, h4(ErrorBoundary, { fallback: h4(PlugIcon, { size: 4.5 }) }, h4(Icon2, { size: 4.5 }))),
-        h4("span", { className: "uspp-cttf-card-name" }, p3.name),
-        h4(Badges, { p: p3 }),
-        h4("span", { className: "uspp-cttf-site-badge", "data-uspp-cttf-plugin-site": p3.site ?? "*" }, pluginSiteLabel(p3)),
-        h4(
-          "div",
-          { className: "uspp-cttf-card-controls" },
-          h4(PluginActions, { p: p3 }),
-          h4(IconButton, { icon: starred ? StarFillIcon : StarIcon, label: starred ? "Unstar" : "Star", active: starred, onClick: toggleStar }),
-          !p3.required && h4(IconButton, { icon: pinned ? PinFillIcon : PinIcon, label: pinned ? "Unpin" : "Pin", active: pinned, onClick: togglePin }),
-          hasSettings && h4(IconButton, { icon: SlidersIcon, label: "config", onClick: openConfig }),
-          h4(Switch2, {
-            checked: enabled,
-            disabled: p3.required || isEnabledAsDependency(p3.name),
-            label: p3.name,
-            onChange: () => {
-              togglePlugin(p3.name);
-              tracker.onToggled(p3);
-            }
-          })
+    const btn = (key, icon, label, onClick, active) => h4(IconButton, { key, icon, label, onClick, active, size: 3.5, className: "uspp-cttf-card-btn" });
+    return h4(BaseCard, {
+      attrs: { "data-failed": String(failed2), "data-required": String(!!p3.required), "data-uspp-cttf-plugin": p3.name },
+      name: p3.name,
+      icon: h4(ErrorBoundary, { fallback: h4(PlugIcon, { size: 3.5 }) }, h4(Icon2, { size: 3.5 })),
+      badges: h4(Badges, { p: p3 }),
+      description: p3.description,
+      controls: [
+        h4(PluginActions, { key: "actions", p: p3 }),
+        btn("star", starred ? StarFillIcon : StarIcon, starred ? "Unstar" : "Star", toggleStar, starred),
+        !p3.required && btn("pin", pinned ? PinFillIcon : PinIcon, pinned ? "Unpin" : "Pin", togglePin, pinned),
+        hasSettings && h4(Tooltip, { key: "cfg", content: "config" }, btn(null, SlidersIcon, "config", openConfig)),
+        h4(Switch2, {
+          key: "switch",
+          checked: enabled,
+          disabled: p3.required || isEnabledAsDependency(p3.name),
+          label: p3.name,
+          onChange: () => {
+            togglePlugin(p3.name);
+            tracker.onToggled(p3);
+          }
+        })
+      ],
+      footer: [
+        h4("span", { key: "a", className: "uspp-cttf-card-authors" }, (p3.authors || []).join(", ") || " "),
+        MULTI_SITE && h4("span", { key: "s", className: "uspp-cttf-site-badge", "data-uspp-cttf-plugin-site": p3.site ?? "*" }, pluginSiteLabel(p3)),
+        showPreview && h4(
+          "button",
+          { key: "p", type: "button", className: "uspp-cttf-card-preview", "aria-label": "Preview", title: "Preview", onClick: openConfig },
+          h4(EyeIcon, { size: 3.5 }),
+          "Preview"
         )
-      ),
-      h4("div", { className: "uspp-cttf-card-desc" }, p3.description),
-      h4("div", { className: "uspp-cttf-card-authors" }, (p3.authors || []).join(", "))
-    );
+      ]
+    });
   }
   function PluginActions({ p: p3 }) {
     const items = getSlotItems("settings.pluginActions").filter((d3) => !d3.plugin || d3.plugin === p3.name);
@@ -9319,31 +9578,27 @@ uspp-cttf-root > * { pointer-events: auto; }
       const ok = await copyToClipboard(t4.url);
       showToast(ok ? "Copied URL" : "Couldn't copy URL", ok ? ToastType.SUCCESS : ToastType.ERROR);
     };
-    return h4(
-      "div",
-      { className: "uspp-cttf-card", "data-uspp-cttf-theme": t4.url },
-      h4(
-        "div",
-        { className: "uspp-cttf-card-head" },
-        h4("span", { className: "uspp-cttf-card-name" }, t4.name),
-        h4("span", { className: "uspp-cttf-badge" }, t4.local ? "Local" : "Online"),
+    const btn = (key, icon, label, onClick) => h4(IconButton, { key, icon, label, onClick, size: 3.5, className: "uspp-cttf-card-btn" });
+    return h4(BaseCard, {
+      attrs: { "data-uspp-cttf-theme": t4.url },
+      name: t4.name,
+      badges: h4("span", { className: "uspp-cttf-badge" }, t4.local ? "Local" : "Online"),
+      description: t4.description,
+      controls: [
+        t4.local ? btn("edit", EditIcon, "Edit", () => openModal(({ onClose }) => h4(LocalThemeModal, { onClose, theme: t4 }), { modalKey: "uspp-cttf-local-theme" })) : btn("copy", CopyIcon, "Copy URL", copy),
+        btn("del", TrashIcon, "Delete", remove),
+        h4(Switch2, { key: "switch", checked: t4.enabled, label: t4.name, onChange: (v3) => (v3 ? enableTheme : disableTheme)(t4.url) })
+      ],
+      footer: [
+        h4("span", { key: "a", className: "uspp-cttf-card-authors" }, t4.author || " "),
         h4(
-          "div",
-          { className: "uspp-cttf-card-controls" },
-          t4.local ? h4(IconButton, { icon: EditIcon, label: "Edit", onClick: () => openModal(({ onClose }) => h4(LocalThemeModal, { onClose, theme: t4 }), { modalKey: "uspp-cttf-local-theme" }) }) : h4(IconButton, { icon: CopyIcon, label: "Copy URL", onClick: copy }),
-          h4(IconButton, { icon: TrashIcon, label: "Delete", onClick: remove }),
-          h4(Switch2, { checked: t4.enabled, label: t4.name, onChange: (v3) => (v3 ? enableTheme : disableTheme)(t4.url) })
+          "label",
+          { key: "s", className: "uspp-cttf-sites uspp-cttf-muted uspp-cttf-small" },
+          h4("input", { type: "checkbox", checked: !!t4.allSites, onChange: (e3) => setThemeAllSites(t4.url, e3.target.checked), "data-uspp-cttf-theme-all": t4.url }),
+          "Use on all sites"
         )
-      ),
-      t4.description && h4("div", { className: "uspp-cttf-card-desc" }, t4.description),
-      h4("div", { className: "uspp-cttf-card-authors" }, t4.author || ""),
-      h4(
-        "label",
-        { className: "uspp-cttf-sites uspp-cttf-muted uspp-cttf-small" },
-        h4("input", { type: "checkbox", checked: !!t4.allSites, onChange: (e3) => setThemeAllSites(t4.url, e3.target.checked), "data-uspp-cttf-theme-all": t4.url }),
-        "Use on all sites"
-      )
-    );
+      ]
+    });
   }
   function ThemesTab() {
     const force = useForceUpdate();
@@ -9500,16 +9755,18 @@ uspp-cttf-root > * { pointer-events: auto; }
       h4(
         "div",
         { className: "uspp-cttf-panel", "data-uspp-cttf-panel": "" },
-        h4("div", { className: "uspp-cttf-tabs", role: "tablist" }, SETTINGS_PAGES.map((p3) => h4("button", {
+        // 页面导航放左侧边栏(同站点设置弹窗的布局),内容区顶部只留插件页自己的一排分类标签
+        h4("nav", { className: "uspp-cttf-panel-nav", role: "tablist", "aria-orientation": "vertical" }, SETTINGS_PAGES.map((p3) => h4("button", {
           key: p3.key,
           type: "button",
           role: "tab",
-          className: "uspp-cttf-chip",
+          className: "uspp-cttf-panel-nav-item",
           "aria-selected": String(p3.key === cur),
           "data-uspp-cttf-panel-tab": p3.key,
+          title: p3.label,
           onClick: () => setCur(p3.key)
-        }, p3.label))),
-        h4(page2.component, { key: page2.key })
+        }, p3.icon && h4(p3.icon, { size: 4 }), h4("span", null, p3.label)))),
+        h4("div", { className: "uspp-cttf-panel-content" }, h4(page2.component, { key: page2.key }))
       )
     );
   }
@@ -10018,8 +10275,8 @@ uspp-cttf-root > * { pointer-events: auto; }
       if (s3.driver === "turbopack") step("扫描模块缓存", rescanRuntimeCache);
       step("onceReady", () => resolveReady());
       dispatch(Events.SITE_READY, { site: s3.id });
-      const failed = step("启动 SiteReady 插件", () => startAllAt(StartAt.SiteReady)) || [];
-      if (failed.length) retryFailed(failed);
+      const failed2 = step("启动 SiteReady 插件", () => startAllAt(StartAt.SiteReady)) || [];
+      if (failed2.length) retryFailed(failed2);
       if (s3.driver === "turbopack") {
         logger19.info(`站点已就绪,已加载 ${moduleCache.size} 个模块`);
         setInterval(() => {
