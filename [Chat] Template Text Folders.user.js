@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.15
+// @version      2.0.16
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.15" : "0.0.0";
+  var VERSION = true ? "2.0.16" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -1049,7 +1049,7 @@
 .uspp-cttf-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .uspp-cttf-ic { display: inline-flex; line-height: 1; }
 .uspp-cttf-ic-img { width: 1.1em; height: 1.1em; object-fit: contain; border-radius: 3px; flex: 0 0 auto; }
-.uspp-cttf-bar-tool { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; height: var(--uspp-cttf-btn-h, 28px); min-height: var(--uspp-cttf-btn-h, 28px); padding: var(--uspp-cttf-btn-vp, 6px) var(--uspp-cttf-btn-hp, 12px); margin: 0 0 0 10px; font-size: var(--uspp-cttf-btn-fs, 14px); line-height: var(--uspp-cttf-btn-lh, 16px); border-radius: var(--uspp-cttf-btn-r, 4px); border: none; background: var(--uspp-cttf-btn-bg); color: var(--uspp-cttf-tool-fg); font-family: ${FONT}; font-weight: 400; cursor: pointer; transition: all .2s ease; }
+.uspp-cttf-bar-tool { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; height: var(--uspp-cttf-btn-h, 28px); min-height: var(--uspp-cttf-btn-h, 28px); padding: var(--uspp-cttf-btn-vp, 6px) var(--uspp-cttf-btn-hp, 12px); margin: 0; font-size: var(--uspp-cttf-btn-fs, 14px); line-height: var(--uspp-cttf-btn-lh, 16px); border-radius: var(--uspp-cttf-btn-r, 4px); border: none; background: var(--uspp-cttf-btn-bg); color: var(--uspp-cttf-tool-fg); font-family: ${FONT}; font-weight: 400; cursor: pointer; transition: all .2s ease; }
 /* 只有图标的按钮(⚙️、清空、名字只有一个符号的文件夹如 🖱️):正方形,边长 = 按钮高度,图标居中(TC 要求) */
 .uspp-cttf-bar > .uspp-cttf-chip-btn.uspp-cttf-chip-icononly, .uspp-cttf-bar > .uspp-cttf-bar-tool { box-sizing: border-box !important; width: var(--uspp-cttf-btn-h, 28px) !important; min-width: var(--uspp-cttf-btn-h, 28px) !important; max-width: var(--uspp-cttf-btn-h, 28px) !important; height: var(--uspp-cttf-btn-h, 28px) !important; padding: 0 !important; aspect-ratio: 1 / 1; justify-content: center; align-items: center; overflow: hidden; gap: 0; }
 .uspp-cttf-bar > .uspp-cttf-chip-btn.uspp-cttf-chip-icononly .uspp-cttf-ic, .uspp-cttf-bar > .uspp-cttf-bar-tool svg { flex: 0 0 auto; margin: 0; }
