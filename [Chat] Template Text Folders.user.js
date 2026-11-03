@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.16
+// @version      2.0.17
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.16" : "0.0.0";
+  var VERSION = true ? "2.0.17" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -1064,64 +1064,40 @@
 .uspp-cttf-pop-empty { padding: 6px 8px 10px; color: var(--uspp-cttf-fg-tertiary); font-size: 13px; }
 `;
   var PANEL_CSS = `
-.uspp-cttf-dlg-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; pointer-events: auto; background: rgb(0 0 0 / .4); }
+/* 弹窗外壳用框架 ModalCard 的 uspp-cttf-modal 系列样式;这里只补本脚本需要的部分 */
+.uspp-cttf-dlg-guard { position: absolute; inset: 0; background: rgb(0 0 0 / .4); }
 /* 叠在框架遮罩(0.5)上合计约 0.7,与原版一致;叠放的第二层弹窗不再加深 */
-.uspp-cttf-overlay ~ .uspp-cttf-overlay .uspp-cttf-dlg-wrap { background: transparent; }
-.uspp-cttf-dlg { position: relative; display: flex; flex-direction: column; max-height: min(85vh, 760px); background: var(--uspp-cttf-surface-l1); color: var(--uspp-cttf-fg-primary); border: 1px solid var(--uspp-cttf-border-l1); border-radius: 24px; box-shadow: 0 16px 48px rgb(0 0 0 / .35); font: 14px/1.45 ${UI_FONT}; overflow: hidden; animation: uspp-cttf-dlg-pop .14s ease-out; }
-@keyframes uspp-cttf-dlg-pop { from { opacity: 0; transform: scale(.97) } to { opacity: 1; transform: none } }
-.uspp-cttf-dlg-head { display: flex; align-items: center; gap: 8px; padding: 20px 16px 8px 24px; }
-.uspp-cttf-dlg-title { font-size: 18px; font-weight: 600; white-space: nowrap; }
-.uspp-cttf-dlg-head-extra { display: flex; align-items: center; gap: 6px; flex: 1; flex-wrap: wrap; min-width: 0; }
-.uspp-cttf-x { margin-left: auto; width: 32px; height: 32px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 9999px; border: none; background: transparent; color: var(--uspp-cttf-fg-secondary); cursor: pointer; }
-.uspp-cttf-x:hover { background: var(--uspp-cttf-button-ghost-hover); color: var(--uspp-cttf-fg-primary); }
-.uspp-cttf-dlg-body { padding: 8px 24px 16px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; scrollbar-width: thin; }
-.uspp-cttf-dlg-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 12px 24px 20px; border-top: 1px solid var(--uspp-cttf-border-l1); }
-.uspp-cttf-b { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 9999px; border: 1px solid var(--uspp-cttf-border-l2); background: transparent; color: var(--uspp-cttf-fg-primary); font: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.uspp-cttf-b:hover:not(:disabled) { background: var(--uspp-cttf-button-ghost-hover); }
-.uspp-cttf-b:disabled { opacity: .5; cursor: default; }
-.uspp-cttf-b-primary { background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); border-color: transparent; }
-.uspp-cttf-b-primary:hover:not(:disabled) { background: var(--uspp-cttf-fg-primary); opacity: .88; }
-.uspp-cttf-b-danger { background: var(--uspp-cttf-fg-danger); border-color: transparent; color: #fff; }
-.uspp-cttf-b-danger:hover:not(:disabled) { background: var(--uspp-cttf-fg-danger); opacity: .88; }
-.uspp-cttf-b-success { background: var(--uspp-cttf-fg-primary); border-color: transparent; color: var(--uspp-cttf-surface-base); }
-.uspp-cttf-b-cancel { background: transparent; }
-.uspp-cttf-b-cancel:hover:not(:disabled) { background: var(--uspp-cttf-button-ghost-hover); }
-.uspp-cttf-b-icon { width: 32px; height: 32px; padding: 0; border-color: transparent; color: var(--uspp-cttf-fg-secondary); }
-.uspp-cttf-b-icon:hover:not(:disabled) { color: var(--uspp-cttf-fg-primary); }
-.uspp-cttf-b-sm { height: 30px; padding: 0 10px; font-size: 13px; }
-.uspp-cttf-icon-b { width: 36px; height: 32px; padding: 0; border-radius: 4px; border: none; background: transparent; cursor: pointer; font-size: 14px; color: inherit; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.uspp-cttf-icon-b:hover { background: var(--uspp-cttf-button-ghost-hover); }
+.uspp-cttf-overlay ~ .uspp-cttf-overlay .uspp-cttf-dlg-guard { background: transparent; }
+.uspp-cttf-dlg { z-index: 1; font-family: ${UI_FONT}; line-height: 1.45; }
+.uspp-cttf-dlg .uspp-cttf-modal-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.uspp-cttf-dlg .uspp-cttf-modal-title { white-space: nowrap; }
+.uspp-cttf-dlg-head-extra { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.uspp-cttf-dlg .uspp-cttf-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 8px; }
+.uspp-cttf-dlg .uspp-cttf-modal-footer { flex-wrap: wrap; }
+.uspp-cttf-dlg .uspp-cttf-setting { padding: 10px 0; }
+.uspp-cttf-dlg .uspp-cttf-btn-icon svg { width: 16px; height: 16px; }
+.uspp-cttf-chip[aria-checked="true"] { background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); border-color: transparent; }
+.uspp-cttf-mini-switch { display: flex; justify-content: center; }
+.uspp-cttf-mini-switch .uspp-cttf-switch { transform: scale(.8); }
+.uspp-cttf-dlg .uspp-cttf-textarea.uspp-cttf-ta { min-height: 150px; white-space: pre-wrap; }
 .uspp-cttf-badge2 { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border-radius: 50%; background: #3B82F6; color: #fff; font-size: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,.1); cursor: default; flex: 0 0 auto; transition: transform .15s ease; }
 .uspp-cttf-badge2:hover { transform: scale(1.1); }
 .uspp-cttf-badge2[data-kind="buttons"] { background: #22c55e; }
 .uspp-cttf-badge2[data-kind="folder"] { width: 20px; height: 20px; font-size: 11px; background: #4F46E5; }
 .uspp-cttf-badge2[data-kind="folder"]:hover { transform: scale(1.15); }
 .uspp-cttf-side-toggle { width: 28px !important; height: 28px !important; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; aspect-ratio: 1 / 1; padding: 0 !important; border-radius: 4px !important; background: transparent; }
-.uspp-cttf-field { display: flex; flex-direction: column; gap: 6px; }
-.uspp-cttf-field-label { font-size: 13px; font-weight: 500; color: var(--uspp-cttf-fg-secondary); }
-.uspp-cttf-field-hint { font-size: 12px; color: var(--uspp-cttf-fg-tertiary); }
-.uspp-cttf-field-err { font-size: 12px; color: var(--uspp-cttf-fg-danger); }
-.uspp-cttf-in, .uspp-cttf-ta, .uspp-cttf-sel { box-sizing: border-box; width: 100%; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--uspp-cttf-border-l1); background: var(--uspp-cttf-surface-l2); color: var(--uspp-cttf-fg-primary); font: inherit; outline: none; }
-.uspp-cttf-in:focus, .uspp-cttf-ta:focus, .uspp-cttf-sel:focus { border-color: var(--uspp-cttf-ring); }
-.uspp-cttf-ta { min-height: 150px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.uspp-cttf-field-err { color: var(--uspp-cttf-fg-danger); }
 .uspp-cttf-color-row { display: flex; gap: 8px; align-items: center; }
-.uspp-cttf-color { width: 100px; height: 40px; padding: 2px; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 12px; background: var(--uspp-cttf-surface-l2); cursor: pointer; flex: 0 0 auto; }
-.uspp-cttf-tabbar { display: flex; flex-wrap: wrap; gap: 6px; }
-.uspp-cttf-tab { height: 30px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--uspp-cttf-border-l1); background: transparent; color: var(--uspp-cttf-fg-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.uspp-cttf-tab:hover { background: var(--uspp-cttf-button-ghost-hover); }
-.uspp-cttf-tab[aria-selected="true"] { background: var(--uspp-cttf-fg-primary); color: var(--uspp-cttf-surface-base); border-color: transparent; }
+.uspp-cttf-color { width: 100px; height: 40px; padding: 2px; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 12px; background: var(--uspp-cttf-surface-l2); cursor: pointer; flex: 0 0 auto; -webkit-appearance: auto !important; appearance: auto !important; opacity: 1 !important; }
 .uspp-cttf-preview { display: flex; justify-content: center; padding: 12px; border-radius: 16px; background: var(--uspp-cttf-surface-l2); }
 .uspp-cttf-preview .uspp-cttf-chip-btn { height: 32px; }
 .uspp-cttf-row2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .uspp-cttf-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.uspp-cttf-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 /* 原生表单控件:站点(ChatGPT 的 Tailwind 重置等)会把 checkbox / radio / color 的外观清掉,这里强制恢复成浏览器原生外观 */
-.uspp-cttf-dlg input[type="checkbox"], .uspp-cttf-dlg input[type="radio"] { -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; position: static !important; width: 16px !important; height: 16px !important; min-width: 16px; margin: 0 !important; padding: 0 !important; opacity: 1 !important; visibility: visible !important; clip: auto !important; clip-path: none !important; pointer-events: auto !important; background: revert !important; border: revert !important; box-shadow: none !important; color-scheme: inherit; accent-color: var(--uspp-cttf-fg-primary); flex: 0 0 auto; cursor: pointer; vertical-align: middle; }
 .uspp-cttf-dlg input[type="color"] { -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; opacity: 1 !important; visibility: visible !important; }
 .uspp-cttf-dlg { color-scheme: light; }
 :root[data-uspp-cttf-theme="dark"] .uspp-cttf-dlg { color-scheme: dark; }
-.uspp-cttf-check { gap: 8px; }
-.uspp-cttf-check:has(input:checked) { font-weight: 500; }
 
 .uspp-cttf-muted2 { color: var(--uspp-cttf-fg-secondary); font-size: 13px; }
 .uspp-cttf-warn2 { color: var(--uspp-cttf-fg-danger); font-weight: 500; }
@@ -1129,7 +1105,7 @@
 .uspp-cttf-status[data-kind="ok"] { color: var(--uspp-cttf-success); }
 .uspp-cttf-status[data-kind="error"] { color: var(--uspp-cttf-fg-danger); }
 .uspp-cttf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.uspp-cttf-col-card { padding: 12px 14px; border-radius: 16px; border: 1px solid var(--uspp-cttf-border-l1); background: var(--uspp-cttf-surface-l1); }
+.uspp-cttf-col-card { gap: 4px; }
 .uspp-cttf-col-card b { display: block; margin-bottom: 4px; }
 .uspp-cttf-diff ul { margin: 4px 0 8px 18px; padding: 0; }
 /* 设置面板 */
@@ -1446,6 +1422,10 @@
     folderButtonCount: '"{name}" 文件夹有 {n} 个按钮',
     automation: "⚡ 自动化",
     pluginsEntry: "🧩 插件",
+    setRulesDesc: "按网站设置插入模板后自动发送的方式。",
+    setConfigDesc: "语言与外观、导出 / 导入 / 重置配置。",
+    setPanelDesc: "新增、修改、删除、隐藏与排序文件夹和按钮。",
+    setSyncDesc: "WebDAV 服务器、测试连接、上传 / 拉取与自动同步。",
     scriptConfig: "🛠️ 脚本配置",
     close: "关闭",
     toggleSidebar: "折叠 / 展开文件夹列表",
@@ -1646,6 +1626,10 @@
     folderButtonCount: 'Folder "{name}" has {n} buttons',
     automation: "⚡ Automation",
     pluginsEntry: "🧩 Plugins",
+    setRulesDesc: "How the message is sent after a template is inserted, per site.",
+    setConfigDesc: "Language and appearance; export / import / reset the config.",
+    setPanelDesc: "Add, edit, delete, hide and reorder folders and buttons.",
+    setSyncDesc: "WebDAV server, connection test, upload / pull and auto sync.",
     scriptConfig: "🛠️ Script config",
     close: "Close",
     toggleSidebar: "Collapse / expand folder list",
@@ -1851,32 +1835,78 @@
   }
   function DialogFrame({ Component, props, onClose, dismissable, width }) {
     useLive();
-    return h("div", {
-      className: "uspp-cttf-dlg-wrap",
-      onClick: (e3) => {
-        if (e3.target === e3.currentTarget && dismissable) onClose();
-      }
-    }, h(
-      "div",
-      { className: "uspp-cttf-dlg", role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 95vw)` }, onClick: (e3) => e3.stopPropagation() },
-      h(Component, { ...props, close: onClose })
-    ));
-  }
-  var CloseSvg = () => h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", "aria-hidden": "true" }, h("path", { d: "M18 6 6 18M6 6l12 12" }));
-  function DialogHeader({ title, children, close }) {
     return h(
-      "div",
-      { className: "uspp-cttf-dlg-head" },
-      h("div", { className: "uspp-cttf-dlg-title" }, title),
-      h("div", { className: "uspp-cttf-dlg-head-extra" }, children),
-      close && h("button", { type: "button", className: "uspp-cttf-x", title: t("close"), "aria-label": t("close"), onClick: close }, h(CloseSvg))
+      Fragment,
+      null,
+      h("div", { className: "uspp-cttf-dlg-guard", onMouseDown: (e3) => e3.stopPropagation(), onClick: (e3) => {
+        e3.stopPropagation();
+        if (dismissable) onClose();
+      } }),
+      // 外壳即框架 ModalCard 的结构与样式(uspp-cttf-modal / -header / -body / -footer / -close)
+      h(
+        "div",
+        { className: "uspp-cttf-modal uspp-cttf-dlg", role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 100%)` }, onClick: (e3) => e3.stopPropagation() },
+        h(Component, { ...props, close: onClose })
+      )
     );
   }
-  var DialogBody = ({ children, className }) => h("div", { className: "uspp-cttf-dlg-body " + (className || "") }, children);
-  var DialogFooter = ({ children }) => h("div", { className: "uspp-cttf-dlg-foot" }, children);
-  function Btn({ kind = "plain", children, ...rest }) {
-    return h("button", { type: "button", className: `uspp-cttf-b uspp-cttf-b-${kind}`, ...rest }, children);
+  var CloseSvg = () => U.icons?.CloseIcon ? h(U.icons.CloseIcon, { size: 4 }) : h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", "aria-hidden": "true" }, h("path", { d: "M18 6 6 18M6 6l12 12" }));
+  function DialogHeader({ title, subtitle, children, close }) {
+    return h(
+      Fragment,
+      null,
+      close && h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-modal-close uspp-cttf-x", title: t("close"), "aria-label": t("close"), onClick: close }, h(CloseSvg)),
+      h(
+        "div",
+        { className: "uspp-cttf-modal-header uspp-cttf-dlg-head" },
+        h("h2", { className: "uspp-cttf-modal-title uspp-cttf-dlg-title" }, title),
+        subtitle && h("div", { className: "uspp-cttf-modal-subtitle" }, subtitle),
+        children && h("div", { className: "uspp-cttf-dlg-head-extra" }, children)
+      )
+    );
   }
+  var DialogBody = ({ children, className }) => h("div", { className: "uspp-cttf-modal-body uspp-cttf-dlg-body " + (className || "") }, children);
+  var DialogFooter = ({ children }) => h("div", { className: "uspp-cttf-modal-footer uspp-cttf-dlg-foot" }, children);
+  function Btn({ kind = "plain", size, children, className, ...rest }) {
+    const v3 = { primary: "uspp-cttf-btn-primary", success: "uspp-cttf-btn-primary", danger: "uspp-cttf-btn-danger", ghost: "uspp-cttf-btn-ghost", icon: "uspp-cttf-btn-icon" }[kind] || "";
+    return h("button", { type: "button", className: ["uspp-cttf-btn", v3, size === "sm" && "uspp-cttf-btn-sm", className].filter(Boolean).join(" "), ...rest }, children);
+  }
+  var Switch = (props) => h(U.components.Switch, props);
+  var SettingRow = ({ title, description, children }) => h("div", { className: "uspp-cttf-setting" }, h(U.components.Row, { title, description }, children));
+  var SwitchRow = ({ title, description, checked, onChange }) => h(SettingRow, { title, description }, h(Switch, { checked, onChange, label: typeof title === "string" ? title : void 0 }));
+  function Choices({ options, value, onChange, label }) {
+    return h("div", { className: "uspp-cttf-tabs", role: "radiogroup", "aria-label": label }, options.map((o3) => h("button", {
+      key: String(o3.value),
+      type: "button",
+      role: "radio",
+      className: "uspp-cttf-chip",
+      "aria-checked": String(o3.value === value),
+      "aria-selected": String(o3.value === value),
+      "data-value": String(o3.value),
+      onClick: () => onChange(o3.value)
+    }, o3.label)));
+  }
+  var IconBtn = ({ icon, label, onClick, className }) => h(U.components.IconButton, { icon: U.icons[icon], label, onClick, className });
+  var openerSetting = ({ description, label, onOpen }) => ({
+    type: U.OptionType.COMPONENT,
+    get description() {
+      return description();
+    },
+    component: function Opener() {
+      useLive();
+      return h("div", { className: "uspp-cttf-row2" }, h(Btn, { kind: "primary", onClick: () => onOpen() }, label()));
+    }
+  });
+  var liveSetting = ({ description, render }) => ({
+    type: U.OptionType.COMPONENT,
+    get description() {
+      return description?.();
+    },
+    component: function Live() {
+      useLive();
+      return render();
+    }
+  });
   function Gone({ onGone, children }) {
     useEffect(() => () => onGone(), []);
     return children;
@@ -1972,23 +2002,27 @@
     }, showIcon && (btn ? h(Icon, { name, btn }) : h("span", { className: "uspp-cttf-ic" }, icon)), shownText && h("span", { className: "uspp-cttf-chip-label" }, shownText));
   }
   function Tabs({ tabs, value, onChange }) {
-    return h("div", { className: "uspp-cttf-tabbar", role: "tablist" }, tabs.map((tb) => h("button", {
+    return h("div", { className: "uspp-cttf-tabs uspp-cttf-tabbar", role: "tablist" }, tabs.map((tb) => h("button", {
       key: tb.value,
       type: "button",
       role: "tab",
       "aria-selected": String(tb.value === value),
-      className: "uspp-cttf-tab",
+      className: "uspp-cttf-chip uspp-cttf-tab",
       onClick: () => onChange(tb.value)
     }, tb.label)));
   }
   function Field({ label, hint, children, error }) {
     return h(
       "label",
-      { className: "uspp-cttf-field" },
-      h("span", { className: "uspp-cttf-field-label" }, label),
+      { className: "uspp-cttf-setting uspp-cttf-field" },
+      h(
+        "div",
+        { className: "uspp-cttf-row-text" },
+        h("div", { className: "uspp-cttf-row-title" }, label),
+        hint && h("div", { className: "uspp-cttf-muted uspp-cttf-small uspp-cttf-field-hint" }, hint)
+      ),
       children,
-      hint && h("span", { className: "uspp-cttf-field-hint" }, hint),
-      error && h("span", { className: "uspp-cttf-field-err" }, error)
+      error && h("div", { className: "uspp-cttf-small uspp-cttf-field-err" }, error)
     );
   }
   function ColorField({ label, value, onChange }) {
@@ -2000,7 +2034,7 @@
         "div",
         { className: "uspp-cttf-color-row" },
         h("input", { type: "color", className: "uspp-cttf-color", value: hex, onInput: (e3) => onChange(e3.target.value) }),
-        h("input", { type: "text", className: "uspp-cttf-in", value, onInput: (e3) => onChange(e3.target.value), spellCheck: false })
+        h("input", { type: "text", className: "uspp-cttf-input uspp-cttf-in", value, onInput: (e3) => onChange(e3.target.value), spellCheck: false })
       )
     );
   }
@@ -2329,7 +2363,6 @@
       });
       close();
     };
-    const radio = (value, label) => h("label", { className: "uspp-cttf-check", key: value }, h("input", { type: "radio", name: "cttf-method", checked: method === value, onChange: () => setMethod(value) }), label);
     return h(
       Fragment,
       null,
@@ -2338,11 +2371,11 @@
         DialogBody,
         null,
         err && h("div", { className: "uspp-cttf-field-err" }, err),
-        h(Field, { label: t("ruleUrl") }, h("input", { className: "uspp-cttf-in", value: domain, placeholder: "chatgpt.com", onInput: (e3) => {
+        h(Field, { label: t("ruleUrl") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: domain, placeholder: "chatgpt.com", onInput: (e3) => {
           setDomain(e3.target.value);
           setErr("");
         } })),
-        h(Field, { label: t("ruleName") }, h("input", { className: "uspp-cttf-in", value: name, placeholder: "ChatGPT", onInput: (e3) => {
+        h(Field, { label: t("ruleName") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: name, placeholder: "ChatGPT", onInput: (e3) => {
           setName(e3.target.value);
           setErr("");
         } })),
@@ -2350,29 +2383,29 @@
           "div",
           { className: "uspp-cttf-color-row" },
           h("span", { style: { width: "24px", display: "inline-flex" } }, h(SiteIcon, { src: favicon || faviconFor(domain) })),
-          h("input", { className: "uspp-cttf-in", value: favicon, placeholder: faviconFor(domain || "example.com"), onInput: (e3) => setFavicon(e3.target.value) }),
+          h("input", { className: "uspp-cttf-input uspp-cttf-in", value: favicon, placeholder: faviconFor(domain || "example.com"), onInput: (e3) => setFavicon(e3.target.value) }),
           h(Btn, { onClick: () => setFavicon(faviconFor(domain)) }, t("fetchIcon"))
         )),
-        h(Field, { label: t("submitMethod") }, h("div", { className: "uspp-cttf-row2" }, radio("enter", "Enter"), radio("modifier_enter", (isMac2() ? "Cmd" : "Ctrl") + "+Enter"), radio("click_submit", t("clickSubmit")))),
+        h(Field, { label: t("submitMethod") }, h(Choices, { label: t("submitMethod"), value: method, onChange: setMethod, options: [{ value: "enter", label: "Enter" }, { value: "modifier_enter", label: (isMac2() ? "Cmd" : "Ctrl") + "+Enter" }, { value: "click_submit", label: t("clickSubmit") }] })),
         h(
           "div",
           null,
-          h(Btn, { kind: "plain", className: "uspp-cttf-b uspp-cttf-b-plain uspp-cttf-b-sm", onClick: () => setShowAdv(!showAdv) }, (showAdv ? "▾ " : "▸ ") + t("advanced")),
+          h(Btn, { kind: "plain", size: "sm", onClick: () => setShowAdv(!showAdv) }, (showAdv ? "▾ " : "▸ ") + t("advanced")),
           showAdv && h(
             "div",
-            { className: "uspp-cttf-col-card", style: { marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" } },
+            { className: "uspp-cttf-section uspp-cttf-col-card", style: { marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" } },
             method === "enter" && h("div", { className: "uspp-cttf-muted2" }, t("enterNoOptions")),
             method === "modifier_enter" && h(
               "div",
               { className: "uspp-cttf-row2" },
               h("span", { className: "uspp-cttf-muted2" }, t("modifierKey")),
-              ["cmd", "ctrl"].map((v3) => h("label", { key: v3, className: "uspp-cttf-check" }, h("input", { type: "radio", name: "cttf-mod", checked: modVariant === v3, onChange: () => setModVariant(v3) }), v3 === "cmd" ? "Cmd" : "Ctrl"))
+              h(Choices, { label: t("modifierKey"), value: modVariant, onChange: setModVariant, options: [{ value: "cmd", label: "Cmd" }, { value: "ctrl", label: "Ctrl" }] })
             ),
             method === "click_submit" && h(
               Fragment,
               null,
-              h("div", { className: "uspp-cttf-row2" }, ["default", "selector"].map((v3) => h("label", { key: v3, className: "uspp-cttf-check" }, h("input", { type: "radio", name: "cttf-click", checked: clickVariant === v3, onChange: () => setClickVariant(v3) }), v3 === "default" ? t("clickDefault") : t("clickSelector")))),
-              clickVariant === "selector" && h("input", { className: "uspp-cttf-in", value: selector, placeholder: t("selectorPlaceholder"), spellCheck: false, onInput: (e3) => {
+              h(Choices, { value: clickVariant, onChange: setClickVariant, options: [{ value: "default", label: t("clickDefault") }, { value: "selector", label: t("clickSelector") }] }),
+              clickVariant === "selector" && h("input", { className: "uspp-cttf-input uspp-cttf-in", value: selector, placeholder: t("selectorPlaceholder"), spellCheck: false, onInput: (e3) => {
                 setSelector(e3.target.value);
                 setErr("");
               } })
@@ -2408,8 +2441,8 @@
           h(SiteIcon, { src: r3.favicon }),
           h("div", { style: { minWidth: 0 } }, h("div", null, r3.name || t("unnamedRule")), h("div", { className: "uspp-cttf-sub" }, r3.domain || t("noUrl"))),
           h("div", { className: "uspp-cttf-muted2", title: methodLabel(r3), style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, methodLabel(r3)),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colEdit"), onClick: () => edit(i3) }, "✏️"),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colDelete"), onClick: () => del(i3) }, "🗑️")
+          h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => edit(i3) }),
+          h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: () => del(i3) })
         ))
       )
     );
@@ -2421,6 +2454,7 @@
       description: "Sends the message after a template is inserted, using per-site rules; includes the rule editor.",
       authors: ["0-V-linuxdo"],
       required: true,
+      settings: U4.definePluginSettings({ rules: openerSetting({ description: () => t("setRulesDesc"), label: () => t("automation"), onOpen: open }) }),
       startAt: U4.StartAt.Init,
       slots: { managerHeader: { label: () => t("automation"), order: 10, onClick: open } },
       start() {
@@ -2458,8 +2492,8 @@
     return h(
       "div",
       { className: "uspp-cttf-cols" },
-      h("div", { className: "uspp-cttf-col-card" }, h("b", null, leftLabel), t("stats", { f: a3.folders, b: a3.buttons })),
-      h("div", { className: "uspp-cttf-col-card" }, h("b", null, rightLabel), t("stats", { f: b3.folders, b: b3.buttons }), extra2 && h("div", { className: "uspp-cttf-sub" }, extra2))
+      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, leftLabel), t("stats", { f: a3.folders, b: a3.buttons })),
+      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, rightLabel), t("stats", { f: b3.folders, b: b3.buttons }), extra2 && h("div", { className: "uspp-cttf-sub" }, extra2))
     );
   }
   function confirmImport(incoming, { onCancel } = {}) {
@@ -2548,7 +2582,6 @@
       const extra2 = U4.getSlotItems("configTabs");
       const tabs = [{ value: "appearance", label: t("tabAppearance") }, { value: "config", label: t("tabConfig") }, ...extra2.map((x4) => ({ value: x4.id, label: typeof x4.label === "function" ? x4.label() : x4.label }))];
       const p3 = prefs.get();
-      const radio = (group, value, cur, label, onPick) => h("label", { key: value, className: "uspp-cttf-check" }, h("input", { type: "radio", name: `cttf-${group}`, checked: cur === value, onChange: onPick }), label);
       const ext = extra2.find((x4) => x4.id === tab);
       return h(
         Fragment,
@@ -2561,23 +2594,20 @@
           tab === "appearance" && h(
             Fragment,
             null,
-            h(Field, { label: t("language") }, h(
-              "div",
-              { className: "uspp-cttf-row2" },
-              [["auto", t("langAuto")], ["zh", t("langZh")], ["en", t("langEn")]].map(([v3, l3]) => radio("lang", v3, p3.language, l3, () => prefs.set({ language: v3 })))
-            )),
-            h(Field, { label: t("folderIcons") }, h(
-              "div",
-              { className: "uspp-cttf-row2" },
-              [[true, t("show")], [false, t("hide")]].map(([v3, l3]) => radio("icons", String(v3), String(config.data.showFolderIcons), l3, () => config.update((d3) => {
-                d3.showFolderIcons = v3;
-              })))
-            ))
+            h(SettingRow, { title: t("language") }, h(Choices, {
+              label: t("language"),
+              value: p3.language,
+              onChange: (v3) => prefs.set({ language: v3 }),
+              options: [{ value: "auto", label: t("langAuto") }, { value: "zh", label: t("langZh") }, { value: "en", label: t("langEn") }]
+            })),
+            h(SwitchRow, { title: t("folderIcons"), checked: !!config.data.showFolderIcons, onChange: (v3) => config.update((d3) => {
+              d3.showFolderIcons = v3;
+            }) })
           ),
           tab === "config" && h(
             Fragment,
             null,
-            [["export", t("exportHint"), exportConfig], ["import", t("importHint"), importFromFile], ["reset", t("resetHint"), resetConfig]].map(([k4, hint, fn2]) => h("div", { key: k4, className: "uspp-cttf-row2" }, h(Btn, { kind: k4 === "reset" ? "danger" : "primary", onClick: () => fn2() }, t(k4)), h("span", { className: "uspp-cttf-muted2" }, hint)))
+            [["export", t("exportHint"), exportConfig], ["import", t("importHint"), importFromFile], ["reset", t("resetHint"), resetConfig]].map(([k4, hint, fn2]) => h(SettingRow, { key: k4, title: t(k4), description: hint }, h(Btn, { kind: k4 === "reset" ? "danger" : "primary", onClick: () => fn2() }, t(k4))))
           ),
           ext && h(U4.ErrorBoundary, { fallback: null }, h(ext.render, { close }))
         )
@@ -2622,6 +2652,15 @@
       description: "Script config: language and appearance, export / import with preview, reset, and migration from the old version's local data.",
       authors: ["0-V-linuxdo"],
       required: true,
+      settings: U4.definePluginSettings({
+        language: liveSetting({ render: () => h(Choices, {
+          label: t("language"),
+          value: prefs.get().language,
+          onChange: (v3) => prefs.set({ language: v3 }),
+          options: [{ value: "auto", label: t("langAuto") }, { value: "zh", label: t("langZh") }, { value: "en", label: t("langEn") }]
+        }) }),
+        scriptConfig: openerSetting({ description: () => t("setConfigDesc"), label: () => t("scriptConfig"), onOpen: () => open() })
+      }),
       startAt: U4.StartAt.Init,
       slots: { managerHeader: { label: () => t("scriptConfig"), order: 30, onClick: () => open() } },
       start() {
@@ -2701,7 +2740,7 @@
           DialogBody,
           null,
           h("div", { className: "uspp-cttf-preview" }, h(Chip, { name: name || "📁", folder: { color, textColor } })),
-          h(Field, { label: t("folderName"), error: err }, h("input", { className: "uspp-cttf-in", value: name, autoFocus: true, onInput: (e3) => {
+          h(Field, { label: t("folderName"), error: err }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: name, autoFocus: true, onInput: (e3) => {
             setName(e3.target.value);
             setErr("");
           }, onKeyDown: (e3) => {
@@ -2813,18 +2852,18 @@
               "div",
               { className: "uspp-cttf-row2" },
               h("span", { className: "uspp-cttf-muted2" }, t("insertVar")),
-              [["varInput", "{inputboard}"], ["varClipboard", "{clipboard}"], ["varSelection", "{selection}"], ["varInputOrClip", "{{inputboard}|{clipboard}}"]].map(([k4, v3]) => h(Btn, { key: k4, kind: "plain", className: "uspp-cttf-b uspp-cttf-b-plain uspp-cttf-b-sm", onMouseDown: (e3) => e3.preventDefault(), onClick: () => insertVar(v3), title: v3 }, t(k4)))
+              [["varInput", "{inputboard}"], ["varClipboard", "{clipboard}"], ["varSelection", "{selection}"], ["varInputOrClip", "{{inputboard}|{clipboard}}"]].map(([k4, v3]) => h(Btn, { key: k4, kind: "plain", size: "sm", onMouseDown: (e3) => e3.preventDefault(), onClick: () => insertVar(v3), title: v3 }, t(k4)))
             ),
-            h("textarea", { ref: ta, className: "uspp-cttf-ta", value: text, placeholder: t("templatePlaceholder"), onInput: (e3) => setText2(e3.target.value), spellCheck: false })
+            h("textarea", { ref: ta, className: "uspp-cttf-textarea uspp-cttf-ta", value: text, placeholder: t("templatePlaceholder"), onInput: (e3) => setText2(e3.target.value), spellCheck: false })
           ),
           tab === "style" && h(
             Fragment,
             null,
-            h(Field, { label: t("buttonName") }, h("input", { ref: nameRef, className: "uspp-cttf-in", value: name, onInput: (e3) => {
+            h(Field, { label: t("buttonName") }, h("input", { ref: nameRef, className: "uspp-cttf-input uspp-cttf-in", value: name, onInput: (e3) => {
               setName(e3.target.value);
               setErr("");
             } })),
-            !isTool && h(Field, { label: t("buttonIcon"), hint: t("buttonIconHint") }, h("input", { className: "uspp-cttf-in", value: favicon, placeholder: "https://… / data:image/…", onInput: (e3) => setFavicon(e3.target.value) })),
+            !isTool && h(Field, { label: t("buttonIcon"), hint: t("buttonIconHint") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: favicon, placeholder: "https://… / data:image/…", onInput: (e3) => setFavicon(e3.target.value) })),
             h(
               "div",
               { className: "uspp-cttf-grid2" },
@@ -2832,7 +2871,7 @@
               h(ColorField, { label: t("textColor"), value: textColor, onChange: setTextColor })
             )
           ),
-          tab === "submit" && h("label", { className: "uspp-cttf-check" }, h("input", { type: "checkbox", checked: auto, onChange: (e3) => setAuto(e3.target.checked) }), t("autoSubmitLabel"))
+          tab === "submit" && h(SwitchRow, { title: t("autoSubmitLabel"), checked: !!auto, onChange: setAuto })
         ),
         h(DialogFooter, null, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("save")))
       );
@@ -2855,7 +2894,7 @@
           null,
           h("div", { className: "uspp-cttf-preview" }, h(Chip, { name, btn: b3 })),
           h("div", { className: "uspp-cttf-muted2" }, t("folderAppearance", { name, bg: b3.color, fg: b3.textColor })),
-          b3.type === "template" && h(Field, { label: t("template") }, h("textarea", { className: "uspp-cttf-ta", style: { minHeight: "80px" }, readOnly: true, value: b3.text })),
+          b3.type === "template" && h(Field, { label: t("template") }, h("textarea", { className: "uspp-cttf-textarea uspp-cttf-ta", style: { minHeight: "80px" }, readOnly: true, value: b3.text })),
           b3.type === "template" && h("div", { className: "uspp-cttf-muted2" }, `${t("colAutoSubmit")}: ${b3.autoSubmit ? t("yes") : t("no")}`),
           h("div", { className: "uspp-cttf-warn2" }, t("irreversible"))
         )
@@ -2922,17 +2961,17 @@
             }
           },
           h("div", { style: { display: "flex", alignItems: "center", gap: "6px", minWidth: 0 } }, h(Chip, { name, folder: f3, withIcon: c3.showFolderIcons, title: t("folderButtonCount", { name, n: n2 }) })),
-          h("label", { className: "uspp-cttf-center", onClick: (e3) => e3.stopPropagation() }, h("input", { type: "checkbox", checked: !f3.hidden, onChange: (e3) => save((d3) => {
-            d3.folders[name].hidden = !e3.target.checked;
+          h("div", { className: "uspp-cttf-center uspp-cttf-mini-switch", onClick: (e3) => e3.stopPropagation() }, h(Switch, { checked: !f3.hidden, label: t("colShow"), onChange: (v3) => save((d3) => {
+            d3.folders[name].hidden = !v3;
           }) })),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colEdit"), onClick: (e3) => {
+          h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: (e3) => {
             e3.stopPropagation();
             editFolder(name);
-          } }, "✏️"),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colDelete"), onClick: (e3) => {
+          } }),
+          h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: (e3) => {
             e3.stopPropagation();
             deleteFolder(name);
-          } }, "🗑️")
+          } })
         );
       };
       const buttonRow = ([name, b3], idx) => {
@@ -2970,11 +3009,11 @@
           },
           h("div", { style: { minWidth: 0 } }, h(Chip, { name, btn: b3, title: b3.text })),
           h("div", { className: "uspp-cttf-vars", title: vars }, vars),
-          h("div", { className: "uspp-cttf-center" }, b3.type === "tool" ? "—" : h("input", { type: "checkbox", checked: !!b3.autoSubmit, onChange: (e3) => save((d3) => {
-            d3.folders[selected].buttons[name].autoSubmit = e3.target.checked;
-          }) })),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colEdit"), onClick: () => editButton(selected, name) }, "✏️"),
-          h("button", { type: "button", className: "uspp-cttf-icon-b", title: t("colDelete"), onClick: () => deleteButton(selected, name) }, "🗑️")
+          h("div", { className: "uspp-cttf-center" }, b3.type === "tool" ? "—" : h("div", { className: "uspp-cttf-mini-switch" }, h(Switch, { checked: !!b3.autoSubmit, label: t("colAutoSubmit"), onChange: (v3) => save((d3) => {
+            d3.folders[selected].buttons[name].autoSubmit = v3;
+          }) }))),
+          h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => editButton(selected, name) }),
+          h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: () => deleteButton(selected, name) })
         );
       };
       return h(
@@ -2983,7 +3022,7 @@
         h(
           DialogHeader,
           { title: t("panelTitle"), close },
-          h("button", { type: "button", className: "uspp-cttf-b uspp-cttf-b-icon uspp-cttf-side-toggle", title: t("toggleSidebar"), "aria-label": t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
+          h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-side-toggle", title: t("toggleSidebar"), "aria-label": t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
             sideCollapsed = !collapsed;
             setCollapsed(!collapsed);
           } }, h(PanelIcon, { open: !collapsed })),
@@ -3029,6 +3068,7 @@
       description: "Settings panel: add, edit, delete, hide and reorder folders and buttons.",
       authors: ["0-V-linuxdo"],
       required: true,
+      settings: U4.definePluginSettings({ settingsPanel: openerSetting({ description: () => t("setPanelDesc"), label: () => t("openSettings"), onOpen: () => openManager() }) }),
       startAt: U4.StartAt.Init,
       // 插件入口:框架设置面板的 Plugins 页(启用 / 停用、插件设置)
       slots: { managerHeader: { label: () => t("pluginsEntry"), order: 40, onClick: () => U4.openSettings({ tab: "plugins" }) } },
@@ -3131,6 +3171,11 @@
       description: "Bottom toolbar with prompt template folders, tool buttons, and the settings / clear buttons.",
       authors: ["0-V-linuxdo"],
       required: true,
+      settings: U4.definePluginSettings({
+        folderIcons: liveSetting({ description: () => t("folderIcons"), render: () => h(Switch, { checked: !!config.data.showFolderIcons, label: t("folderIcons"), onChange: (v3) => config.update((d3) => {
+          d3.showFolderIcons = v3;
+        }) }) })
+      }),
       startAt: U4.StartAt.DOMContentLoaded,
       slots: {
         bar: { render: Toolbar, order: 0 },
@@ -3487,24 +3532,24 @@
     return h(
       Fragment,
       null,
-      h("label", { className: "uspp-cttf-check" }, h("input", { type: "checkbox", checked: !!draft.enabled, onChange: (e3) => set("enabled", e3.target.checked) }), h("b", null, t("webdavEnable"))),
+      h(SwitchRow, { title: t("webdavEnable"), checked: !!draft.enabled, onChange: (v3) => set("enabled", v3) }),
       !off && h(
         Fragment,
         null,
-        h(Field, { label: t("serverUrl"), error: insecure ? t("httpWarn") : null }, h("input", { className: "uspp-cttf-in", value: draft.serverUrl, placeholder: "https://dav.jianguoyun.com/dav/", spellCheck: false, onInput: (e3) => set("serverUrl", e3.target.value) })),
+        h(Field, { label: t("serverUrl"), error: insecure ? t("httpWarn") : null }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: draft.serverUrl, placeholder: "https://dav.jianguoyun.com/dav/", spellCheck: false, onInput: (e3) => set("serverUrl", e3.target.value) })),
         h(
           "div",
           { className: "uspp-cttf-grid2" },
-          h(Field, { label: t("username") }, h("input", { className: "uspp-cttf-in", value: draft.username, autoComplete: "off", spellCheck: false, onInput: (e3) => set("username", e3.target.value) })),
+          h(Field, { label: t("username") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: draft.username, autoComplete: "off", spellCheck: false, onInput: (e3) => set("username", e3.target.value) })),
           h(Field, { label: t("password") }, h(
             "div",
             { className: "uspp-cttf-color-row" },
-            h("input", { className: "uspp-cttf-in", type: showPw ? "text" : "password", value: draft.password, autoComplete: "new-password", spellCheck: false, onInput: (e3) => set("password", e3.target.value) }),
-            h("button", { type: "button", className: "uspp-cttf-icon-b", title: showPw ? t("hidePassword") : t("showPassword"), onClick: () => setShowPw(!showPw) }, showPw ? "🙈" : "👁")
+            h("input", { className: "uspp-cttf-input uspp-cttf-in", type: showPw ? "text" : "password", value: draft.password, autoComplete: "new-password", spellCheck: false, onInput: (e3) => set("password", e3.target.value) }),
+            h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon", title: showPw ? t("hidePassword") : t("showPassword"), onClick: () => setShowPw(!showPw) }, showPw ? "🙈" : "👁")
           ))
         ),
-        h(Field, { label: t("remotePath") }, h("input", { className: "uspp-cttf-in", value: draft.remotePath, placeholder: "ChatTemplateTextFolders/config.json", spellCheck: false, onInput: (e3) => set("remotePath", e3.target.value) })),
-        h("label", { className: "uspp-cttf-check" }, h("input", { type: "checkbox", checked: !!draft.autoSync, onChange: (e3) => set("autoSync", e3.target.checked) }), t("autoSync"))
+        h(Field, { label: t("remotePath") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: draft.remotePath, placeholder: "ChatTemplateTextFolders/config.json", spellCheck: false, onInput: (e3) => set("remotePath", e3.target.value) })),
+        h(SwitchRow, { title: t("autoSync"), checked: !!draft.autoSync, onChange: (v3) => set("autoSync", v3) })
       ),
       h(
         "div",
@@ -3596,6 +3641,7 @@
       description: "Sync the template config through WebDAV: test, upload, pull, conflict resolution, optional auto sync.",
       authors: ["0-V-linuxdo"],
       required: true,
+      settings: U4.definePluginSettings({ sync: openerSetting({ description: () => t("setSyncDesc"), label: () => t("tabSync"), onOpen: () => entry.openScriptConfig?.("WebDAVSync") }) }),
       startAt: U4.StartAt.SiteReady,
       slots: { configTabs: { label: () => t("tabSync"), order: 10, render: SyncTab } },
       start() {
@@ -8042,7 +8088,7 @@ ${orphaned.join("\n")}`);
     Input: () => Input,
     Row: () => Row,
     Select: () => Select,
-    Switch: () => Switch,
+    Switch: () => Switch2,
     Tooltip: () => Tooltip
   });
   function withFallback(nativeRender, fallbackRender, label) {
@@ -8084,7 +8130,7 @@ ${orphaned.join("\n")}`);
       className: classes("uspp-cttf-btn", "uspp-cttf-btn-icon", active && "uspp-cttf-active", className)
     }, h4(Icon2, { size }));
   }
-  var Switch = withFallback(
+  var Switch2 = withFallback(
     ({ checked, onChange, disabled: disabled2, label }) => {
       const S3 = siteComponent("Switch");
       if (!S3) return null;
@@ -8899,7 +8945,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
     switch (setting.type) {
       case OptionType.BOOLEAN:
-        return inline(h4(Switch, { checked: !!value, onChange: set, label: title }));
+        return inline(h4(Switch2, { checked: !!value, onChange: set, label: title }));
       case OptionType.SELECT:
         return inline(h4(Select, { value, options: setting.options || [], onChange: set, label: title }));
       case OptionType.SLIDER: {
@@ -9095,7 +9141,7 @@ uspp-cttf-root > * { pointer-events: auto; }
           h4(IconButton, { icon: starred ? StarFillIcon : StarIcon, label: starred ? "Unstar" : "Star", active: starred, onClick: toggleStar }),
           !p3.required && h4(IconButton, { icon: pinned ? PinFillIcon : PinIcon, label: pinned ? "Unpin" : "Pin", active: pinned, onClick: togglePin }),
           hasSettings && h4(IconButton, { icon: SlidersIcon, label: "config", onClick: openConfig }),
-          h4(Switch, {
+          h4(Switch2, {
             checked: enabled,
             disabled: p3.required || isEnabledAsDependency(p3.name),
             label: p3.name,
@@ -9286,7 +9332,7 @@ uspp-cttf-root > * { pointer-events: auto; }
           { className: "uspp-cttf-card-controls" },
           t4.local ? h4(IconButton, { icon: EditIcon, label: "Edit", onClick: () => openModal(({ onClose }) => h4(LocalThemeModal, { onClose, theme: t4 }), { modalKey: "uspp-cttf-local-theme" }) }) : h4(IconButton, { icon: CopyIcon, label: "Copy URL", onClick: copy }),
           h4(IconButton, { icon: TrashIcon, label: "Delete", onClick: remove }),
-          h4(Switch, { checked: t4.enabled, label: t4.name, onChange: (v3) => (v3 ? enableTheme : disableTheme)(t4.url) })
+          h4(Switch2, { checked: t4.enabled, label: t4.name, onChange: (v3) => (v3 ? enableTheme : disableTheme)(t4.url) })
         )
       ),
       t4.description && h4("div", { className: "uspp-cttf-card-desc" }, t4.description),
@@ -9366,7 +9412,7 @@ uspp-cttf-root > * { pointer-events: auto; }
       h4(
         Row,
         { title: "Enable Quick CSS", description: `Applies as you type, only on ${siteLabel()}. Turning it off keeps your code but stops applying it.` },
-        h4(Switch, { checked: enabled, label: "Enable Quick CSS", onChange: (v3) => setQuickCss({ enabled: v3 }) })
+        h4(Switch2, { checked: enabled, label: "Enable Quick CSS", onChange: (v3) => setQuickCss({ enabled: v3 }) })
       ),
       h4(CodeEditor, { value: css, readOnly: !enabled, placeholder: "Paste your CSS here...", minHeight: 360, onChange: (v3) => setQuickCss({ css: v3 }) })
     );
@@ -9412,7 +9458,7 @@ uspp-cttf-root > * { pointer-events: auto; }
         h4(
           Row,
           { title: "Include sensitive values", description: "Plugin settings marked sensitive (such as keys) are left out unless this is on." },
-          h4(Switch, { checked: secrets, label: "Include sensitive values", onChange: setSecrets })
+          h4(Switch2, { checked: secrets, label: "Include sensitive values", onChange: setSecrets })
         )
       ),
       h4(
