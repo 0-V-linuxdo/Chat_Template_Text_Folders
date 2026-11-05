@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.18
+// @version      2.0.19
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -73,7 +73,7 @@
   // <define:__USPP_SITES__>
   var define_USPP_SITES_default = ["chat"];
 
-  // ../Userscriptpp/core/env.js
+  // ../../../../../../root/Userscriptpp/core/env.js
   var W = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
   var GM = {
     get: typeof GM_getValue === "function" ? GM_getValue : null,
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.18" : "0.0.0";
+  var VERSION = true ? "2.0.19" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -1132,6 +1132,19 @@
 .uspp-cttf-tbl-scroll { flex: 1; overflow: auto; scrollbar-width: thin; }
 .uspp-cttf-mgr-foot { padding: 10px 12px; border-top: 1px solid var(--uspp-cttf-border-l1); display: flex; gap: 8px; align-items: center; }
 .uspp-cttf-center { text-align: center; }
+/* 列对齐:除第一列外,表头文字和行内控件都在各自列里居中(§16.3) */
+.uspp-cttf-tbl-head > :not(:first-child) { text-align: center; }
+.uspp-cttf-tbl-row > :not(:first-child) { justify-self: center; }
+.uspp-cttf-tbl-row > .uspp-cttf-vars { justify-self: stretch; text-align: center; }
+/* 「+ 新建文件夹」「+ 新建按钮」:原版橙色实心白字(--add-color)、圆角 4、padding 8px 16px、字号 14、字重 500 */
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-btn-add { background: #fd7e14; color: #fff; border: none; border-radius: 4px; padding: 8px 16px; height: auto; min-height: 0; font-size: 14px; font-weight: 500; line-height: normal; box-shadow: none; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-btn-add:hover { background: #e96f0c; color: #fff; }
+.uspp-cttf-mgr-add { justify-content: center; border-top: none; padding: 8px; }
+/* 右栏标题行:h3 纯文字 + 20×20 徽章(间距 10),下边距 8,无分隔线 */
+.uspp-cttf-mgr-main-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 8px 0; margin-bottom: 8px; }
+.uspp-cttf-mgr-main-title { display: flex; align-items: center; gap: 10px; margin: 0; min-width: 0; font-size: 1.17em; font-weight: 400; color: var(--uspp-cttf-fg-primary); }
+.uspp-cttf-mgr-main-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uspp-cttf-mgr-main-title strong { font-weight: 700; }
 .uspp-cttf-vars { font-size: 12px; color: var(--uspp-cttf-fg-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) { .uspp-cttf-mgr-side { flex-basis: 220px; } .uspp-cttf-mgr-main .uspp-cttf-tbl-head, .uspp-cttf-mgr-main .uspp-cttf-tbl-row { grid-template-columns: minmax(100px, 1fr) 64px 50px 32px 32px; } .uspp-cttf-cols, .uspp-cttf-grid2 { grid-template-columns: 1fr; } }
 .uspp-cttf-rule-row { display: grid; grid-template-columns: 28px 1fr 140px 36px 36px; gap: 8px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--uspp-cttf-border-l1); }
@@ -1866,7 +1879,7 @@
     );
   }
   var CloseSvg = () => U.icons?.CloseIcon ? h(U.icons.CloseIcon, { size: 4 }) : h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", "aria-hidden": "true" }, h("path", { d: "M18 6 6 18M6 6l12 12" }));
-  function DialogHeader({ title, subtitle, children, close }) {
+  function DialogHeader({ title, subtitle, children, close, lead }) {
     return h(
       Fragment,
       null,
@@ -1874,6 +1887,7 @@
       h(
         "div",
         { className: "uspp-cttf-modal-header uspp-cttf-dlg-head" },
+        lead,
         h("h2", { className: "uspp-cttf-modal-title uspp-cttf-dlg-title" }, title),
         subtitle && h("div", { className: "uspp-cttf-modal-subtitle" }, subtitle),
         children && h("div", { className: "uspp-cttf-dlg-head-extra" }, children)
@@ -1883,7 +1897,7 @@
   var DialogBody = ({ children, className }) => h("div", { className: "uspp-cttf-modal-body uspp-cttf-dlg-body " + (className || "") }, children);
   var DialogFooter = ({ children }) => h("div", { className: "uspp-cttf-modal-footer uspp-cttf-dlg-foot" }, children);
   function Btn({ kind = "plain", size, children, className, ...rest }) {
-    const v3 = { primary: "uspp-cttf-btn-primary", success: "uspp-cttf-btn-primary", danger: "uspp-cttf-btn-danger", ghost: "uspp-cttf-btn-ghost", icon: "uspp-cttf-btn-icon" }[kind] || "";
+    const v3 = { primary: "uspp-cttf-btn-primary", success: "uspp-cttf-btn-primary", danger: "uspp-cttf-btn-danger", add: "uspp-cttf-btn-add", ghost: "uspp-cttf-btn-ghost", icon: "uspp-cttf-btn-icon" }[kind] || "";
     return h("button", { type: "button", className: ["uspp-cttf-btn", v3, size === "sm" && "uspp-cttf-btn-sm", className].filter(Boolean).join(" "), ...rest }, children);
   }
   var Switch = (props) => h(U.components.Switch, props);
@@ -3050,13 +3064,17 @@
       return h(
         Fragment,
         null,
+        // 头部左→右:折叠按钮 | 标题 | 计数徽章 | 右侧按钮组(§8.1)
         h(
           DialogHeader,
-          { title: t("panelTitle"), close },
-          h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-side-toggle", title: t("toggleSidebar"), "aria-label": t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
-            sideCollapsed = !collapsed;
-            setCollapsed(!collapsed);
-          } }, h(PanelIcon, { open: !collapsed })),
+          {
+            title: t("panelTitle"),
+            close,
+            lead: h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-side-toggle", title: t("toggleSidebar"), "aria-label": t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
+              sideCollapsed = !collapsed;
+              setCollapsed(!collapsed);
+            } }, h(PanelIcon, { open: !collapsed }))
+          },
           h(Badge, { kind: "folders", title: t("folderCount", { n: s3.folders }) }, String(s3.folders)),
           h(Badge, { kind: "buttons", title: t("buttonCount", { n: s3.buttons }) }, String(s3.buttons)),
           h("span", { style: { flex: 1 } }),
@@ -3070,7 +3088,7 @@
             { className: "uspp-cttf-mgr-side", "data-collapsed": String(collapsed) },
             h("div", { className: "uspp-cttf-tbl-head" }, h("span", null, t("colFolderName")), h("span", { className: "uspp-cttf-center" }, t("colShow")), h("span", null, t("colEdit")), h("span", null, t("colDelete"))),
             h("div", { className: "uspp-cttf-tbl-scroll" }, c3.folderOrder.filter((n2) => c3.folders[n2]).map(folderRow)),
-            h("div", { className: "uspp-cttf-mgr-foot" }, h(Btn, { kind: "primary", onClick: () => editFolder(null) }, t("newFolder")))
+            h("div", { className: "uspp-cttf-mgr-foot uspp-cttf-mgr-add" }, h(Btn, { kind: "add", onClick: () => editFolder(null) }, t("newFolder")))
           ),
           h(
             "div",
@@ -3078,13 +3096,17 @@
             folder ? h(
               Fragment,
               null,
+              // 标题行:纯文字「➤ 文件夹名」+ 按钮数徽章,右侧「+ 新建按钮」(§16.3)
               h(
                 "div",
-                { className: "uspp-cttf-mgr-foot", style: { borderTop: "none", borderBottom: "1px solid var(--uspp-cttf-border-l1)" } },
-                h(Chip, { name: selected, folder, withIcon: c3.showFolderIcons }),
-                h(Badge, { kind: "folder", title: t("folderButtonCount", { name: selected, n: Object.keys(folder.buttons).length }) }, String(Object.keys(folder.buttons).length)),
-                h("span", { style: { flex: 1 } }),
-                h(Btn, { kind: "primary", onClick: () => editButton(selected, null) }, t("newButton"))
+                { className: "uspp-cttf-mgr-main-head" },
+                h(
+                  "h3",
+                  { className: "uspp-cttf-mgr-main-title" },
+                  h("span", { className: "uspp-cttf-mgr-main-name" }, "➤ ", h("strong", null, selected)),
+                  h(Badge, { kind: "folder", title: t("folderButtonCount", { name: selected, n: Object.keys(folder.buttons).length }) }, String(Object.keys(folder.buttons).length))
+                ),
+                h(Btn, { kind: "add", onClick: () => editButton(selected, null) }, t("newButton"))
               ),
               h("div", { className: "uspp-cttf-tbl-head" }, h("span", null, t("colPreview")), h("span", null, t("colVars")), h("span", { className: "uspp-cttf-center" }, t("colAutoSubmit")), h("span", null, t("colEdit")), h("span", null, t("colDelete"))),
               h("div", { className: "uspp-cttf-tbl-scroll" }, Object.entries(folder.buttons).map(buttonRow))
@@ -3751,7 +3773,7 @@
   // uspp:plugins
   var plugins_default = [];
 
-  // ../Userscriptpp/core/lib/logger.js
+  // ../../../../../../root/Userscriptpp/core/lib/logger.js
   var COLORS = { log: "#a78bfa", info: "#38bdf8", warn: "#f59e0b", error: "#ef4444", debug: "#9ca3af" };
   var Logger = class {
     constructor(name, color = "#a78bfa") {
@@ -3787,7 +3809,7 @@
     }
   };
 
-  // ../Userscriptpp/core/lib/diag.js
+  // ../../../../../../root/Userscriptpp/core/lib/diag.js
   var DIAG_KEY = `UserscriptPP:${SCRIPT_ID}:diag`;
   var cfg = {};
   if (IS_DEV) {
@@ -3846,7 +3868,7 @@
     return { script: SCRIPT_ID, config: cfg, at: now(), counters: { ...counters }, scripts: loadedScripts(), ...extra(), events: events.slice() };
   }
 
-  // ../Userscriptpp/core/lib/utils.js
+  // ../../../../../../root/Userscriptpp/core/lib/utils.js
   var sleep3 = (ms) => new Promise((r3) => setTimeout(r3, ms));
   function debounce(fn2, ms = 100) {
     let t4;
@@ -3914,7 +3936,7 @@
     }
   }
 
-  // ../Userscriptpp/core/lib/lazy.js
+  // ../../../../../../root/Userscriptpp/core/lib/lazy.js
   function makeLazy(factory, attempts = 5) {
     let tries = 0, cache;
     return () => {
@@ -3978,7 +4000,7 @@
     });
   }
 
-  // ../Userscriptpp/core/lib/match.js
+  // ../../../../../../root/Userscriptpp/core/lib/match.js
   var reCache = /* @__PURE__ */ new Map();
   var globToRe = (s3, any) => s3.split("*").map((x4) => x4.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(any);
   function compile(pattern) {
@@ -4019,7 +4041,7 @@
     return (host2.includes("*") ? 0 : 1e4) + host2.replace(/\*/g, "").length * 10 + path.replace(/\*/g, "").length;
   }
 
-  // ../Userscriptpp/core/lib/sites.js
+  // ../../../../../../root/Userscriptpp/core/lib/sites.js
   var logger = new Logger("Sites", "#5eead4");
   var GENERIC2 = Object.freeze({ id: "generic", name: "Generic", matches: [], generic: true });
   var registry = /* @__PURE__ */ new Map();
@@ -4090,7 +4112,7 @@
     return true;
   }
 
-  // ../Userscriptpp/core/lib/events.js
+  // ../../../../../../root/Userscriptpp/core/lib/events.js
   var logger2 = new Logger("Events", "#fde68a");
   var handlers = /* @__PURE__ */ new Map();
   var Events = Object.freeze({
@@ -4127,7 +4149,7 @@
     }
   }
 
-  // ../Userscriptpp/core/lib/settings.js
+  // ../../../../../../root/Userscriptpp/core/lib/settings.js
   var logger3 = new Logger("Settings", "#86efac");
   var STORAGE_KEY = "UserscriptPPSettings";
   var SITE_STORAGE_KEY = `UserscriptPP:${SCRIPT_ID}:settings`;
@@ -4505,7 +4527,7 @@
     W.addEventListener("pagehide", flush2);
   }
 
-  // ../Userscriptpp/core/lib/patches.js
+  // ../../../../../../root/Userscriptpp/core/lib/patches.js
   var logger4 = new Logger("Patcher", "#c4b5fd");
   var IDENT = "(?:[A-Za-z_$][\\w$]*)";
   function expandIdent(source) {
@@ -4659,7 +4681,7 @@
     return { code, applied: [...appliedPlugins], results, mismatches };
   }
 
-  // ../Userscriptpp/core/lib/turbopack.js
+  // ../../../../../../root/Userscriptpp/core/lib/turbopack.js
   var logger5 = new Logger("Turbopack", "#93c5fd");
   var fnToString = Function.prototype.toString;
   var META = Symbol.for("uspp.cttf.factory");
@@ -5371,7 +5393,7 @@ ${orphaned.join("\n")}`);
     tick();
   }
 
-  // ../Userscriptpp/core/lib/styles.js
+  // ../../../../../../root/Userscriptpp/core/lib/styles.js
   var logger6 = new Logger("Styles", "#f9a8d4");
   var styles = /* @__PURE__ */ new Map();
   var container = null;
@@ -5512,7 +5534,7 @@ ${orphaned.join("\n")}`);
     return true;
   }
 
-  // ../Userscriptpp/core/lib/slots.js
+  // ../../../../../../root/Userscriptpp/core/lib/slots.js
   var logger7 = new Logger("Slots", "#fdba74");
   var slots = /* @__PURE__ */ new Map();
   var listeners = /* @__PURE__ */ new Map();
@@ -5549,7 +5571,7 @@ ${orphaned.join("\n")}`);
   var getSlotVersion = () => version;
   var slotValue = (v3, ctx) => typeof v3 === "function" ? !!v3(ctx) : !!v3;
 
-  // ../Userscriptpp/core/lib/finders.js
+  // ../../../../../../root/Userscriptpp/core/lib/finders.js
   var logger8 = new Logger("Finders", "#67e8f9");
   var fnToString2 = Function.prototype.toString;
   var REACT_MEMO = Symbol.for("react.memo");
@@ -5854,7 +5876,7 @@ ${orphaned.join("\n")}`);
     return reactCache;
   }
 
-  // ../Userscriptpp/node_modules/preact/compat/dist/compat.module.js
+  // ../../../../../../root/Userscriptpp/node_modules/preact/compat/dist/compat.module.js
   var compat_module_exports = {};
   __export(compat_module_exports, {
     Children: () => L2,
@@ -5905,7 +5927,7 @@ ${orphaned.join("\n")}`);
     version: () => cn
   });
 
-  // ../Userscriptpp/node_modules/preact/dist/preact.module.js
+  // ../../../../../../root/Userscriptpp/node_modules/preact/dist/preact.module.js
   var n;
   var l;
   var u;
@@ -6201,7 +6223,7 @@ ${orphaned.join("\n")}`);
     return n2.__v.__b - l3.__v.__b;
   }, H.__r = 0, f = Math.random().toString(8), c = "__d" + f, a = "__a" + f, s = /(PointerCapture)$|Capture$/i, h2 = 0, p = V(false), v = V(true), y = 0;
 
-  // ../Userscriptpp/node_modules/preact/hooks/dist/hooks.module.js
+  // ../../../../../../root/Userscriptpp/node_modules/preact/hooks/dist/hooks.module.js
   var t3;
   var r2;
   var u2;
@@ -6388,7 +6410,7 @@ ${orphaned.join("\n")}`);
     return "function" == typeof t4 ? t4(n2) : t4;
   }
 
-  // ../Userscriptpp/node_modules/preact/compat/dist/compat.module.js
+  // ../../../../../../root/Userscriptpp/node_modules/preact/compat/dist/compat.module.js
   function g3(n2, t4) {
     for (var e3 in t4) n2[e3] = t4[e3];
     return n2;
@@ -6700,7 +6722,7 @@ ${orphaned.join("\n")}`);
   var Sn = hn;
   var gn = { useState: d2, useId: g2, useReducer: y2, useEffect: h3, useLayoutEffect: _2, useInsertionEffect: I2, useTransition: k3, useDeferredValue: w3, useSyncExternalStore: C3, startTransition: x3, useRef: A2, useImperativeHandle: F2, useMemo: T2, useCallback: q2, useContext: x2, useDebugValue: P2, version: "18.3.1", Children: L2, render: nn, hydrate: tn, unmountComponentAtNode: pn, createPortal: $2, createElement: k, createContext: X, createFactory: sn, cloneElement: mn, createRef: M, Fragment: S, isValidElement: hn, isElement: Sn, isFragment: vn, isMemo: dn, findDOMNode: yn, Component: C, PureComponent: M2, memo: N2, forwardRef: D3, flushSync: bn, unstable_batchedUpdates: _n, StrictMode: S, Suspense: P3, SuspenseList: B3, lazy: z3, __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: an };
 
-  // ../Userscriptpp/core/ui/react.js
+  // ../../../../../../root/Userscriptpp/core/ui/react.js
   var bundled = Object.freeze({
     name: "preact",
     site: false,
@@ -6804,7 +6826,7 @@ ${orphaned.join("\n")}`);
     return Wrapped;
   };
 
-  // ../Userscriptpp/core/lib/plugins.js
+  // ../../../../../../root/Userscriptpp/core/lib/plugins.js
   var logger9 = new Logger("PluginManager", "#a5b4fc");
   var StartAt = Object.freeze({
     Init: "Init",
@@ -7218,7 +7240,7 @@ ${orphaned.join("\n")}`);
     return true;
   }
 
-  // ../Userscriptpp/core/lib/backup.js
+  // ../../../../../../root/Userscriptpp/core/lib/backup.js
   var logger10 = new Logger("Backup", "#93c5fd");
   var BACKUP_FORMAT = "userscript-pp-settings";
   var clone = (v3) => parseStored(serialize2(v3)) ?? JSON.parse(serialize2(v3));
@@ -7321,7 +7343,7 @@ ${orphaned.join("\n")}`);
     });
   }
 
-  // ../Userscriptpp/core/lib/net.js
+  // ../../../../../../root/Userscriptpp/core/lib/net.js
   function fetchExternal(url, { timeout = 3e4 } = {}) {
     if (!GM.xhr) return W.fetch(url);
     return new Promise((resolve2, reject) => {
@@ -7356,7 +7378,7 @@ ${orphaned.join("\n")}`);
     });
   }
 
-  // ../Userscriptpp/core/lib/themes.js
+  // ../../../../../../root/Userscriptpp/core/lib/themes.js
   var logger11 = new Logger("Themes", "#fcd34d");
   var cssCache = /* @__PURE__ */ new Map();
   var applied = /* @__PURE__ */ new Set();
@@ -7630,7 +7652,7 @@ ${orphaned.join("\n")}`);
     else disableStyle(QUICK_CSS);
   }
 
-  // ../Userscriptpp/core/lib/dom.js
+  // ../../../../../../root/Userscriptpp/core/lib/dom.js
   var logger12 = new Logger("DOM", "#a7f3d0");
   var subs = /* @__PURE__ */ new Set();
   var mo = null;
@@ -7800,7 +7822,7 @@ ${orphaned.join("\n")}`);
     if (mo) collect(mo.takeRecords());
   }
 
-  // ../Userscriptpp/core/lib/route.js
+  // ../../../../../../root/Userscriptpp/core/lib/route.js
   var installed2 = false;
   var last = null;
   var parser = null;
@@ -7851,7 +7873,7 @@ ${orphaned.join("\n")}`);
     return subscribe(Events.ROUTE_CHANGE, fn2);
   }
 
-  // ../Userscriptpp/core/lib/network.js
+  // ../../../../../../root/Userscriptpp/core/lib/network.js
   var logger13 = new Logger("Network", "#c4b5fd");
   var reqSubs = /* @__PURE__ */ new Set();
   var resSubs = /* @__PURE__ */ new Set();
@@ -7969,7 +7991,7 @@ ${orphaned.join("\n")}`);
     return () => resSubs.delete(s3);
   }
 
-  // ../Userscriptpp/core/lib/menu.js
+  // ../../../../../../root/Userscriptpp/core/lib/menu.js
   var logger14 = new Logger("Menu", "#fcd34d");
   var registered = /* @__PURE__ */ new Map();
   function sync2() {
@@ -8020,7 +8042,7 @@ ${orphaned.join("\n")}`);
     sync2();
   }
 
-  // ../Userscriptpp/core/lib/fiber.js
+  // ../../../../../../root/Userscriptpp/core/lib/fiber.js
   function getFiber(el) {
     if (!el) return null;
     for (const k4 of Object.keys(el)) {
@@ -8047,7 +8069,7 @@ ${orphaned.join("\n")}`);
     return f3 ? f3.memoizedProps : null;
   }
 
-  // ../Userscriptpp/core/lib/jsxhook.js
+  // ../../../../../../root/Userscriptpp/core/lib/jsxhook.js
   var logger15 = new Logger("RenderHook", "#fca5a5");
   var hooks = /* @__PURE__ */ new Map();
   var stringHooks = /* @__PURE__ */ new Map();
@@ -8140,7 +8162,7 @@ ${orphaned.join("\n")}`);
     return treeHas(node.props?.children, test2, depth - 1);
   }
 
-  // ../Userscriptpp/core/ui/components.js
+  // ../../../../../../root/Userscriptpp/core/ui/components.js
   var components_exports = {};
   __export(components_exports, {
     Button: () => Button,
@@ -8292,7 +8314,7 @@ ${orphaned.join("\n")}`);
     );
   }
 
-  // ../Userscriptpp/core/ui/icons.js
+  // ../../../../../../root/Userscriptpp/core/ui/icons.js
   var icons_exports = {};
   __export(icons_exports, {
     ArchiveIcon: () => ArchiveIcon,
@@ -8363,7 +8385,7 @@ ${orphaned.join("\n")}`);
   var EyeIcon = svg2(["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"]);
   var ArchiveIcon = svg2(["M3 4h18v4H3z", "M5 8v12h14V8", "M10 12h4"]);
 
-  // ../Userscriptpp/core/ui/theme.js
+  // ../../../../../../root/Userscriptpp/core/ui/theme.js
   function luminance(color) {
     const m3 = /rgba?\(([^)]+)\)/.exec(color || "");
     if (!m3) return null;
@@ -8423,7 +8445,7 @@ ${orphaned.join("\n")}`);
     }, { once: true });
   }
 
-  // ../Userscriptpp/core/ui/root.js
+  // ../../../../../../root/Userscriptpp/core/ui/root.js
   var logger16 = new Logger("UI", "#fbcfe8");
   var root = null;
   var host = null;
@@ -8476,7 +8498,7 @@ ${orphaned.join("\n")}`);
     }
   }
 
-  // ../Userscriptpp/core/ui/modal.js
+  // ../../../../../../root/Userscriptpp/core/ui/modal.js
   var logger17 = new Logger("Modal", "#fbcfe8");
   var modals = [];
   var listeners4 = /* @__PURE__ */ new Set();
@@ -8609,7 +8631,7 @@ ${orphaned.join("\n")}`);
     });
   }
 
-  // ../Userscriptpp/core/ui/toast.js
+  // ../../../../../../root/Userscriptpp/core/ui/toast.js
   var logger18 = new Logger("Toast", "#fbcfe8");
   var ToastType = Object.freeze({
     MESSAGE: "MESSAGE",
@@ -8728,7 +8750,7 @@ ${orphaned.join("\n")}`);
     return t4;
   }
 
-  // ../Userscriptpp/core/ui/floating.js
+  // ../../../../../../root/Userscriptpp/core/ui/floating.js
   var subscribe5 = (fn2) => {
     const off = onSlotChange("floating", fn2);
     SettingsStore.addChangeListener("plugins.Settings.floatingPosition", fn2);
@@ -8778,7 +8800,7 @@ ${orphaned.join("\n")}`);
     tryMount();
   }
 
-  // ../Userscriptpp/core/ui/styles.css.js
+  // ../../../../../../root/Userscriptpp/core/ui/styles.css.js
   var LIGHT = `--uspp-cttf-surface-base:#fff;--uspp-cttf-surface-l1:#fff;--uspp-cttf-surface-l2:#f4f4f5;--uspp-cttf-surface-l3:#d4d4d8;--uspp-cttf-fg-primary:#111;--uspp-cttf-fg-secondary:#5f5f66;--uspp-cttf-fg-tertiary:#8a8a93;--uspp-cttf-fg-danger:#e5484d;--uspp-cttf-border-l1:rgb(0 0 0 / .1);--uspp-cttf-border-l2:rgb(0 0 0 / .16);--uspp-cttf-ring:#888;--uspp-cttf-button-ghost-hover:rgb(0 0 0 / .06);`;
   var DARK = `--uspp-cttf-surface-base:#151517;--uspp-cttf-surface-l1:#1c1c1f;--uspp-cttf-surface-l2:#26262a;--uspp-cttf-surface-l3:#3f3f46;--uspp-cttf-fg-primary:#f4f4f5;--uspp-cttf-fg-secondary:#a1a1aa;--uspp-cttf-fg-tertiary:#71717a;--uspp-cttf-fg-danger:#f06a6e;--uspp-cttf-border-l1:rgb(255 255 255 / .1);--uspp-cttf-border-l2:rgb(255 255 255 / .16);--uspp-cttf-ring:#a1a1aa;--uspp-cttf-button-ghost-hover:rgb(255 255 255 / .08);`;
   var UI_CSS = `
@@ -8920,7 +8942,7 @@ uspp-cttf-root > * { pointer-events: auto; }
 .uspp-cttf-preview-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--uspp-cttf-border-l2); background: var(--uspp-cttf-surface-l1); font-weight: 500; font-size: 13px; }
 `;
 
-  // ../Userscriptpp/core/settings/index.js
+  // ../../../../../../root/Userscriptpp/core/settings/index.js
   var NAME = "Settings";
   var MENU_COMMAND_ID = "uspp-cttf-settings";
   var settings = definePluginSettings({
@@ -8979,7 +9001,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     }
   });
 
-  // ../Userscriptpp/core/settings/PluginPreview.js
+  // ../../../../../../root/Userscriptpp/core/settings/PluginPreview.js
   var SLOT_LABELS = {
     toolbar: "Toolbar button",
     menuCommand: "Script menu command",
@@ -9098,7 +9120,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/PluginModal.js
+  // ../../../../../../root/Userscriptpp/core/settings/PluginModal.js
   function usePluginSettings(name) {
     const force = useForceUpdate();
     useEffect2(() => {
@@ -9229,7 +9251,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/BaseCard.js
+  // ../../../../../../root/Userscriptpp/core/settings/BaseCard.js
   function BaseCard({ className, attrs, name, icon, badges, description, controls, footer }) {
     return h4(
       "div",
@@ -9256,11 +9278,11 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/site-label.js
+  // ../../../../../../root/Userscriptpp/core/settings/site-label.js
   var siteLabel = () => isGeneric() ? location.hostname || "this site" : getSite().name;
   var pluginSiteLabel = (p3) => p3.site === "*" ? "All sites" : getSiteById(p3.site)?.name ?? p3.site;
 
-  // ../Userscriptpp/core/settings/shared.js
+  // ../../../../../../root/Userscriptpp/core/settings/shared.js
   var TAB_IDS = { plugins: "uspp_cttf_plugins_tab", themes: "uspp_cttf_themes_tab", quickCss: "uspp_cttf_quickcss_tab", backup: "uspp_cttf_backup_tab" };
   var sys = () => Settings.plugins.Settings;
   var sysPlain = () => PlainSettings.plugins.Settings ??= {};
@@ -9269,7 +9291,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     return Array.isArray(v3) ? v3.slice() : [];
   }
 
-  // ../Userscriptpp/core/settings/PluginsTab.js
+  // ../../../../../../root/Userscriptpp/core/settings/PluginsTab.js
   var TAGS = [
     ["composer", "Composer"],
     ["messages", "Messages"],
@@ -9505,7 +9527,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/ThemesTab.js
+  // ../../../../../../root/Userscriptpp/core/settings/ThemesTab.js
   function OnlineThemeModal({ onClose }) {
     const [url, setUrl] = useState2("");
     const [busy3, setBusy] = useState2(false);
@@ -9652,7 +9674,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/QuickCssTab.js
+  // ../../../../../../root/Userscriptpp/core/settings/QuickCssTab.js
   function QuickCssTab() {
     const force = useForceUpdate();
     useEffect2(() => {
@@ -9673,7 +9695,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/BackupTab.js
+  // ../../../../../../root/Userscriptpp/core/settings/BackupTab.js
   async function runImport() {
     const text = await pickJsonFile();
     if (text == null) return false;
@@ -9730,7 +9752,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     );
   }
 
-  // ../Userscriptpp/core/settings/pages.js
+  // ../../../../../../root/Userscriptpp/core/settings/pages.js
   var page = (C4, label) => {
     const P4 = () => h4(ErrorBoundary, { fallback: h4("div", { className: "uspp-cttf-page uspp-cttf-error" }, `${label} failed to render.`) }, h4(C4));
     P4.displayName = `Uspp${label.replace(/\s/g, "")}Page`;
@@ -9744,7 +9766,7 @@ uspp-cttf-root > * { pointer-events: auto; }
   ]);
   var pageByKey = (key) => SETTINGS_PAGES.find((p3) => p3.key === key || p3.id === key) || SETTINGS_PAGES[0];
 
-  // ../Userscriptpp/core/settings/SettingsPanel.js
+  // ../../../../../../root/Userscriptpp/core/settings/SettingsPanel.js
   var PANEL_KEY = "uspp-cttf-settings-panel";
   function SettingsPanel({ tab, onClose }) {
     const [cur, setCur] = useState2(pageByKey(tab).key);
@@ -9777,7 +9799,7 @@ uspp-cttf-root > * { pointer-events: auto; }
   }
   var closeSettingsPanel = () => closeModal(PANEL_KEY);
 
-  // ../Userscriptpp/core/index.js
+  // ../../../../../../root/Userscriptpp/core/index.js
   var logger19 = new Logger("Core", "#c4b5fd");
   var DEFAULT_READY_TIMEOUT = 15e3;
   var BUILD_SITES = typeof define_USPP_SITES_default !== "undefined" ? define_USPP_SITES_default : [];

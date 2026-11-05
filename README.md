@@ -1,85 +1,65 @@
-<img src="https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg" alt="图标" width="60" height="60"/>
+# [Chat] Template Text Folders · Userscript++ 版(2.0)
 
-<h1>
-  [Chat] Template Text Folders
-  <a href="https://raw.githubusercontent.com/0-V-linuxdo/Chat_Template_Text_Folders/refs/heads/main/%5BChat%5D%20Template%20Text%20Folders.user.js">
-    <img align="right" src="./assets/install-userscript-badge.svg" alt="安装 userscript"/>
-  </a>
-</h1>
+在 AI 聊天网页底部放一条**按钮栏**:文件夹 → 模板按钮,一键把常用提示词写进输入框,可选自动发送;支持 **WebDAV 同步**。
+本版基于 [Userscript++](https://github.com/0-V-linuxdo/Userscriptpp) 框架,按功能规格净室重写,不含原实现代码。 构建所用框架版本:Userscriptpp main `fefb1df`(Void++ 风格卡片与页签、插件效果预览)。
 
-<details open>
-<summary>简介</summary>
-  
-- 在AI网页底部，添加 `提示词模版` 文件夹+按钮，
-- 减少重复输入，提升输入效率！
+## 本体插件(只内置必要的)
 
-  <details open>
-  <summary>示例1：ChatGPT网页</summary>
-    <img width="1462" height="1083" alt="image" src="https://github.com/user-attachments/assets/b7d417c7-5235-42de-8e70-ed3edac3cb31" />
-  </details>
+| 插件 | 作用 |
+| --- | --- |
+| `Settings` | 框架自带:框架设置面板、菜单命令 |
+| `PromptToolbar` | 底部按钮栏、文件夹弹层、模板 / 工具按钮、⚙️ 设置、✖ 清空、「打开模板设置」菜单 |
+| `PromptManager` | 设置面板:文件夹 / 按钮增删改、显示开关、拖拽排序(文件夹、按钮、跨文件夹移动) |
+| `AutoSubmit` | 写入后自动发送;「⚡ 自动化」规则管理(Enter / Cmd·Ctrl+Enter / 点击发送按钮 / 自定义选择器) |
+| `ConfigTransfer` | 「🛠️ 脚本配置」:语言、文件夹图标、导出 / 导入(带差异预览)/ 重置;旧版本地数据迁移 |
+| `WebDAVSync` | WebDAV 测试连接 / 上传 / 拉取、冲突选择框、可选自动同步 |
 
-</details>
+写入输入框(定位输入框、四个模板变量、按编辑器类型写入)是站点公共件 `lib/composer.js`,不能被单独关掉。
+可选插件(网站样式规则、Google Drive 同步、详细差异视图)不在本体里。
 
-<details>
-<summary>支持的浏览器</summary>
-  
-- Chrome
-- Firefox
-- Safari
+## 模板变量
 
-注意：
-Firefox/Safari 获取剪切板内容，需要手动确认！
-</details>
+| 变量 | 含义 |
+| --- | --- |
+| `{inputboard}` | 输入框当前全部文本(含它时整体替换输入框) |
+| `{clipboard}` | 剪贴板文本(读不到时不写入) |
+| `{selection}` | 点击时页面选中的文本 |
+| `{{inputboard}\|{clipboard}}` | 输入框非空用输入框,否则用剪贴板(整体替换) |
 
-<details>
-<summary>支持的脚本管理器</summary>
-  
-- Adguard (app version) - All
-- violentmonkey - Chrome/Firefox
-- Stay - Safari
+## 数据与同步
 
-其他：
-- Arc Boost
+- 配置、语言偏好、WebDAV 设置存在脚本管理器的 GM 存储(键 `cttf.config` / `cttf.prefs` / `cttf.webdav`),**所有网站共用一份**,多标签页自动同步;不写进网页的 localStorage / IndexedDB。
+- 首次运行会导入当前网站上旧版的 `localStorage['chatGPTButtonFoldersConfig']`;之后在其他网站发现不同的旧数据时提示一次。旧数据不删除。
+- 导出的 JSON 与原版格式兼容,原版导出的文件可直接导入。导出文件里没有 WebDAV 密码。
+- WebDAV:请求全部走 `GM_xmlhttpRequest`(`@connect *`),Basic 认证;远端文件 = 导出格式 + `_sync` 字段;目录不存在时自动逐级创建;上传带 `If-Match`,远端在别处改过时弹出「以本地为准 / 以云端为准」。坚果云示例:地址 `https://dav.jianguoyun.com/dav/`,密码用「应用密码」。
+- 自动同步(可选):页面就绪后检查一次云端(10 分钟内多标签只查一次),本地修改后 10 秒合并上传;冲突时只显示提示条,点击处理。
 
-提示：
-脚本数据存储在 本地 - 浏览器localstorage 中！
-</details>
+## 支持的网站
 
-<details>
-<summary>支持的AI网页</summary>
-  
-| 图标 | 名称 | 网址 | 内置样式 | 备注 |
-|:---:|---|---|:---:|---|
-| <img src="https://www.google.com/s2/favicons?domain=chatgpt.com&amp;sz=32" width="20" height="20" alt="ChatGPT"> | ChatGPT | `https://chatgpt.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=chat01.ai&amp;sz=32" width="20" height="20" alt="Chat01"> | Chat01 | `https://chat01.ai/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=claude.ai&amp;sz=32" width="20" height="20" alt="Claude"> | Claude | `https://claude.ai/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=gemini.google.com&amp;sz=32" width="20" height="20" alt="Gemini"> | Gemini | `https://gemini.google.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=aistudio.google.com&amp;sz=32" width="20" height="20" alt="Google AI Studio"> | Google AI Studio | `https://aistudio.google.com/*` | ✅ |  |
-| <img src="https://auth.business.gemini.google/favicon.ico" width="20" height="20" alt="Gemini Business"> | Gemini Business | `https://business.gemini.google/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=grok.com&amp;sz=32" width="20" height="20" alt="Grok"> | Grok | `https://grok.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=gk.dairoot.cn&amp;sz=32" width="20" height="20" alt="Grok 镜像"> | Grok 镜像 | `https://gk.dairoot.cn/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=x.com&amp;sz=32" width="20" height="20" alt="X Grok"> | X Grok | `https://x.com/i/grok*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=chat.deepseek.com&amp;sz=32" width="20" height="20" alt="DeepSeek"> | DeepSeek | `https://chat.deepseek.com/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=chat.z.ai&amp;sz=32" width="20" height="20" alt="Z.ai"> | Z.ai | `https://chat.z.ai/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=chat.qwen.ai&amp;sz=32" width="20" height="20" alt="Qwen"> | Qwen | `https://chat.qwen.ai/*` | ❌ | 不支持 AdGuard 注入，因为网页严格限制 JS 来源 |
-| <img src="https://www.google.com/s2/favicons?domain=anuneko.com&amp;sz=32" width="20" height="20" alt="Anuneko"> | Anuneko | `https://anuneko.com/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=perplexity.ai&amp;sz=32" width="20" height="20" alt="Perplexity"> | Perplexity | `https://*.perplexity.ai/*` | ✅ |  |
-| <img src="https://kagi.com/favicon-assistant-32x32.png" width="20" height="20" alt="Kagi Assistant"> | Kagi Assistant | `https://assistant.kagi.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=arena.ai&amp;sz=32" width="20" height="20" alt="Arena"> | Arena | `https://arena.ai/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=manus.im&amp;sz=32" width="20" height="20" alt="Manus"> | Manus | `https://manus.im/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=poe.com&amp;sz=32" width="20" height="20" alt="Poe"> | Poe | `https://poe.com/*` | ✅ |  |
-| <img src="https://app.lobehub.com/favicon.ico" width="20" height="20" alt="LobeHub"> | LobeHub | `https://app.lobehub.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=monica.im&amp;sz=32" width="20" height="20" alt="Monica"> | Monica | `https://monica.im/*` | ✅ |  |
-| <img src="https://web.tabbit.ai/favicon.ico" width="20" height="20" alt="Tabbit Browser"> | Tabbit Browser | `https://web.tabbit.ai/*` | ❌ | 脚本功能正常 |
-| <img src="https://www.google.com/s2/favicons?domain=setapp.typingcloud.com&amp;sz=32" width="20" height="20" alt="TypingCloud SetApp"> | TypingCloud SetApp | `https://setapp.typingcloud.com/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=cerebr.yym68686.top&amp;sz=32" width="20" height="20" alt="Cerebr"> | Cerebr | `https://cerebr.fugue.pro/*`<br>`https://cerebr.vercel.app/*`<br>`https://cerebr.yym68686.top/*`<br>`https://cerebr.pages.dev/*` | ✅ | 暂只支持网页版，插件版没有适配最新的插件系统 |
-| <img src="https://www.google.com/s2/favicons?domain=www.notion.so&amp;sz=32" width="20" height="20" alt="Notion"> | Notion | `https://app.notion.com/*`<br>`https://www.notion.so/*` | ✅ |  |
-| <img src="https://www.google.com/s2/favicons?domain=chat.mistral.ai&amp;sz=32" width="20" height="20" alt="Mistral"> | Mistral | `https://chat.mistral.ai/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=copilot.microsoft.com&amp;sz=32" width="20" height="20" alt="Microsoft Copilot"> | Microsoft Copilot | `https://copilot.microsoft.com/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=meta.ai&amp;sz=32" width="20" height="20" alt="Meta AI"> | Meta AI | `https://meta.ai/*` | ❌ |  |
-| <img src="https://www.google.com/s2/favicons?domain=web.telegram.org&sz=32" width="20" height="20" alt="Telegram Web A"> | Telegram Web A | `https://web.telegram.org/a/*` | ✅ | 适配 `#editable-message-text` composer；设置页隐藏工具栏 |
-</details>
+ChatGPT、Chat01、Claude、Gemini、AI Studio、Gemini Business、Grok(含镜像与 X)、DeepSeek、Z.ai、Qwen、Anuneko、Perplexity、Kagi Assistant、Arena、Manus、Poe、LobeHub、Monica、Tabbit、TypingCloud、Cerebr、Notion、Mistral、Copilot、Meta AI、Telegram Web A。
+新增网站只需在 `sites/chat/hosts.js` 加一项(输入框 / 发送按钮选择器、隐藏按钮栏的页面、固定样式)。
 
----
+## 构建与测试
 
-完整源码请查看 [dev 分支](https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/tree/dev)。
+```sh
+git clone https://github.com/0-V-linuxdo/Userscriptpp ../Userscriptpp && (cd ../Userscriptpp && npm install)
+npm install
+npm run build   # 产出 dist/*.user.js(发布 / 开发两种),并复制发布构建到仓库根目录
+npm test        # 构建 + jsdom 冒烟测试(仿 ChatGPT 页面 + 内存 WebDAV 服务器)
+```
+
+也可以用 `USPP_DIR=<框架目录>` 指定框架位置。
+
+## 目录
+
+- `sites/chat/index.js`:站点适配(按钮栏宿主、显示 / 隐藏、注入点 `bar`)
+- `sites/chat/hosts.js`:各网站差异表
+- `sites/chat/lib/`:配置模型、存储、写入输入框、自动提交、WebDAV 客户端、界面公共件、中英文
+- `sites/chat/plugins/`:六个本体插件
+- `test/`:冒烟测试
+
+## 框架补丁
+
+`patches/` 下的补丁会在构建时自动打到 Userscript++ 框架上(已打过则跳过):
+
+- `userscriptpp-modal-host-dialog.patch`:框架弹窗只放进站点真正的模态框里。ChatGPT 页面常驻一个非模态、零尺寸、不接收点击的 quick chat 浮层(`section[role=dialog][data-state=open][aria-modal=false]`),原逻辑会把弹窗塞进去,导致编辑、删除、横幅「查看」等按钮点了看不见弹窗。建议合入框架上游。
