@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.23
+// @version      2.0.24
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.23" : "0.0.0";
+  var VERSION = true ? "2.0.24" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -109,6 +109,7 @@
   var useEffect = (...a3) => U.react.useEffect(...a3);
   var useRef = (...a3) => U.react.useRef(...a3);
   var useReducer = (...a3) => U.react.useReducer(...a3);
+  var useLayoutEffect = (...a3) => U.react.useLayoutEffect(...a3);
 
   // sites/chat/hosts.js
   var prefix = (...list) => (u3) => list.some((p3) => u3.pathname.startsWith(p3));
@@ -1739,6 +1740,11 @@
 /* 插件设置弹窗:各页签内容高度不同,弹窗固定为最大高度,切页签时不再忽高忽低(内容区自行滚动) */
 .uspp-cttf-modal:has(> .uspp-cttf-modal-body > .uspp-cttf-panel) { height: min(85vh, 760px); }
 .uspp-cttf-modal:has(> .uspp-cttf-modal-body > .uspp-cttf-panel) > .uspp-cttf-modal-body { flex: 1 1 auto; min-height: 0; }
+
+/* 子弹窗只遮罩主弹窗:页面不再额外变暗;变暗 + 2px 模糊只盖在主弹窗上(与主弹窗同圆角)。无动画,打开即生效 */
+.uspp-cttf-overlay:has(> .uspp-cttf-dlg-guard-sub), .uspp-cttf-overlay:has(.uspp-cttf-dlg-guard-sub) { background: transparent; }
+.uspp-cttf-dlg-guard.uspp-cttf-dlg-guard-sub { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.uspp-cttf-dlg-mask { position: fixed; pointer-events: none; background: rgb(0 0 0 / .5); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); border-radius: 4px; }
 `;
 
   // sites/chat/lib/settle.js
@@ -3998,27 +4004,60 @@
     }, []);
   }
   function openDialog(Component, props = {}, { key, dismissable = true, width = 560, className = "" } = {}) {
+    const parent = liveDialogs[liveDialogs.length - 1] || null;
     let closeFn = () => {
     };
     const k4 = U.openModal(({ onClose }) => {
       closeFn = onClose;
-      return h(DialogFrame, { Component, props, onClose, dismissable, width, className });
+      return h(DialogFrame, { Component, props, onClose, dismissable, width, className, parent });
     }, { modalKey: key ? `cttf-${key}` : void 0 });
     return () => U.closeModal(k4);
   }
-  function DialogFrame({ Component, props, onClose, dismissable, width, className }) {
+  var liveDialogs = [];
+  var rectStyle = (el) => {
+    const r3 = el.getBoundingClientRect();
+    return { left: `${r3.left}px`, top: `${r3.top}px`, width: `${r3.width}px`, height: `${r3.height}px` };
+  };
+  function DialogFrame({ Component, props, onClose, dismissable, width, className, parent }) {
     useLive();
+    const box = useRef(null);
+    const mask = useRef(null);
+    useLayoutEffect(() => {
+      const el = box.current;
+      liveDialogs.push(el);
+      return () => {
+        const i3 = liveDialogs.indexOf(el);
+        if (i3 >= 0) liveDialogs.splice(i3, 1);
+      };
+    }, []);
+    const sub = !!(parent && parent.isConnected);
+    useLayoutEffect(() => {
+      if (!sub) return;
+      const place = () => {
+        if (parent.isConnected && mask.current) Object.assign(mask.current.style, rectStyle(parent));
+      };
+      place();
+      const ro = typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
+      ro?.observe(parent);
+      addEventListener("resize", place);
+      return () => {
+        ro?.disconnect();
+        removeEventListener("resize", place);
+      };
+    }, [sub]);
     return h(
       Fragment,
       null,
-      h("div", { className: "uspp-cttf-dlg-guard", onMouseDown: (e3) => e3.stopPropagation(), onClick: (e3) => {
+      // 拦截层铺满全屏(点外面是否关闭由 dismissable 决定);子弹窗时它透明,只由下面的 mask 盖住主弹窗
+      h("div", { className: "uspp-cttf-dlg-guard" + (sub ? " uspp-cttf-dlg-guard-sub" : ""), onMouseDown: (e3) => e3.stopPropagation(), onClick: (e3) => {
         e3.stopPropagation();
         if (dismissable) onClose();
       } }),
+      sub && h("div", { ref: mask, className: "uspp-cttf-dlg-mask", style: rectStyle(parent), "aria-hidden": "true" }),
       // 外壳即框架 ModalCard 的结构与样式(uspp-cttf-modal / -header / -body / -footer / -close)
       h(
         "div",
-        { className: "uspp-cttf-modal uspp-cttf-dlg" + (className ? " " + className : ""), role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 100%)` }, onClick: (e3) => e3.stopPropagation() },
+        { ref: box, className: "uspp-cttf-modal uspp-cttf-dlg" + (className ? " " + className : ""), role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 100%)` }, onClick: (e3) => e3.stopPropagation() },
         h(Component, { ...props, close: onClose })
       )
     );
@@ -10415,7 +10454,7 @@ ${orphaned.join("\n")}`);
   var hook = (name) => (...args) => getReact2()[name](...args);
   var useState2 = hook("useState");
   var useEffect2 = hook("useEffect");
-  var useLayoutEffect = hook("useLayoutEffect");
+  var useLayoutEffect2 = hook("useLayoutEffect");
   var useMemo = hook("useMemo");
   var useRef2 = hook("useRef");
   var useCallback = hook("useCallback");
@@ -13771,7 +13810,7 @@ uspp-cttf-root > * { pointer-events: auto; }
         usingSiteRenderer,
         useState: useState2,
         useEffect: useEffect2,
-        useLayoutEffect,
+        useLayoutEffect: useLayoutEffect2,
         useMemo,
         useRef: useRef2,
         useCallback,
