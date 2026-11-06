@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.22
+// @version      2.0.23
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.22" : "0.0.0";
+  var VERSION = true ? "2.0.23" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -12508,7 +12508,8 @@ uspp-cttf-root > * { pointer-events: auto; }
 .uspp-cttf-divider { display: flex; align-items: center; gap: 8px; color: var(--uspp-cttf-fg-tertiary); font-size: 12px; margin: 4px 0; }
 .uspp-cttf-divider::before, .uspp-cttf-divider::after { content: ""; flex: 1; height: 1px; background: var(--uspp-cttf-border-l1); }
 .uspp-cttf-card { display: flex; flex-direction: column; padding: 0; min-height: 120px; min-width: 0; overflow: hidden; contain: content; border: 1px solid var(--uspp-cttf-border-l1); border-radius: 8px; background: var(--uspp-cttf-surface-l1); }
-.uspp-cttf-card[data-required="true"] { opacity: .4; }
+.uspp-cttf-switch-lock { display: inline-flex; cursor: not-allowed; }
+.uspp-cttf-switch-lock button, .uspp-cttf-switch-lock [role="switch"] { opacity: 1 !important; pointer-events: none; }
 .uspp-cttf-card[data-failed="true"] { opacity: .5; border-color: color-mix(in srgb, var(--uspp-cttf-fg-danger) 45%, transparent); }
 .uspp-cttf-card-body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
 .uspp-cttf-card-head { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
@@ -13017,7 +13018,7 @@ uspp-cttf-root > * { pointer-events: auto; }
     const failed2 = !p3.required && isPluginEnabled(p3.name) && !p3.started;
     const icon = (key, tip, Icon2, cls) => h4(Tooltip, { key, content: tip }, h4("span", { className: classes("uspp-cttf-icon-badge", cls) }, h4(Icon2, { size: 3.5 })));
     if (failed2) out.push(icon("fail", "This plugin failed to start", WarningIcon, "uspp-cttf-warn"));
-    if (p3.required) out.push(icon("req", `This plugin is required for ${SCRIPT_NAME} to work`, CircleAlertIcon));
+    if (p3.required) out.push(icon("req", `This plugin is required for ${SCRIPT_NAME} to work`, LockIcon));
     if (p3.dev) out.push(icon("dev", "Development build only", WrenchIcon));
     if (p3.chromiumOnly) out.push(icon("chr", "Chromium only", ChromiumIcon));
     const seen = sys().knownPlugins?.[p3.name];
@@ -13057,10 +13058,18 @@ uspp-cttf-root > * { pointer-events: auto; }
         btn("star", starred ? StarFillIcon : StarIcon, starred ? "Unstar" : "Star", toggleStar, starred),
         !p3.required && btn("pin", pinned ? PinFillIcon : PinIcon, pinned ? "Unpin" : "Pin", togglePin, pinned),
         hasSettings && h4(Tooltip, { key: "cfg", content: "config" }, btn(null, SlidersIcon, "config", openConfig)),
-        h4(Switch2, {
+        p3.required ? h4(
+          Tooltip,
+          { key: "switch", content: `Required for ${SCRIPT_NAME} to work, can't be turned off` },
+          h4(
+            "span",
+            { className: "uspp-cttf-switch-lock", "data-uspp-cttf-locked": "true" },
+            h4(Switch2, { checked: true, disabled: true, label: p3.name })
+          )
+        ) : h4(Switch2, {
           key: "switch",
           checked: enabled,
-          disabled: p3.required || isEnabledAsDependency(p3.name),
+          disabled: isEnabledAsDependency(p3.name),
           label: p3.name,
           onChange: () => {
             togglePlugin(p3.name);

@@ -1,7 +1,7 @@
 # [Chat] Template Text Folders · Userscript++ 版(2.0)
 
 在 AI 聊天网页底部放一条**按钮栏**:文件夹 → 模板按钮,一键把常用提示词写进输入框,可选自动发送;支持 **WebDAV 同步**。
-本版基于 [Userscript++](https://github.com/0-V-linuxdo/Userscriptpp) 框架,按功能规格净室重写,不含原实现代码。 构建所用框架版本:Userscriptpp main `fefb1df`(Void++ 风格卡片与页签、插件效果预览)。
+本版基于 [Userscript++](https://github.com/0-V-linuxdo/Userscriptpp) 框架,按功能规格净室重写,不含原实现代码。 构建所用框架版本:Userscriptpp main `ec1795a`(必需插件卡片保持正常外观、开关锁定)。
 
 ## 本体插件(只内置必要的)
 
