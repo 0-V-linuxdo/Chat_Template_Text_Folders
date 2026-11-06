@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.24
+// @version      2.0.25
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.24" : "0.0.0";
+  var VERSION = true ? "2.0.25" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -4084,8 +4084,27 @@
     const v3 = { primary: "uspp-cttf-btn-primary", success: "uspp-cttf-btn-primary", danger: "uspp-cttf-btn-danger", add: "uspp-cttf-btn-add", ghost: "uspp-cttf-btn-ghost", icon: "uspp-cttf-btn-icon" }[kind] || "";
     return h("button", { type: "button", className: ["uspp-cttf-btn", v3, `uspp-cttf-k-${kind}`, size === "sm" && "uspp-cttf-btn-sm", className].filter(Boolean).join(" "), ...rest }, children);
   }
-  var Switch = (props) => h(U.components.Switch, props);
-  var Checkbox = ({ checked, onChange, label }) => h("input", { type: "checkbox", className: "uspp-cttf-cb", checked: !!checked, title: label, "aria-label": label, onChange: (e3) => onChange?.(e3.target.checked) });
+  function afterPaint(fn2) {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(fn2, 0));
+    else setTimeout(fn2, 0);
+  }
+  var holdDrag = (e3) => {
+    const row = e3.currentTarget.closest?.('[draggable="true"]');
+    if (!row) return;
+    row.setAttribute("draggable", "false");
+    const back = () => {
+      row.setAttribute("draggable", "true");
+      removeEventListener("pointerup", back, true);
+      removeEventListener("pointercancel", back, true);
+    };
+    addEventListener("pointerup", back, true);
+    addEventListener("pointercancel", back, true);
+  };
+  var Switch = ({ onChange, ...props }) => h(U.components.Switch, { ...props, onChange: (v3) => afterPaint(() => onChange?.(v3)) });
+  var Checkbox = ({ checked, onChange, label }) => h("input", { type: "checkbox", className: "uspp-cttf-cb", checked: !!checked, title: label, "aria-label": label, onPointerDown: holdDrag, onChange: (e3) => {
+    const v3 = e3.target.checked;
+    afterPaint(() => onChange?.(v3));
+  } });
   var SettingRow = ({ title, description, children }) => h("div", { className: "uspp-cttf-setting" }, h(U.components.Row, { title, description }, children));
   var SwitchRow = ({ title, description, checked, onChange }) => h(SettingRow, { title, description }, h(Switch, { checked, onChange, label: typeof title === "string" ? title : void 0 }));
   var Choices = ({ options, value, onChange, label }) => h(U.components.Select, { value, options, onChange, label });
@@ -5393,9 +5412,9 @@
                   { className: "uspp-cttf-cfg-switch" },
                   h("input", { type: "checkbox", checked: !!config.data.showFolderIcons, onChange: (e3) => {
                     const v3 = e3.target.checked;
-                    config.update((d3) => {
+                    afterPaint(() => config.update((d3) => {
                       d3.showFolderIcons = v3;
-                    });
+                    }));
                   } }),
                   h("span", { className: "uspp-cttf-cfg-slider" })
                 ),
@@ -6734,7 +6753,10 @@
             setOpen(!open);
           }
         } },
-        h("label", { className: "uspp-cttf-ss-toggle", title: on2 ? t("disableRuleTip") : t("enableRuleTip"), onClick: (e3) => e3.stopPropagation() }, h("input", { type: "checkbox", checked: on2, "aria-label": on2 ? t("disableRuleTip") : t("enableRuleTip"), onChange: (e3) => toggle(e3.target.checked) })),
+        h("label", { className: "uspp-cttf-ss-toggle", title: on2 ? t("disableRuleTip") : t("enableRuleTip"), onClick: (e3) => e3.stopPropagation() }, h("input", { type: "checkbox", checked: on2, "aria-label": on2 ? t("disableRuleTip") : t("enableRuleTip"), onChange: (e3) => {
+          const v3 = e3.target.checked;
+          afterPaint(() => toggle(v3));
+        } })),
         h("strong", { className: "uspp-cttf-ss-rule-name" }, name),
         !official && h(
           "span",
