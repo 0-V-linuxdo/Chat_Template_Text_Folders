@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.19
+// @version      2.0.20
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.19" : "0.0.0";
+  var VERSION = true ? "2.0.20" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -913,23 +913,6 @@
     const folders = isObj(cfg2?.folders) ? Object.values(cfg2.folders) : [];
     return { folders: folders.length, buttons: folders.reduce((n2, f3) => n2 + (isObj(f3?.buttons) ? Object.keys(f3.buttons).length : 0), 0) };
   }
-  function diffSummary(cur, next) {
-    const a3 = cur.folders || {}, b3 = next.folders || {};
-    const added = Object.keys(b3).filter((n2) => !(n2 in a3));
-    const removed = Object.keys(a3).filter((n2) => !(n2 in b3));
-    const changed = Object.keys(b3).filter((n2) => n2 in a3 && canonical({ f: a3[n2] }) !== canonical({ f: b3[n2] }));
-    const common = (n2) => n2 in a3 && n2 in b3;
-    const orderChanged = JSON.stringify((cur.folderOrder || []).filter(common)) !== JSON.stringify((next.folderOrder || []).filter(common));
-    const strip = (c3) => {
-      const x4 = { ...c3 };
-      delete x4.folders;
-      delete x4.folderOrder;
-      delete x4._sync;
-      return x4;
-    };
-    const settingsChanged = canonical(strip(cur)) !== canonical(strip(next));
-    return { added, removed, changed, orderChanged, settingsChanged, same: !added.length && !removed.length && !changed.length && !orderChanged && !settingsChanged };
-  }
   var WORDY = /[\p{L}\p{N}]/u;
   var graphemes = (s3) => {
     try {
@@ -1006,6 +989,17 @@
     lastRemoteModified: "",
     lastSyncedHash: ""
   });
+  var drive = createKV("cttf.drive", {
+    enabled: false,
+    clientId: "",
+    clientSecret: "",
+    refreshToken: "",
+    fileId: "",
+    fileName: "[Chat] Template Text Folders.backup.json",
+    lastSyncedAt: 0,
+    requestMode: "default",
+    configCollapsed: false
+  });
   var flags = createKV("cttf.flags", { legacyIgnored: {}, migrated: false });
   var editing = 0;
   var editingGuard = { enter() {
@@ -1018,7 +1012,7 @@
   } };
 
   // sites/chat/styles.js
-  var UI_FONT = `system-ui, -apple-system, "Segoe UI", sans-serif`;
+  var UI_FONT = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
   var FONT = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
   function barMetrics(height, spacing = 0) {
     const clamp2 = (v3, a3, b3) => Math.min(b3, Math.max(a3, v3));
@@ -1066,14 +1060,13 @@
   var PANEL_CSS = `
 /* 弹窗外壳用框架 ModalCard 的 uspp-cttf-modal 系列样式;这里只补本脚本需要的部分 */
 .uspp-cttf-dlg-guard { position: absolute; inset: 0; background: rgb(0 0 0 / .4); }
-/* 叠在框架遮罩(0.5)上合计约 0.7,与原版一致;叠放的第二层弹窗不再加深 */
-.uspp-cttf-overlay ~ .uspp-cttf-overlay .uspp-cttf-dlg-guard { background: transparent; }
+/* 叠在框架遮罩(0.5)上合计约 0.7,与原版一致;原版每一层弹窗都有自己的遮罩,子窗口打开时底下的面板会再压暗一层 */
 .uspp-cttf-dlg { z-index: 1; font-family: ${UI_FONT}; line-height: 1.45; }
 .uspp-cttf-dlg .uspp-cttf-modal-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .uspp-cttf-dlg .uspp-cttf-modal-title { white-space: nowrap; }
 .uspp-cttf-dlg-head-extra { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .uspp-cttf-dlg .uspp-cttf-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
-.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 4px; }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 16px; }
 /* 插件效果预览(框架 preview 字段)里的演示 */
 .uspp-cttf-demo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .uspp-cttf-demo-row .uspp-cttf-chip-btn { height: 28px; padding: 6px 12px; border-radius: 4px; border: none; font-size: 14px; line-height: 16px; display: inline-flex; align-items: center; gap: 4px; pointer-events: none; }
@@ -1150,6 +1143,594 @@
 .uspp-cttf-rule-row { display: grid; grid-template-columns: 28px 1fr 140px 36px 36px; gap: 8px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--uspp-cttf-border-l1); }
 .uspp-cttf-rule-row img { width: 20px; height: 20px; }
 .uspp-cttf-sub { font-size: 12px; color: var(--uspp-cttf-fg-tertiary); word-break: break-all; }
+
+/* ================= 原版主题(TC 2026-11-05「落地」):本脚本弹窗的配色、圆角、阴影、控件全部按原版 =================
+   色板 = spec §12 / 原版 runtime-services.js 的 theme.light / theme.dark。同时改写框架变量,让弹窗里的框架组件(Row、Select 等)跟着变 */
+.uspp-cttf-dlg {
+  --o-dialog: #ffffff; --o-layer: #f3f4f6; --o-layer-hover: #e5e7eb; --o-border: #e5e7eb; --o-text: #333333; --o-muted: #6b7280; --o-shadow: rgba(0,0,0,.1);
+  --o-primary: #3B82F6; --o-info: #6366F1; --o-success: #22c55e; --o-danger: #ef4444; --o-cancel: #6B7280; --o-add: #fd7e14;
+  --o-input-bg: #ffffff; --o-input-border: #d1d5db; --o-input-fg: #1f2937; --o-selected: rgba(0,0,0,.1);
+}
+:root[data-uspp-cttf-theme="dark"] .uspp-cttf-dlg {
+  --o-dialog: #111111; --o-layer: #1f1f1f; --o-layer-hover: #2c2c2c; --o-border: #2a2a2a; --o-text: #e5e7eb; --o-muted: #6b7280; --o-shadow: rgba(0,0,0,.5);
+  --o-primary: #2563EB; --o-info: #4F46E5; --o-success: #16a34a; --o-danger: #dc2626; --o-cancel: #3f3f46;
+  --o-input-bg: #1f1f1f; --o-input-border: #2a2a2a; --o-input-fg: #f9fafb; --o-selected: rgba(255,255,255,.1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-uspp-cttf-theme]) .uspp-cttf-dlg {
+  --o-dialog: #111111; --o-layer: #1f1f1f; --o-layer-hover: #2c2c2c; --o-border: #2a2a2a; --o-text: #e5e7eb; --o-muted: #6b7280; --o-shadow: rgba(0,0,0,.5);
+  --o-primary: #2563EB; --o-info: #4F46E5; --o-success: #16a34a; --o-danger: #dc2626; --o-cancel: #3f3f46;
+  --o-input-bg: #1f1f1f; --o-input-border: #2a2a2a; --o-input-fg: #f9fafb; --o-selected: rgba(255,255,255,.1);
+} }
+.uspp-cttf-dlg { --uspp-cttf-surface-l1: var(--o-dialog); --uspp-cttf-surface-l2: var(--o-layer); --uspp-cttf-border-l1: var(--o-border); --uspp-cttf-border-l2: var(--o-border); --uspp-cttf-fg-primary: var(--o-text); --uspp-cttf-fg-secondary: var(--o-muted); --uspp-cttf-fg-tertiary: var(--o-muted); --uspp-cttf-fg-danger: var(--o-danger); }
+/* 遮罩:合计约 .7(框架 .5 + 本层 .4),加 2px 模糊;弹窗无动画 */
+.uspp-cttf-dlg-guard { backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+/* 弹窗外框:底 #111 / #fff,圆角 4,1px 边框,阴影 0 8px 24px */
+.uspp-cttf-modal.uspp-cttf-dlg { background: var(--o-dialog); color: var(--o-text); border: 1px solid var(--o-border); border-radius: 4px; box-shadow: 0 8px 24px var(--o-shadow); animation: none; }
+.uspp-cttf-dlg .uspp-cttf-modal-title { font-size: 18px; font-weight: 600; }
+.uspp-cttf-dlg .uspp-cttf-modal-footer { border-top: 1px solid var(--o-border); gap: 12px; padding-top: 16px; }
+.uspp-cttf-dlg .uspp-cttf-modal-footer.uspp-cttf-dlg-foot-split { justify-content: space-between; }
+/* 关闭 ✕:32×32 圆形,透明底,悬停浅灰 */
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-modal-close { width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-modal-close:hover:not(:disabled) { background: rgba(148,163,184,.2); }
+/* 侧栏折叠按钮:28×28,透明底,圆角 4,图标 16×16,颜色 = 正文色(原版) */
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-side-toggle { color: var(--o-text); background: transparent; border: none; border-radius: 4px; line-height: 0; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-side-toggle svg { width: 16px; height: 16px; }
+/* 编辑框顶部标题条:贴满弹窗顶,底 --button-bg,下边框,预览按钮在标题右侧的小框里 */
+.uspp-cttf-dlg .uspp-cttf-modal-header.uspp-cttf-dlg-titlebar { background: var(--o-layer); border-bottom: 1px solid var(--o-border); padding: 16px 56px 16px 24px; margin-bottom: 16px; gap: 16px; flex-wrap: nowrap; }
+.uspp-cttf-dlg-titlebar .uspp-cttf-dlg-head-extra { flex: 0 1 auto; }
+.uspp-cttf-dlg-titlebar .uspp-cttf-btn-preview { padding: 4px; border-radius: 4px; background: var(--o-dialog); }
+.uspp-cttf-dlg-titlebar .uspp-cttf-btn-preview .uspp-cttf-chip-btn { height: auto; padding: 6px 12px; font-size: 14px; border-radius: 4px; border: none; }
+/* 通用按钮(:where 压低优先级,让下面各 kind 的配色生效):[btn] = padding 8px 16px、圆角 4、无边框、字号 14、字重 500,底色 --button-bg */
+.uspp-cttf-dlg .uspp-cttf-btn:where(:not(.uspp-cttf-btn-icon):not(.uspp-cttf-modal-close)) { height: auto; min-height: 0; padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; line-height: normal; background: var(--o-layer); color: var(--o-text); box-shadow: none; opacity: 1; transition: background-color .2s ease, color .2s ease, filter .2s ease; }
+.uspp-cttf-dlg .uspp-cttf-btn:where(:not(.uspp-cttf-btn-icon):not(.uspp-cttf-modal-close):not([class*="uspp-cttf-k-"]), .uspp-cttf-k-plain):hover:not(:disabled) { background: var(--o-layer-hover); }
+.uspp-cttf-dlg .uspp-cttf-btn:disabled { opacity: .5; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-primary, .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-success { background: var(--o-success); color: #fff; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-danger { background: var(--o-danger); color: #fff; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-cancel { background: var(--o-cancel); color: #fff; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-add { background: var(--o-add); color: #fff; }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-primary:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-success:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-danger:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-cancel:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-add:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-info:hover:not(:disabled), .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-var:hover:not(:disabled) { filter: brightness(1.1); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-primary:hover:not(:disabled) { background: var(--o-success); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-danger:hover:not(:disabled) { background: var(--o-danger); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-cancel:hover:not(:disabled) { background: var(--o-cancel); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-add:hover:not(:disabled) { background: var(--o-add); }
+/* 设置面板头部「⚡ 自动化」「🛠️ 脚本配置」等:实心靛蓝,padding 5px 10px,字重正常 */
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-info, .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-info:hover:not(:disabled) { background: var(--o-info); color: #fff; padding: 5px 10px; font-weight: 400; }
+/* 插入变量:实心主色,字号 12,padding 4px 8px,小阴影 */
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-var, .uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-k-var:hover:not(:disabled) { background: var(--o-primary); color: #fff; padding: 4px 8px; font-size: 12px; font-weight: 400; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.uspp-cttf-dlg .uspp-cttf-btn.uspp-cttf-btn-sm:not(.uspp-cttf-k-var) { padding: 4px 8px; font-size: 12px; }
+/* 页签:实心按钮,选中主色白字 + 2px 主色下边框;去掉框架的下划线 */
+.uspp-cttf-dlg .uspp-cttf-tabs { gap: 8px; border-bottom: 1px solid var(--o-border); padding-bottom: 0; margin-bottom: 12px; }
+.uspp-cttf-dlg .uspp-cttf-tab { height: auto; padding: 8px 16px; border-radius: 4px 4px 0 0; background: var(--o-layer); color: var(--o-text); border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; }
+.uspp-cttf-dlg .uspp-cttf-tab:hover { background: var(--o-layer-hover); color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-tab[aria-selected="true"] { background: var(--o-primary); color: #fff; border-bottom-color: var(--o-primary); }
+.uspp-cttf-dlg .uspp-cttf-tab::after { display: none; }
+/* 输入框 / 文本框 / 下拉:底 --button-bg,1px 边框,圆角 4,padding 8;模板文本用普通字体 */
+.uspp-cttf-dlg .uspp-cttf-input, .uspp-cttf-dlg .uspp-cttf-textarea, .uspp-cttf-dlg select { background: var(--o-input-bg); border: 1px solid var(--o-input-border); border-radius: 4px; color: var(--o-input-fg); font-family: ${FONT}; font-size: 14px; box-shadow: none; }
+.uspp-cttf-dlg .uspp-cttf-input { padding: 8px; height: auto; }
+.uspp-cttf-dlg .uspp-cttf-textarea { padding: 8px; }
+/* 原版输入框获得焦点时不变色、不加边框高亮 */
+.uspp-cttf-dlg .uspp-cttf-input:focus, .uspp-cttf-dlg .uspp-cttf-textarea:focus, .uspp-cttf-dlg select:focus { border-color: var(--o-input-border); outline: none; box-shadow: none; }
+/* 原版输入框没设字号:浏览器默认 13.33px、行高 normal,字色同正文 */
+.uspp-cttf-dlg .uspp-cttf-input, .uspp-cttf-dlg .uspp-cttf-textarea, .uspp-cttf-dlg select { font-size: 13.3333px; line-height: normal; color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-color { border-radius: 4px; border: 1px solid var(--o-border); background: transparent; }
+/* 复选框:原生外观,放大 1.1,主色 */
+.uspp-cttf-dlg input.uspp-cttf-cb { -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; opacity: 1 !important; visibility: visible !important; width: 14px; height: 14px; margin: 0; transform: scale(1.1); accent-color: var(--o-primary); cursor: pointer; }
+.uspp-cttf-checkrow { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; cursor: pointer; padding: 4px 0; }
+.uspp-cttf-mini-switch .uspp-cttf-cb { transform: scale(1.1); }
+/* 修改 / 删除:emoji,36×32,无底色无边框 */
+.uspp-cttf-emoji-btn { width: 36px; height: 32px; padding: 0; border: none; background: none; font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; }
+.uspp-cttf-emoji-btn:hover { background: var(--o-selected); }
+/* 预览框(非标题条):小框,底 --button-bg,圆角 4 */
+.uspp-cttf-dlg .uspp-cttf-btn-preview { border-radius: 4px; background: var(--o-layer); }
+/* 设置面板:表头条、列表外框、选中行浮块、按钮行卡片 */
+.uspp-cttf-dlg .uspp-cttf-mgr { border-top: 1px solid var(--o-border); padding-top: 8px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-side { border-right: none; margin-right: 12px; padding: 2px 8px 4px 2px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-main { padding: 0 8px 4px; }
+.uspp-cttf-dlg .uspp-cttf-tbl-head { background: var(--o-layer); border: 1px solid var(--o-border); border-radius: 4px 4px 0 0; color: var(--o-text); font-weight: 500; padding: 6px 16px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-main .uspp-cttf-tbl-head { padding: 6px 13px; z-index: 2; }
+.uspp-cttf-dlg .uspp-cttf-tbl-scroll { border: 1px solid var(--o-border); border-top: none; border-radius: 0 0 4px 4px; padding: 8px; }
+.uspp-cttf-dlg .uspp-cttf-tbl-row { border-bottom: none; border-radius: 4px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-side .uspp-cttf-tbl-row { padding: 8px; margin: 4px 0; min-height: 36px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-side .uspp-cttf-tbl-row[data-selected="true"] { background: var(--o-selected); }
+.uspp-cttf-dlg .uspp-cttf-mgr-main .uspp-cttf-tbl-row { padding: 4px; margin-bottom: 8px; background: var(--o-layer); border: 1px solid var(--o-border); align-items: start; }
+.uspp-cttf-dlg .uspp-cttf-mgr-main .uspp-cttf-tbl-row > :not(:first-child) { align-self: center; }
+.uspp-cttf-dlg .uspp-cttf-mgr-main .uspp-cttf-vars { color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-mgr-side .uspp-cttf-tbl-row .uspp-cttf-chip-btn { padding: 6px 12px; height: auto; }
+.uspp-cttf-dlg .uspp-cttf-mgr-side .uspp-cttf-tbl-row[data-selected="true"] .uspp-cttf-chip-btn { font-weight: 600; }
+/* 按钮预览(右栏行内):6px 12px,1px 描边 + 小阴影,字重 400,允许换行 */
+.uspp-cttf-dlg .uspp-cttf-mgr-main .uspp-cttf-tbl-row .uspp-cttf-chip-btn { height: auto; padding: 6px 12px; border: 1px solid rgba(0,0,0,.1); box-shadow: 0 2px 4px rgba(0,0,0,.05); font-weight: 400; white-space: normal; line-height: 1.4; column-gap: 6px; }
+.uspp-cttf-dlg .uspp-cttf-mgr-add { padding: 8px; }
+/* 自动化规则:卡片行 */
+.uspp-cttf-dlg .uspp-cttf-rule-row { background: var(--o-layer); border: 1px solid var(--o-border); border-radius: 4px; margin-bottom: 8px; padding: 8px; }
+/* 计数徽章:深色用原版深色成功色 */
+:root[data-uspp-cttf-theme="dark"] .uspp-cttf-badge2[data-kind="buttons"] { background: #16a34a; }
+@media (prefers-color-scheme: dark) { :root:not([data-uspp-cttf-theme]) .uspp-cttf-badge2[data-kind="buttons"] { background: #16a34a; } }
+:root[data-uspp-cttf-theme="dark"] .uspp-cttf-badge2[data-kind="folders"] { background: #2563EB; }
+@media (prefers-color-scheme: dark) { :root:not([data-uspp-cttf-theme]) .uspp-cttf-badge2[data-kind="folders"] { background: #2563EB; } }
+
+/* ---- 原版内框(卡片)---- */
+.uspp-cttf-dlg .uspp-cttf-card { padding: 12px; border-radius: 4px; border: 1px solid var(--o-border); background: var(--o-layer); color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-card-lg { padding: 16px; border-radius: 6px; display: flex; flex-direction: column; gap: 16px; }
+.uspp-cttf-dlg .uspp-cttf-card-lg > .uspp-cttf-setting { border: none; padding: 0; margin: 0; }
+.uspp-cttf-dlg .uspp-cttf-card-plain { padding: 8px; background: transparent; margin: 16px 0 0; }
+.uspp-cttf-dlg .uspp-cttf-tpl-card .uspp-cttf-row2 { gap: 8px; margin-bottom: 12px; }
+.uspp-cttf-dlg .uspp-cttf-tpl-card .uspp-cttf-tpl-label { margin-right: 4px; }
+.uspp-cttf-dlg .uspp-cttf-tpl-label { font-size: 14px; font-weight: 500; white-space: nowrap; }
+.uspp-cttf-dlg .uspp-cttf-card .uspp-cttf-textarea { background: var(--o-dialog); }
+/* 删除确认框:红色标题、注意事项、圆点列表、色块 */
+.uspp-cttf-danger-title { color: var(--o-danger); }
+.uspp-cttf-del-note { margin: 0 0 8px; color: var(--o-text); line-height: 1.5; }
+.uspp-cttf-del-head { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.uspp-cttf-del-chip { display: inline-flex; align-items: center; border-radius: 4px; padding: 6px 12px; font-size: 14px; font-weight: 500; line-height: 1.2; }
+.uspp-cttf-del-chip-sm { padding: 4px 8px; font-size: 12px; font-weight: 400; border: 1px solid rgba(0,0,0,.1); }
+.uspp-cttf-dot-li { position: relative; margin: 4px 0; padding-left: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.uspp-cttf-dot-li::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.uspp-cttf-swatch { display: inline-block; width: 16px; height: 16px; border: 1px solid #333; vertical-align: middle; }
+.uspp-cttf-del-hr { margin: 8px 0; border: none; border-top: 1px solid var(--o-border); }
+.uspp-cttf-del-list { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-del-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.uspp-cttf-dlg .uspp-cttf-card .uspp-cttf-del-ta { min-height: 150px; height: 150px; padding: 2px; background: var(--o-layer); }
+.uspp-cttf-dlg .uspp-cttf-del-rule { padding: 12px; border-radius: 6px; margin-top: 16px; }
+.uspp-cttf-del-rule-id { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.uspp-cttf-del-rule-ic { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.uspp-cttf-del-rule-ic img { width: 24px; height: 24px; object-fit: contain; }
+.uspp-cttf-del-rule-name { font-size: 14px; font-weight: 600; }
+/* 自动化列表:外框 + 表头 + 行卡片 */
+.uspp-cttf-dlg .uspp-cttf-list-frame { border: 1px solid var(--o-border); border-radius: 8px; overflow: hidden; background: var(--o-dialog); }
+.uspp-cttf-dlg .uspp-cttf-list-frame > .uspp-cttf-tbl-head { border: none; border-bottom: 1px solid var(--o-border); border-radius: 0; padding: 6px 12px; margin: 0; font-size: 12px; font-weight: 600; }
+.uspp-cttf-dlg .uspp-cttf-list-frame > .uspp-cttf-tbl-head > :nth-child(2) { text-align: left; padding-left: 8px; }
+.uspp-cttf-dlg .uspp-cttf-list-body { display: flex; flex-direction: column; gap: 8px; padding: 8px; max-height: 260px; overflow-y: auto; scrollbar-width: none; }
+.uspp-cttf-dlg .uspp-cttf-list-body > .uspp-cttf-rule-row { margin: 0; padding: 8px 10px; border-radius: 6px; transition: border-color .2s ease, box-shadow .2s ease; }
+.uspp-cttf-dlg .uspp-cttf-list-body > .uspp-cttf-rule-row:hover { border-color: var(--o-primary); box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+.uspp-cttf-dlg .uspp-cttf-list-frame .uspp-cttf-rule-row { grid-template-columns: 30px 1fr 120px 40px 40px; }
+/* 提交方式徽标 */
+.uspp-cttf-method { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; font-size: 12px; font-weight: 600; min-width: 0; }
+.uspp-cttf-keycap { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: linear-gradient(180deg, rgba(17,17,17,.95), rgba(45,45,45,.95)); box-shadow: inset 0 -1px 0 rgba(255,255,255,.12), 0 2px 4px rgba(0,0,0,.45); font-size: 12px; font-weight: 600; color: #fff; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; line-height: 1.2; white-space: nowrap; }
+.uspp-cttf-key-plus { color: var(--o-muted); font-size: 11px; font-weight: 600; }
+.uspp-cttf-click-badge { padding: 4px 12px; border-radius: 20px; background: linear-gradient(180deg, rgba(253,224,71,.85), rgba(251,191,36,.9)); border: 1px solid rgba(217,119,6,.4); box-shadow: inset 0 -1px 0 rgba(217,119,6,.35), 0 1px 2px rgba(217,119,6,.25); color: rgba(120,53,15,.95); font-weight: 700; font-size: 12px; letter-spacing: .02em; white-space: nowrap; }
+/* 导入确认:配置对比卡 + 黄色警告框 */
+.uspp-cttf-dlg .uspp-cttf-cmp-card { gap: 12px; border-radius: 8px; }
+.uspp-cttf-cmp-title { margin: 0; font-size: 14px; font-weight: 600; }
+.uspp-cttf-dlg .uspp-cttf-cmp-card .uspp-cttf-col-card { background: var(--o-dialog); border: 1px solid var(--o-border); border-radius: 6px; padding: 12px; }
+.uspp-cttf-dlg .uspp-cttf-cmp-card .uspp-cttf-col-card:last-child { border-color: var(--o-info); }
+.uspp-cttf-dlg .uspp-cttf-cmp-card .uspp-cttf-col-card:last-child b { color: var(--o-info); }
+.uspp-cttf-warn-box { display: flex; align-items: center; gap: 8px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px; color: #92400e; font-size: 13px; }
+.uspp-cttf-warn-ic { font-size: 16px; }
+.uspp-cttf-dlg .uspp-cttf-list-add { margin-top: 12px; text-align: left; }
+.uspp-cttf-dlg .uspp-cttf-list-add .uspp-cttf-btn { padding: 6px 12px; }
+/* ---- 🎨 网站样式 ---- */
+.uspp-cttf-ss-ic { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; object-fit: contain; flex-shrink: 0; }
+.uspp-cttf-ss-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.uspp-cttf-ss-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: rgba(59,130,246,.12); color: var(--o-primary); border: 1px solid rgba(59,130,246,.18); }
+.uspp-cttf-ss-pill[data-kind="fetched"], .uspp-cttf-ss-pill[data-kind="current"] { background: rgba(34,197,94,.12); color: var(--o-success); border-color: rgba(34,197,94,.24); }
+.uspp-cttf-ss-pill[data-kind="source"] { background: var(--o-layer); color: var(--o-text); border-color: var(--o-border); }
+.uspp-cttf-ss-pill[data-kind="current"] { padding: 1px 8px; font-size: 11px; margin-left: 6px; }
+.uspp-cttf-dlg .uspp-cttf-ss-frame .uspp-cttf-ss-row { display: grid; grid-template-columns: 32px 1fr 96px 96px; gap: 8px; align-items: center; }
+.uspp-cttf-dlg .uspp-cttf-ss-frame > .uspp-cttf-tbl-head > :nth-child(n+3) { text-align: center; }
+.uspp-cttf-dlg .uspp-cttf-ss-body { max-height: 440px; }
+.uspp-cttf-dlg .uspp-cttf-ss-body > .uspp-cttf-ss-row { padding: 12px 10px; }
+.uspp-cttf-ss-site-name { display: flex; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.uspp-cttf-ss-count { justify-self: center; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 4px; font-size: 12px; cursor: pointer; background: rgba(59,130,246,.12); color: var(--o-primary); border: 1px solid rgba(59,130,246,.35); }
+.uspp-cttf-ss-count[data-kind="custom"] { background: rgba(99,102,241,.12); color: var(--o-info); border-color: rgba(99,102,241,.35); }
+.uspp-cttf-ss-count:hover { filter: brightness(1.2); }
+.uspp-cttf-ss-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.uspp-cttf-ss-empty { padding: 18px; border-radius: 8px; border: 1px dashed var(--o-border); background: var(--o-layer); color: var(--o-muted); font-size: 13px; text-align: left; }
+/* 站点规则 */
+.uspp-cttf-ss-site { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--o-border); flex-wrap: wrap; }
+.uspp-cttf-ss-site-id { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+.uspp-cttf-ss-site-tabs { display: flex; gap: 8px; align-items: center; }
+.uspp-cttf-ss-srctab { min-width: 96px; height: 32px; padding: 0 12px; border-radius: 4px; cursor: pointer; font-size: 13px; background: transparent; color: var(--o-primary); border: 1px solid rgba(59,130,246,.35); }
+.uspp-cttf-ss-srctab[data-kind="custom"] { color: var(--o-info); border-color: rgba(99,102,241,.35); }
+.uspp-cttf-ss-srctab[aria-selected="true"] { background: rgba(59,130,246,.14); }
+.uspp-cttf-ss-srctab[data-kind="custom"][aria-selected="true"] { background: rgba(99,102,241,.18); }
+.uspp-cttf-ss-rules { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.uspp-cttf-ss-rule { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid rgba(148,163,184,.18); border-radius: 12px; background: var(--o-dialog); box-shadow: 0 8px 20px rgba(15,23,42,.05); }
+.uspp-cttf-ss-rule[data-off="true"] { opacity: .65; }
+.uspp-cttf-ss-rule-head { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.uspp-cttf-ss-rule-name { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+.uspp-cttf-ss-rule-acts { display: flex; gap: 4px; flex-shrink: 0; }
+.uspp-cttf-ss-sec { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--o-border); background: var(--o-layer); }
+.uspp-cttf-ss-msec { border-color: rgba(59,130,246,.14); background: rgba(59,130,246,.06); }
+.uspp-cttf-ss-sec-label { font-size: 11px; font-weight: 600; color: var(--o-muted); letter-spacing: .08em; text-transform: uppercase; }
+.uspp-cttf-ss-mgroup { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(59,130,246,.08); }
+.uspp-cttf-ss-mgroup ul { margin: 0; padding: 0 0 0 18px; color: rgba(59,130,246,.55); }
+.uspp-cttf-ss-mgroup li + li { margin-top: 6px; }
+.uspp-cttf-ss-mgroup code, .uspp-cttf-ss-code { font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; color: var(--o-text); word-break: break-all; }
+.uspp-cttf-ss-mtype { align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: rgba(59,130,246,.14); color: var(--o-primary); font-size: 11px; font-weight: 600; }
+.uspp-cttf-ss-layout { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.uspp-cttf-ss-code { margin: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--o-border); background: var(--o-dialog); white-space: pre-wrap; max-height: 260px; overflow: auto; }
+/* 样式编辑框 */
+.uspp-cttf-dlg .uspp-cttf-ss-editor { gap: 8px; }
+.uspp-cttf-ss-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.uspp-cttf-ss-pilltab { padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; background: transparent; color: var(--o-muted); border: 1px solid var(--o-border); }
+.uspp-cttf-ss-pilltab[aria-selected="true"] { background: var(--o-dialog); color: var(--o-text); font-weight: 600; }
+.uspp-cttf-ss-label { font-size: 14px; font-weight: 600; margin-top: 4px; }
+.uspp-cttf-ss-mrow { display: grid; grid-template-columns: 140px 1fr 36px; gap: 8px; align-items: center; }
+.uspp-cttf-dlg .uspp-cttf-ss-select { height: 38px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--o-input-border); background: var(--o-input-bg); color: var(--o-text); }
+.uspp-cttf-ss-x { width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer; background: rgba(239,68,68,.15); color: var(--o-danger); font-size: 16px; }
+.uspp-cttf-ss-x:disabled { opacity: .4; cursor: default; }
+.uspp-cttf-ss-addm { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; background: var(--o-dialog); color: var(--o-primary); font-size: 13px; }
+.uspp-cttf-ss-iconrow { display: flex; align-items: flex-start; gap: 12px; }
+.uspp-cttf-ss-iconrow > .uspp-cttf-ss-ic { width: 40px; height: 40px; }
+.uspp-cttf-ss-iconcol { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.uspp-cttf-dlg .uspp-cttf-ss-icon-in { min-height: 0; padding: 10px 12px; border-radius: 6px; resize: vertical; }
+.uspp-cttf-ss-iconhint { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--o-muted); }
+.uspp-cttf-ss-g { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--o-border); cursor: pointer; background: var(--o-dialog); color: #4285F4; font-weight: 700; flex-shrink: 0; }
+.uspp-cttf-dlg .uspp-cttf-ss-css { min-height: 260px; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre; }
+/* ---- 🔍 配置差异预览 ---- */
+.uspp-cttf-dlg .uspp-cttf-d-body { display: flex; flex-direction: column; max-height: 70vh; overflow: hidden; }
+.uspp-cttf-d-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--o-layer); color: var(--o-text); border: 1px solid var(--o-border); }
+.uspp-cttf-d-badge[data-kind="added"] { background: rgba(34,197,94,.15); color: var(--o-success); border-color: rgba(34,197,94,.3); }
+.uspp-cttf-d-badge[data-kind="removed"] { background: rgba(248,113,113,.15); color: var(--o-danger); border-color: rgba(248,113,113,.3); }
+.uspp-cttf-d-badge[data-kind="changed"] { background: rgba(59,130,246,.14); color: var(--o-info); border-color: rgba(59,130,246,.28); }
+.uspp-cttf-d-summary { display: grid; grid-template-columns: 260px 16px 1fr; margin-bottom: 8px; }
+.uspp-cttf-d-summary > :last-child { grid-column: 3; }
+.uspp-cttf-d-sumgroup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.uspp-cttf-d-main { display: grid; grid-template-columns: 260px 1fr; gap: 16px; min-height: 0; flex: 1 1 auto; }
+.uspp-cttf-d-side { display: flex; flex-direction: column; border: 1px solid var(--o-border); border-radius: 4px; min-height: 0; overflow: hidden; }
+.uspp-cttf-d-sidehead, .uspp-cttf-d-colhead { padding: 6px 8px; background: var(--o-layer); border-bottom: 1px solid var(--o-border); font-size: 13px; font-weight: 500; text-align: center; }
+.uspp-cttf-d-sidelist { flex: 1 1 auto; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 52vh; }
+.uspp-cttf-d-folder { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 6px; border: 1px solid transparent; background: transparent; cursor: pointer; color: var(--o-text); text-align: left; }
+.uspp-cttf-d-folder[aria-selected="true"] { background: var(--o-selected); border-color: var(--o-border); }
+.uspp-cttf-d-folder:hover { background: var(--o-layer-hover); }
+.uspp-cttf-d-fname { padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uspp-cttf-d-ftags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.uspp-cttf-d-ftags .uspp-cttf-d-badge { padding: 2px 8px; font-size: 11px; }
+.uspp-cttf-d-detail { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.uspp-cttf-d-info { font-size: 13px; color: var(--o-muted); }
+.uspp-cttf-d-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; }
+.uspp-cttf-d-col { display: flex; flex-direction: column; border: 1px solid var(--o-border); border-radius: 4px; overflow: hidden; min-width: 0; }
+.uspp-cttf-d-collist { display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow: auto; max-height: 52vh; }
+.uspp-cttf-d-item { padding: 8px; border-radius: 6px; border: 1px solid var(--o-border); background: var(--o-layer); }
+.uspp-cttf-d-item[data-status="added"] { background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.35); }
+.uspp-cttf-d-item[data-status="removed"] { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.35); }
+.uspp-cttf-d-item[data-status="changed"] { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.35); }
+.uspp-cttf-d-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.uspp-cttf-d-row .uspp-cttf-chip-btn { max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.uspp-cttf-d-fields { margin-top: 6px; font-size: 12px; color: var(--o-muted); word-break: break-all; }
+.uspp-cttf-d-empty, .uspp-cttf-d-none { padding: 16px; border-radius: 6px; border: 1px dashed var(--o-border); color: var(--o-muted); font-size: 13px; text-align: center; }
+@media (max-width: 720px) { .uspp-cttf-d-main, .uspp-cttf-d-summary { grid-template-columns: 1fr; } .uspp-cttf-d-summary > :last-child { grid-column: auto; } .uspp-cttf-d-cols { grid-template-columns: 1fr; } }
+.uspp-cttf-info-title { color: var(--o-info); }
+.uspp-cttf-stat-lines { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.uspp-cttf-stat-lines > div { display: flex; align-items: center; gap: 8px; }
+.uspp-cttf-stat-dot { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: 600; color: #fff; background: var(--o-primary); }
+.uspp-cttf-stat-dot[data-kind="buttons"] { background: var(--o-success); }
+.uspp-cttf-dlg .uspp-cttf-cmp-card .uspp-cttf-col-card b { font-size: 12px; font-weight: 400; margin-bottom: 8px; }
+.uspp-cttf-d-dhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border: 1px solid var(--o-border); border-radius: 4px; font-size: 15px; }
+/* 原版:页签栏下方留 20px;编辑框底部分隔线上下各 20px;页签高 36 */
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-tabs { margin-bottom: 16px; }
+.uspp-cttf-dlg .uspp-cttf-tab { line-height: normal; }
+.uspp-cttf-dlg .uspp-cttf-modal-footer.uspp-cttf-dlg-foot-split { padding-top: 20px; }
+.uspp-cttf-dlg .uspp-cttf-modal-body:has(+ .uspp-cttf-dlg-foot-split) { padding-bottom: 20px; }
+/* 原版图标输入区:预览 40×40 + 可换行文本框(1–4 行自动增高)+ 说明 + Google G 圆按钮 */
+.uspp-cttf-fav-field { display: flex; align-items: flex-start; gap: 12px; width: 100%; }
+.uspp-cttf-fav-prev { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 22px; }
+.uspp-cttf-fav-prev img { width: 24px; height: 24px; object-fit: contain; }
+.uspp-cttf-fav-col { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-dlg .uspp-cttf-textarea.uspp-cttf-fav-in { min-height: 0; padding: 10px 12px; border-radius: 6px; background: var(--o-dialog); font-size: 14px; line-height: 1.5; resize: vertical; overflow-y: hidden; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; box-shadow: inset 0 1px 2px rgba(0,0,0,.03); }
+.uspp-cttf-fav-hint { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--o-muted); }
+.uspp-cttf-fav-hint > span { flex: 1; min-width: 0; margin-right: 12px; }
+.uspp-cttf-fav-g { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 1px solid var(--o-input-border); background: var(--o-dialog); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 6px rgba(59,130,246,.16); }
+.uspp-cttf-fav-g:hover { filter: brightness(1.15); }
+/* 原版表单项:无分隔线,标签 14px/500、与控件间距 8px,项间距 20px(弹窗主体自带 4px gap) */
+.uspp-cttf-dlg .uspp-cttf-setting.uspp-cttf-field { display: block; border: none; padding: 0; }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-setting.uspp-cttf-field { margin: 0 0 16px; }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-setting.uspp-cttf-field:last-child { margin-bottom: 0; }
+.uspp-cttf-dlg .uspp-cttf-field > .uspp-cttf-row-text { margin: 0; }
+.uspp-cttf-dlg .uspp-cttf-field .uspp-cttf-row-title { display: block; margin: 0 0 8px; font-size: 14px; font-weight: 500; line-height: normal; color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-field .uspp-cttf-color { display: block; width: 100px; height: 40px; padding: 1px 2px; border: 1px solid var(--o-border); border-radius: 4px; background: var(--o-input-bg); }
+/* 原版自动化规则编辑器(rule-editor-dialog.js) */
+.uspp-cttf-dlg .uspp-cttf-rule-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 6px; border: 1px solid var(--o-border); background: var(--o-layer); }
+.uspp-cttf-dlg .uspp-cttf-rl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-rin { width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--o-input-border); border-radius: 6px; background: var(--o-dialog); color: var(--o-text); box-shadow: inset 0 1px 2px rgba(0,0,0,.03); outline: none; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+.uspp-cttf-dlg .uspp-cttf-rl .uspp-cttf-fav-hint { font-weight: 600; }
+.uspp-cttf-dlg .uspp-cttf-rm { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-dlg .uspp-cttf-rm-head { display: flex; align-items: center; justify-content: space-between; }
+.uspp-cttf-dlg .uspp-cttf-rm-title { font-size: 13px; font-weight: 600; color: var(--o-text); }
+.uspp-cttf-dlg .uspp-cttf-rm-toggle { width: 28px; height: 28px; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 4px; background: transparent; color: ButtonText; font-size: 13.3333px; cursor: pointer; transition: background-color .2s ease, border-color .2s ease; }
+.uspp-cttf-dlg .uspp-cttf-rm-toggle:hover { background: var(--o-layer); border-color: var(--o-input-border); }
+.uspp-cttf-dlg .uspp-cttf-rm-opts { display: flex; flex-wrap: wrap; gap: 15px; font-size: 16px; }
+.uspp-cttf-dlg .uspp-cttf-rm-opt { display: inline-flex; align-items: center; cursor: pointer; }
+.uspp-cttf-dlg .uspp-cttf-rm-opt input, .uspp-cttf-dlg .uspp-cttf-rv input { margin: 3px 6px 0 5px; cursor: pointer; appearance: auto !important; -webkit-appearance: radio !important; }
+.uspp-cttf-dlg .uspp-cttf-rm-opt input { margin-top: 3px; margin-bottom: 0; }
+.uspp-cttf-dlg .uspp-cttf-rm-adv { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 12px; border-radius: 6px; border: 1px solid var(--o-input-border); background: var(--o-dialog); box-shadow: inset 0 1px 2px rgba(15,23,42,.04); }
+.uspp-cttf-dlg .uspp-cttf-rm-adv-title { font-size: 12px; font-weight: 600; opacity: .75; }
+.uspp-cttf-dlg .uspp-cttf-rm-tip { font-size: 12px; color: var(--o-muted); }
+.uspp-cttf-dlg .uspp-cttf-rv-group { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-dlg .uspp-cttf-rv { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.uspp-cttf-dlg .uspp-cttf-rv input { margin: 2px 3px 0 5px; }
+.uspp-cttf-dlg .uspp-cttf-rv-text { display: flex; flex-direction: column; gap: 2px; }
+.uspp-cttf-dlg .uspp-cttf-rv-label { font-size: 13px; font-weight: 600; }
+.uspp-cttf-dlg .uspp-cttf-rv-desc { font-size: 12px; opacity: .75; }
+.uspp-cttf-dlg .uspp-cttf-dlg-titlebar .uspp-cttf-btn-preview { padding: 4px; border-radius: 4px; background: var(--o-dialog); }
+.uspp-cttf-dlg .uspp-cttf-modal-body > .uspp-cttf-field .uspp-cttf-fav-col { gap: 6px; }
+/* 原版确认框 confirm-dialog:padding 20 24 16,标题 18/600 下距 20,正文继承 16px,卡片 margin 16 0、padding 8,底栏上分隔线 + padding-top 16 */
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-confirm { padding: 20px 24px 16px; font-size: 16px; line-height: normal; display: block; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm > .uspp-cttf-modal-header { padding: 0; margin: 0 0 20px; border: none; background: none; min-height: 0; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-dlg-title { margin: 0; font-size: 18px; font-weight: 600; line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm > .uspp-cttf-modal-body { padding: 0; margin: 0; display: block; overflow: visible; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm > .uspp-cttf-modal-footer { margin: 0; padding: 16px 0 0; border-top: 1px solid var(--o-border); background: none; justify-content: flex-end; gap: 12px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm > .uspp-cttf-modal-footer .uspp-cttf-btn { height: auto; min-height: 0; padding: 8px 16px; font-size: 13.3333px; font-weight: 400; line-height: normal; border-radius: 4px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-del-note { margin: 8px 0; line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-card.uspp-cttf-card-plain { margin: 16px 0; padding: 8px; border: 1px solid var(--o-border); border-radius: 4px; background: none; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-dot-li { display: block; line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-del-head { line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-del-chip { line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-del-item { margin-bottom: 8px; line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-swatch { margin-right: 4px; }
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-confirm { box-sizing: border-box; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-dlg-title { line-height: 24px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-confirm .uspp-cttf-card { display: block; }
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-pad24 { padding: 24px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-pad24 .uspp-cttf-card.uspp-cttf-del-rule { margin: 16px 0; padding: 12px; border-radius: 6px; background: var(--o-layer); border: 1px solid var(--o-border); }
+.uspp-cttf-dlg-confirm .uspp-cttf-del-chip-btn { padding: 6px 12px; font-size: 12px; font-weight: 400; }
+/* 原版 createUnifiedDialog:padding 24,标题 h2 18/600、下距 12;底栏上边线,margin-top 20 / padding-top 20 */
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-u { padding: 24px; box-sizing: border-box; display: block; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-header { padding: 0; margin: 0 0 12px; border: none; background: none; min-height: 0; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-close + .uspp-cttf-modal-header { min-height: 32px; margin-bottom: 16px; align-items: center; padding-right: 44px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-close { top: 24px; right: 24px; width: 32px; height: 32px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u .uspp-cttf-dlg-title { margin: 0; font-size: 18px; font-weight: 600; line-height: 24px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-body { padding: 0; margin: 0; display: block; overflow: visible; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-footer { margin: 20px 0 0; padding: 20px 0 0; border-top: 1px solid var(--o-border); background: none; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u > .uspp-cttf-modal-footer .uspp-cttf-btn { height: auto; min-height: 0; padding: 8px 16px; font-size: 14px; font-weight: 400; line-height: normal; border-radius: 4px; }
+.uspp-cttf-dlg-rule .uspp-cttf-rin, .uspp-cttf-dlg-rule .uspp-cttf-fav-in { font-weight: 400; color: var(--o-input-fg); }
+.uspp-cttf-dlg-auto .uspp-cttf-rule-row > div > div:first-child { font-size: 14px; font-weight: 600; }
+.uspp-cttf-dlg-auto .uspp-cttf-rule-row:not(.uspp-cttf-tbl-head) > span:first-child { font-size: 16px; }
+/* 原版文件夹 / 按钮编辑器:标签页与底栏按钮为浏览器默认按钮字号 13.33px、常规字重 */
+.uspp-cttf-dlg-ed .uspp-cttf-dlg-titlebar .uspp-cttf-dlg-title { line-height: 24px; }
+.uspp-cttf-dlg-ed .uspp-cttf-dlg-titlebar .uspp-cttf-chip-btn { font-weight: 400; }
+.uspp-cttf-dlg-ed .uspp-cttf-tab { font-size: 13.3333px; font-weight: 400; height: 36px; }
+.uspp-cttf-dlg-ed > .uspp-cttf-modal-footer .uspp-cttf-btn { height: auto; min-height: 0; padding: 8px 16px; font-size: 13.3333px; font-weight: 400; line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-folder .uspp-cttf-modal-body > .uspp-cttf-setting.uspp-cttf-field { margin-bottom: 36px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-folder .uspp-cttf-modal-body > .uspp-cttf-setting.uspp-cttf-field:last-child { margin-bottom: 0; }
+.uspp-cttf-dlg .uspp-cttf-auto-cb { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--o-text); cursor: pointer; }
+.uspp-cttf-dlg .uspp-cttf-auto-cb input { margin: 3px 3px 3px 4px; width: 13px; height: 13px; cursor: pointer; appearance: auto !important; -webkit-appearance: checkbox !important; }
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-ed { box-sizing: border-box; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ed .uspp-cttf-modal-header.uspp-cttf-dlg-titlebar { margin-bottom: 11px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ed.uspp-cttf-dlg-folder .uspp-cttf-modal-header.uspp-cttf-dlg-titlebar { margin-bottom: 13px; }
+.uspp-cttf-dlg-ed .uspp-cttf-tabs { gap: 10px; }
+/* 原版编辑器底栏分隔线在内容宽度内(左右留 24),按钮下方留 24 */
+.uspp-cttf-dlg.uspp-cttf-dlg-ed > .uspp-cttf-modal-footer { margin: 0 24px; padding: 20px 0 24px; }
+.uspp-cttf-dlg .uspp-cttf-card { min-height: 0; }
+.uspp-cttf-dlg.uspp-cttf-dlg-auto > .uspp-cttf-modal-close + .uspp-cttf-modal-header { margin-bottom: 10px; }
+.uspp-cttf-dlg .uspp-cttf-list-body { box-sizing: border-box; }
+.uspp-cttf-dlg-auto .uspp-cttf-list-add .uspp-cttf-btn { height: auto; min-height: 0; padding: 6px 12px; font-size: 13.3333px; font-weight: 400; line-height: normal; }
+.uspp-cttf-dlg-auto .uspp-cttf-list-body .uspp-cttf-rule-row > .uspp-cttf-btn { width: 32px; min-width: 32px; justify-self: center; }
+/* 原版网站样式主弹窗(style-settings-dialog.js) */
+.uspp-cttf-dlg.uspp-cttf-dlg-ss > .uspp-cttf-modal-close + .uspp-cttf-modal-header { margin-bottom: 12px; gap: 12px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ss .uspp-cttf-dlg-title { line-height: 1.2; }
+.uspp-cttf-dlg-ss .uspp-cttf-dlg-head-extra { flex: 0 1 auto; gap: 10px; }
+.uspp-cttf-dlg-ss .uspp-cttf-dlg-head-extra .uspp-cttf-btn, .uspp-cttf-dlg-ss .uspp-cttf-ss-foot .uspp-cttf-k-info, .uspp-cttf-dlg-ss .uspp-cttf-ss-foot .uspp-cttf-k-success { height: auto; min-height: 0; padding: 5px 10px; font-size: 14px; font-weight: 500; line-height: 1.2; border-radius: 4px; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-foot .uspp-cttf-k-add { height: 32px; min-height: 0; padding: 0 12px; font-size: 14px; font-weight: 500; line-height: 1; border-radius: 4px; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-pill { line-height: 1.2; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-pill[data-kind="fetched"], .uspp-cttf-dlg-ss .uspp-cttf-ss-pill[data-kind="current"] { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.22); }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-pill[data-kind="source"] { background: rgba(148,163,184,.14); border-color: rgba(148,163,184,.18); color: var(--o-text); }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-pill[data-kind="current"] { padding: 2px 8px; font-size: 11px; margin-left: 0; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-frame { max-height: 500px; display: flex; flex-direction: column; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ss .uspp-cttf-ss-frame .uspp-cttf-ss-row { grid-template-columns: 34px 1fr 96px 96px; gap: 10px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ss .uspp-cttf-ss-frame > .uspp-cttf-tbl-head { padding: 8px 12px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-ss .uspp-cttf-ss-body > .uspp-cttf-ss-row { padding: 10px 12px; border-radius: 8px; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-body > .uspp-cttf-ss-row > .uspp-cttf-ss-ic { justify-self: center; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-site-name { gap: 4px; line-height: 1.2; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-site-name strong { font-weight: 600; font-size: 14px; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-body .uspp-cttf-sub { margin-top: 2px; font-size: 12px; line-height: 1.2; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-count { min-width: 32px; font-weight: 500; line-height: 1; border-color: rgba(59,130,246,.18); }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-count[data-kind="custom"] { border-color: rgba(99,102,241,.18); }
+/* 原版站点规则弹窗 */
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-site { gap: 12px; padding-bottom: 12px; margin-bottom: 14px; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-site > .uspp-cttf-ss-ic { width: 26px; flex: 0 0 26px; margin: 0 2px 0 4px; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-site-id { flex: 1 1 220px; line-height: 1.2; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-site-id .uspp-cttf-sub { margin-top: 2px; font-size: 12px; line-height: 1.2; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-site-tabs { gap: 10px; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-srctab { min-width: 96px; height: 32px; padding: 0 14px; font-size: 13px; font-weight: 500; line-height: 1; background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.16); }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-srctab[aria-selected="true"] { background: rgba(59,130,246,.18); border-color: rgba(59,130,246,.28); }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-srctab[data-kind="custom"] { background: rgba(99,102,241,.08); border-color: rgba(99,102,241,.16); }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-srctab[data-kind="custom"][aria-selected="true"] { background: rgba(99,102,241,.18); border-color: rgba(99,102,241,.28); }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-addhost .uspp-cttf-btn { min-width: 96px; height: 32px; min-height: 0; padding: 0 14px; font-size: 14px; font-weight: 500; line-height: 1; border-radius: 4px; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-empty { padding: 18px 16px; border-radius: 10px; border: 1px dashed rgba(148,163,184,.4); background: rgba(148,163,184,.08); text-align: left; }
+.uspp-cttf-ss-toggle { display: inline-flex; align-items: center; cursor: pointer; }
+.uspp-cttf-ss-toggle input { margin: 3px 3px 3px 4px; width: 13px; height: 13px; cursor: pointer; accent-color: var(--o-primary); appearance: auto !important; -webkit-appearance: checkbox !important; }
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-rule-name { font-weight: 700; line-height: normal; }
+/* 原版样式编辑器 */
+.uspp-cttf-dlg .uspp-cttf-rule-card.uspp-cttf-ss-editor { gap: 16px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-pills { margin: 0; gap: 8px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-pilltab { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--o-input-border); font-size: 13px; font-weight: 500; line-height: normal; color: var(--o-muted); background: transparent; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-pilltab[aria-selected="true"] { background: var(--o-dialog); color: var(--o-text); font-weight: 600; box-shadow: 0 2px 6px rgba(15,23,42,.08); }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-panel { display: flex; flex-direction: column; gap: 12px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-msect { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-mtitle { font-size: 13px; font-weight: 600; color: var(--o-text); }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-mrows { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-mrow { grid-template-columns: 140px minmax(0, 1fr) auto; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-select { height: 40px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--o-input-border); background: var(--o-dialog); color: var(--o-text); font-size: 14px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-mval { color: var(--o-text); }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-x { width: 36px; height: 36px; border-radius: 50%; background: rgba(239,68,68,.12); font-size: 13.3333px; }
+.uspp-cttf-dlg-sse .uspp-cttf-ss-addm { align-self: flex-start; padding: 8px 12px; border-radius: 6px; background: var(--o-dialog); font-size: 13.3333px; line-height: normal; }
+.uspp-cttf-dlg-sse .uspp-cttf-rin, .uspp-cttf-dlg-sse .uspp-cttf-fav-in { font-weight: 400; }
+.uspp-cttf-dlg-sse .uspp-cttf-rin:not(.uspp-cttf-ss-mval) { color: var(--o-input-fg); }
+.uspp-cttf-dlg-sse textarea.uspp-cttf-ss-css { width: 100%; min-height: 160px; padding: 12px; border: 1px solid var(--o-input-border); border-radius: 6px; background: var(--o-dialog); color: var(--o-input-fg); box-shadow: inset 0 1px 2px rgba(0,0,0,.03); outline: none; resize: vertical; font-family: monospace; font-size: 13px; font-weight: 400; line-height: 1.5; box-sizing: border-box; white-space: pre-wrap; }
+/* 原版导入确认(import-confirm-dialog):圆角 8,标题 h3 下距 20,对比卡 padding 16 / 下距 20,警告框下距 20,底栏无分隔线 */
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-imp { border-radius: 8px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-imp > .uspp-cttf-modal-header { margin-bottom: 20px; }
+.uspp-cttf-dlg-imp .uspp-cttf-dlg-title { line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-imp .uspp-cttf-card.uspp-cttf-cmp-card { display: block; padding: 16px; margin: 0 0 20px; border-radius: 8px; }
+.uspp-cttf-dlg-imp .uspp-cttf-cmp-title { margin: 0 0 12px; line-height: normal; }
+.uspp-cttf-dlg-imp .uspp-cttf-cols { gap: 16px; margin-bottom: 12px; }
+.uspp-cttf-dlg-imp .uspp-cttf-cmp-card .uspp-cttf-col-card { display: block; }
+.uspp-cttf-dlg-imp .uspp-cttf-cmp-card .uspp-cttf-col-card b { display: block; margin-bottom: 8px; font-weight: 500; line-height: normal; }
+.uspp-cttf-dlg-imp .uspp-cttf-cmp-card .uspp-cttf-col-card:last-child b { font-weight: 600; }
+.uspp-cttf-dlg-imp .uspp-cttf-stat-lines { gap: 4px; line-height: normal; }
+.uspp-cttf-dlg-imp .uspp-cttf-stat-dot { width: 18px; height: 18px; }
+.uspp-cttf-dlg-imp .uspp-cttf-warn-box { margin-bottom: 20px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u.uspp-cttf-dlg-imp > .uspp-cttf-modal-footer { margin: 0; padding: 0; border: none; gap: 12px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u.uspp-cttf-dlg-imp > .uspp-cttf-modal-footer .uspp-cttf-btn { font-weight: 500; border-radius: 6px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u.uspp-cttf-dlg-imp > .uspp-cttf-modal-footer .uspp-cttf-imp-diffbtn { background: var(--o-layer); color: var(--o-text); border: 1px solid var(--o-border); }
+.uspp-cttf-dlg.uspp-cttf-dlg-ss .uspp-cttf-dlg-head-extra .uspp-cttf-btn.uspp-cttf-btn-sm { height: auto; min-height: 0; padding: 5px 10px; font-size: 14px; font-weight: 500; line-height: 1.2; }
+.uspp-cttf-dlg-ss .uspp-cttf-ss-body > .uspp-cttf-ss-row > span.uspp-cttf-ss-ic { width: auto; height: auto; }
+.uspp-cttf-dlg.uspp-cttf-dlg-u.uspp-cttf-dlg-imp > .uspp-cttf-modal-footer .uspp-cttf-btn:not(.uspp-cttf-imp-diffbtn) { border: none; }
+.uspp-cttf-del-rule-id > div:last-child { display: flex; flex-direction: column; gap: 4px; }
+/* 原版配置差异预览(import-diff-dialog) */
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-diff { padding: 8px 18px 16px; max-height: 82vh; display: flex; flex-direction: column; }
+.uspp-cttf-dlg.uspp-cttf-dlg-diff > .uspp-cttf-modal-close { top: 8px; right: 18px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-diff > .uspp-cttf-modal-close + .uspp-cttf-modal-header { min-height: 32px; margin-bottom: 6px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-diff .uspp-cttf-dlg-title { line-height: normal; }
+.uspp-cttf-dlg.uspp-cttf-dlg-diff > .uspp-cttf-modal-body.uspp-cttf-d-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: none; overflow: hidden; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-summary { row-gap: 8px; align-items: center; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-badge { letter-spacing: .01em; line-height: normal; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-main { display: flex; gap: 16px; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-side { flex: 0 0 260px; background: var(--o-layer); border-radius: 6px; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-sidehead { margin: 0 0 -1px; padding: 6px 8px; border: 1px solid var(--o-border); border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 500; text-align: left; line-height: normal; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-sidelist { padding: 12px; gap: 8px; max-height: none; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-folder { padding: 10px 12px; border-radius: 6px; border: 1px solid var(--o-border); background: var(--o-dialog); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-folder[aria-selected="true"] { border-color: var(--o-primary); background: rgba(79,70,229,.08); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-fname { font-size: 14px; font-weight: 500; padding: 4px 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(15,23,42,.08); max-width: 100%; line-height: normal; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-folder:not([data-status="unchanged"]) .uspp-cttf-d-fname { font-weight: 600; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-ftags { gap: 6px; flex-shrink: 0; flex-wrap: nowrap; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-ftags .uspp-cttf-d-badge { padding: 4px 10px; font-size: 12px; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-detail { flex: 1 1 auto; gap: 0; border: 1px solid var(--o-border); border-radius: 6px; background: var(--o-dialog); overflow: hidden; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-dhead { padding: 16px 20px; border: none; border-bottom: 1px solid var(--o-border); border-radius: 0; gap: 12px; flex-wrap: wrap; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-dname { font-size: 16px; font-weight: 600; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-dbadges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-info { padding: 12px 20px; border-bottom: 1px solid var(--o-border); font-size: 13px; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-cols { gap: 16px; padding: 20px; flex: 1 1 auto; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-col { border-radius: 6px; background: var(--o-layer); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-colhead { padding: 6px 8px; font-size: 12px; font-weight: 500; border-radius: 4px 4px 0 0; line-height: normal; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-collist { gap: 4px; padding: 10px; max-height: none; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-item { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--o-border); background: var(--o-dialog); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-item[data-status="added"] { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.5); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-item[data-status="removed"] { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.5); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-item[data-status="changed"] { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.4); }
+.uspp-cttf-dlg-diff .uspp-cttf-d-row { gap: 4px; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-btnwrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-row .uspp-cttf-chip-btn { max-width: 100%; pointer-events: none; line-height: 1.4; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-fields { margin-top: 0; }
+.uspp-cttf-dlg-diff .uspp-cttf-d-row .uspp-cttf-chip-btn { height: auto; min-height: 34px; padding: 6px 12px; font-size: 14px; font-weight: 400; line-height: 1.4; border: 1px solid rgba(0,0,0,.1); border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.05); gap: 8px; }
+/* 原版自动化列表:名称 / 网址为 flex 列、间距 4,行高 17 / 15;网址最宽 260 省略 */
+.uspp-cttf-dlg-auto .uspp-cttf-list-body .uspp-cttf-rule-row > div:nth-child(2) { display: flex; flex-direction: column; gap: 4px; }
+.uspp-cttf-dlg-auto .uspp-cttf-list-body .uspp-cttf-rule-row > div:nth-child(2) > div:first-child { line-height: 17px; }
+.uspp-cttf-dlg-auto .uspp-cttf-list-body .uspp-cttf-rule-row > div:nth-child(2) > .uspp-cttf-sub { line-height: 15px; margin: 0; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 原版删除按钮确认框:模板文本框为常规文字色 */
+.uspp-cttf-dlg .uspp-cttf-del-ta, .uspp-cttf-dlg .uspp-cttf-del-ta:read-only { color: var(--o-text); opacity: 1; -webkit-text-fill-color: var(--o-text); }
+/* 原版脚本配置弹窗(showConfigSettingsDialog):标题行下距 20;标签页 13.33/400、间距 10、下距 20 */
+.uspp-cttf-dlg.uspp-cttf-dlg-cfg > .uspp-cttf-modal-close + .uspp-cttf-modal-header { margin-bottom: 20px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-cfg .uspp-cttf-modal-body > .uspp-cttf-tabs { gap: 10px; margin-bottom: 20px; }
+.uspp-cttf-dlg.uspp-cttf-dlg-cfg .uspp-cttf-tab { font-size: 13.3333px; font-weight: 400; height: 36px; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-rows { display: flex; flex-direction: column; gap: 20px; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-rows.uspp-cttf-cfg-mb { margin-bottom: 20px; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-row { display: flex; flex-direction: row; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--o-border); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-row.uspp-cttf-cfg-row-last { padding-bottom: 0; border-bottom: none; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-label { display: inline-flex; min-width: 130px; justify-content: flex-start; margin-right: 12px; font-size: 16px; font-weight: 400; line-height: normal; color: var(--o-text); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-langs, .uspp-cttf-dlg-cfg .uspp-cttf-cfg-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-lang { padding: 6px 14px; font: inherit; font-size: 13.3333px; font-weight: 400; line-height: normal; border-radius: 999px; cursor: pointer; background: var(--o-input-bg); color: var(--o-input-fg); border: 1px solid var(--o-input-border); transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-lang:hover { border-color: var(--o-primary); box-shadow: 0 0 0 1px var(--o-primary) inset; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-lang.uspp-cttf-active { background: var(--o-primary); color: #fff; border-color: var(--o-primary); box-shadow: 0 0 0 1px var(--o-primary) inset; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switchwrap { display: inline-flex; align-items: center; gap: 10px; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switch { position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switch input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-slider { position: absolute; cursor: pointer; inset: 0; background-color: rgba(148, 163, 184, .35); border-radius: 999px; transition: background-color .25s ease, box-shadow .25s ease; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(15, 23, 42, .25); transition: transform .25s ease; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switch input:checked + .uspp-cttf-cfg-slider { background-color: #22c55e; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switch input:checked + .uspp-cttf-cfg-slider::before { transform: translateX(24px); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-switch input:focus-visible + .uspp-cttf-cfg-slider { box-shadow: 0 0 0 3px rgba(34, 197, 94, .35); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-state { font-size: 13px; font-weight: 500; min-width: 38px; color: var(--o-muted); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-state.uspp-cttf-on { color: var(--o-success); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-btn { padding: 8px 16px; font: inherit; font-size: 13.3333px; font-weight: 400; line-height: normal; border: none; border-radius: 4px; color: #fff; cursor: pointer; }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-reset { background: var(--o-cancel); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-import { background: var(--o-add); }
+.uspp-cttf-dlg-cfg .uspp-cttf-cfg-export { background: var(--o-success); }
+/* 原版站点规则展开区(style-settings-dialog.js createRuleRow):规则列表最高 460、间距 12;
+   匹配区 / CSS 区 gap 6;网址行等宽字 12px、行高 1.6、行距 6;CSS 块 rgba 底;布局徽章始终显示 */
+.uspp-cttf-dlg-ssr .uspp-cttf-ss-rules { gap: 12px; max-height: 460px; }
+.uspp-cttf-ss-details { display: flex; flex-direction: column; gap: 10px; }
+.uspp-cttf-ss-details > .uspp-cttf-ss-sec { gap: 6px; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mlist { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup ul { list-style-position: outside; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup li + li { margin-top: 0; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup li:not(:last-child) { margin-bottom: 6px; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mtype { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; line-height: normal; }
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup code, .uspp-cttf-ss-details .uspp-cttf-ss-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; color: var(--o-text); }
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup code { display: block; min-width: 0; background: none; padding: 0; }
+.uspp-cttf-ss-details .uspp-cttf-ss-csec { border: 1px solid rgba(148,163,184,.16); background: rgba(15,23,42,.03); }
+.uspp-cttf-ss-details .uspp-cttf-ss-code { display: block; margin: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(148,163,184,.16); background: rgba(15,23,42,.045); max-height: none; overflow: visible; }
+.uspp-cttf-ss-laybadges { display: flex; flex-wrap: wrap; gap: 6px; }
+.uspp-cttf-ss-laybadge { display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.uspp-cttf-ss-lay-h { background: rgba(16,185,129,.12); color: var(--o-success); border: 1px solid rgba(16,185,129,.18); }
+.uspp-cttf-ss-lay-b { background: rgba(59,130,246,.12); color: var(--o-primary); border: 1px solid rgba(59,130,246,.18); }
+/* 原版模板页:文本框为行内元素,卡片底部多出约 4px 行内留白 */
+.uspp-cttf-dlg.uspp-cttf-dlg-ed .uspp-cttf-tpl-card { padding-bottom: 16px; }
+/* 原版网址列表:li 继承 16px 字号(列表符号行高约 23),分区标签行高 normal */
+.uspp-cttf-ss-details .uspp-cttf-ss-mgroup li { font-size: 16px; line-height: normal; }
+.uspp-cttf-ss-details .uspp-cttf-ss-sec-label { line-height: normal; }
+/* 原版关闭按钮(createDialogCloseIconButton):文字「✕」、浏览器默认按钮字号 13.33px,悬停浅灰圆底 */
+.uspp-cttf-dlg > .uspp-cttf-modal-close { border-radius: 50%; font-size: 13.3333px; font-weight: 400; line-height: normal; color: var(--o-text); }
+.uspp-cttf-dlg > .uspp-cttf-modal-close > svg { display: none; }
+.uspp-cttf-dlg > .uspp-cttf-modal-close::before { content: "✕"; }
+.uspp-cttf-dlg > .uspp-cttf-modal-close:hover { background: rgba(148,163,184,.2); }
+/* 同步页:各同步插件区块上下叠放,间距 20 */
+.uspp-cttf-sync-stack { display: flex; flex-direction: column; gap: 20px; }
+/* Google Drive 同步区块(原版 driveSyncSection) */
+.uspp-cttf-ds { display: flex; flex-direction: column; gap: 8px; }
+.uspp-cttf-ds-headwrap { display: flex; flex-direction: column; gap: 6px; }
+.uspp-cttf-ds-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.uspp-cttf-ds-title { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; line-height: normal; color: var(--o-text); }
+.uspp-cttf-ds-modstatus { font-size: 12px; line-height: normal; color: var(--o-muted); }
+.uspp-cttf-ds-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--o-border); border-radius: 8px; background: var(--o-input-bg); }
+.uspp-cttf-ds-inner { display: flex; flex-direction: column; gap: 4px; }
+.uspp-cttf-ds-modewrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.uspp-cttf-ds-modegrid { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; row-gap: 8px; width: 100%; }
+.uspp-cttf-ds-modelabel { font-size: 16px; line-height: normal; color: var(--o-text); white-space: nowrap; }
+.uspp-cttf-ds-modes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
+.uspp-cttf-ds-mode { padding: 6px 12px; border-radius: 18px; border: 1px solid var(--o-input-border); background: transparent; color: var(--o-text); font: inherit; font-size: 13.3333px; line-height: normal; cursor: pointer; }
+.uspp-cttf-ds-mode.uspp-cttf-active { background: var(--o-primary); color: #fff; border-color: var(--o-primary); }
+.uspp-cttf-ds-hr { height: 1px; background: var(--o-border); margin: 0 0 8px; }
+.uspp-cttf-ds-hr.uspp-cttf-ds-hr2 { margin: 4px 0 8px; }
+.uspp-cttf-ds-fold { display: flex; flex-direction: column; gap: 6px; }
+.uspp-cttf-ds-foldhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; cursor: pointer; }
+.uspp-cttf-ds-foldtitle { font-size: 16px; line-height: normal; color: var(--o-text); }
+.uspp-cttf-ds-arrow { font-size: 12px; line-height: normal; color: var(--o-muted); }
+.uspp-cttf-ds-fields { display: flex; flex-direction: column; gap: 6px; }
+.uspp-cttf-ds-flabel { display: flex; flex-direction: column; gap: 6px; }
+.uspp-cttf-ds-fname { display: inline-flex; min-width: 130px; margin-right: 12px; font-size: 15px; line-height: normal; color: var(--o-text); }
+.uspp-cttf-ds-field { position: relative; width: 100%; padding-bottom: 4px; } /* 原版文本框为行内元素,下方留约 4px */
+.uspp-cttf-ds-ta { box-sizing: border-box; width: 100%; min-height: 36px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--o-ds-ta-border, var(--o-input-border)); background: var(--o-input-bg); color: var(--o-input-fg); font: inherit; font-size: 13px; line-height: 1.4; resize: none; overflow: hidden; outline: none; white-space: pre-wrap; word-break: break-word; display: block; }
+.uspp-cttf-ds-ta:focus { border-color: var(--o-primary); box-shadow: 0 0 0 1px var(--o-primary) inset; }
+.uspp-cttf-ds-field[data-visible="false"] .uspp-cttf-ds-ta { color: transparent; text-shadow: 0 0 0 var(--o-text); -webkit-text-security: disc; caret-color: transparent; }
+.uspp-cttf-ds-eye { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); border: 1px solid var(--o-input-border); background: var(--o-layer); color: var(--o-text); border-radius: 6px; padding: 4px 6px; cursor: pointer; font-size: 12px; line-height: 1; }
+.uspp-cttf-ds-eye:hover { border-color: var(--o-primary); background: var(--o-input-bg); }
+.uspp-cttf-ds-saverow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.uspp-cttf-ds-actrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.uspp-cttf-ds-acts { display: flex; flex: 1; gap: 8px; min-width: 220px; }
+.uspp-cttf-ds-btn { padding: 8px 16px; border: none; border-radius: 4px; color: #fff; font: inherit; font-size: 13.3333px; font-weight: 400; line-height: normal; cursor: pointer; }
+.uspp-cttf-ds-btn:disabled { opacity: .7; cursor: default; }
+.uspp-cttf-ds-save { background: var(--o-primary); }
+.uspp-cttf-ds-up { background: var(--o-success); flex: 1; }
+.uspp-cttf-ds-pull { background: var(--o-info); flex: 1; }
+.uspp-cttf-ds-status { flex: 1; min-height: 18px; font-size: 13px; color: var(--o-text); }
+.uspp-cttf-ds-status[data-kind="ok"] { color: var(--o-success); }
+.uspp-cttf-ds-status[data-kind="error"] { color: var(--o-danger); }
+/* Drive 差异选择框(原版 showDriveDiffChoiceDialog) */
+.uspp-cttf-modal.uspp-cttf-dlg.uspp-cttf-dlg-drivediff { padding: 20px; box-sizing: border-box; display: block; border-radius: 8px; }
+.uspp-cttf-dlg-drivediff > .uspp-cttf-modal-body { padding: 0; margin: 0; display: block; overflow: visible; }
+.uspp-cttf-dd-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.uspp-cttf-dd-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--o-text); }
+.uspp-cttf-dd-op { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(59,130,246,.12); color: var(--o-info); border: 1px solid rgba(59,130,246,.25); }
+.uspp-cttf-dd-desc { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--o-muted); }
+.uspp-cttf-dd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.uspp-cttf-dd-card { border: 1px solid var(--o-border); border-radius: 8px; padding: 12px; background: var(--o-layer); }
+.uspp-cttf-dd-ct { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--o-text); }
+.uspp-cttf-dd-cs { font-size: 12px; color: var(--o-muted); }
+.uspp-cttf-dd-card.uspp-cttf-dd-remote { border-color: var(--o-info); background: rgba(79,70,229,.06); }
+.uspp-cttf-dd-remote .uspp-cttf-dd-ct, .uspp-cttf-dd-remote .uspp-cttf-dd-cs { color: var(--o-info); }
+.uspp-cttf-dd-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.uspp-cttf-dd-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.uspp-cttf-dd-btn { padding: 8px 16px; border: none; border-radius: 6px; color: #fff; font: inherit; font-size: 13.3333px; line-height: normal; cursor: pointer; }
+.uspp-cttf-dd-diff { background: var(--o-layer); color: var(--o-text); border: 1px solid var(--o-border); }
+.uspp-cttf-dd-local { background: var(--o-success); }
+.uspp-cttf-dd-useremote { background: var(--o-info); }
+.uspp-cttf-dd-cancel { background: var(--o-cancel); }
+/* 原版同步输入框:暗色下边框 #3f3f46,占位文字为输入文字色的约 72% */
+:root[data-uspp-cttf-theme="dark"] .uspp-cttf-dlg { --o-ds-ta-border: #3f3f46; }
+@media (prefers-color-scheme: dark) { :root:not([data-uspp-cttf-theme]) .uspp-cttf-dlg { --o-ds-ta-border: #3f3f46; } }
+.uspp-cttf-ds-ta::placeholder { color: var(--o-input-fg); opacity: .72; }
 `;
 
   // sites/chat/lib/settle.js
@@ -1203,6 +1784,1426 @@
     return settled;
   }
 
+  // sites/chat/lib/officialstyles.js
+  var OFFICIAL_STYLE_SOURCE_URL = "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css";
+  var OFFICIAL_STYLE_BUNDLE = {
+    "version": "[20260714] v1.0.0",
+    "sourceUrl": "https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/dev/userstyle/%5BChat%5D%20Template%20Text%20Folders.user.css",
+    "lastFetchedAt": 0,
+    "rules": [
+      {
+        "id": "official-chat01-toolbar-space",
+        "name": "Chat01 - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "chat01.ai"
+          }
+        ],
+        "cssCode": "main {\n    padding-bottom: 40px !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-kagi-assistant-toolbar-space",
+        "name": "Kagi Assistant - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "assistant.kagi.com"
+          }
+        ],
+        "cssCode": "main.main-center-box {\n    padding-bottom: 20px !important;\n}\n\n/* 新版 assistant.kagi.com 应用壳层级较高，确保脚本栏可见。 */\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-typingcloud-toolbar-space",
+        "name": "TypingCloud - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "setapp.typingcloud.com"
+          }
+        ],
+        "cssCode": "main {\n    padding-bottom: 30px !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-cerebr-toolbar-space",
+        "name": "Cerebr - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "cerebr.fugue.pro"
+          },
+          {
+            "type": "domain",
+            "value": "cerebr.vercel.app"
+          },
+          {
+            "type": "domain",
+            "value": "cerebr.yym68686.top"
+          },
+          {
+            "type": "domain",
+            "value": "cerebr.pages.dev"
+          }
+        ],
+        "cssCode": "#chat-container {\n    padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}\n\n#input-container {\n    bottom: 40px !important;\n}\n\n#scroll-to-bottom {\n    bottom: calc(112px + env(safe-area-inset-bottom) + var(--chat-bottom-extra-padding, 0px)) !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-lobehub-toolbar-space",
+        "name": "LobeHub - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "app.lobehub.com"
+          }
+        ],
+        "cssCode": ':root {\n    --cttf-lobehub-toolbar-reserve: calc(88px + env(safe-area-inset-bottom, 0px));\n}\n\n/* 首页：放大滚动容器底部留白，避免输入区和脚本栏贴得太近。 */\ndiv[style*="overflow-y: auto"][style*="padding-block: 44px 16vh"]:has(div[data-testid="chat-input"]) {\n    padding-bottom: calc(16vh + var(--cttf-lobehub-toolbar-reserve)) !important;\n    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n}\n\n/* 对话页：主滚动列需要额外底部空间，保证最后一条消息和输入框可见。 */\ndiv[style*="overflow-y: auto"][style*="position: relative"]:has(div[data-testid="chat-input"]) {\n    padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n    scroll-padding-bottom: var(--cttf-lobehub-toolbar-reserve) !important;\n}\n\n/* 提高脚本栏层级，避免被 LobeHub 的浮层或底栏盖住。 */\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}',
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
+        "favicon": ""
+      },
+      {
+        "id": "official-perplexity-toolbar-space",
+        "name": "Perplexity - Toolbar space and sidebar fix",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "perplexity.ai"
+          }
+        ],
+        "cssCode": '.erp-tab\\:p-0 {\n    padding-bottom: 20px !important;\n}\n\n/* [Perplexity] 辅助 */\n/* 收窄 匿名模式选择器 */\ndiv[data-placement="top-start"] .w-sideBarWidth {\n  width: 100% !important;\n}',
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-perplexity-hide-toolbar-special-pages",
+        "name": "Perplexity - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/settings"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/discover"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/spaces"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/library"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/computer/connectors"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://www.perplexity.ai/account"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}\n\n.erp-tab\\:p-0 {\n    padding-bottom: 0px !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-poe-hide-toolbar-special-pages",
+        "name": "Poe - Hide toolbar on explore, profile, settings, and utility pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/explore"
+          },
+          {
+            "type": "url",
+            "value": "https://poe.com/chats"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/profile"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/settings"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/create_bot"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/api"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://poe.com/leaderboard"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-monica-toolbar-space",
+        "name": "Monica - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "monica.im"
+          }
+        ],
+        "cssCode": 'body[monica-version] {\n    --cttf-monica-toolbar-reserve: calc(52px + env(safe-area-inset-bottom, 0px));\n}\n\nbody[monica-version] #root {\n    padding-bottom: 0 !important;\n}\n\nbody[monica-version] div[class*="home-page--"],\nbody[monica-version] div[class*="horizontal-view--"][class*="is-chat-tab-page--"],\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"] {\n    min-height: 0 !important;\n}\n\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"] {\n    padding-bottom: var(--cttf-monica-toolbar-reserve) !important;\n    box-sizing: border-box !important;\n}\n\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="scrollable"],\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="scroll-content"],\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"] [class*="chat-list"] {\n    scroll-padding-bottom: var(--cttf-monica-toolbar-reserve) !important;\n}\n\nbody[monica-version] #cttf-ui-host {\n    z-index: 1200 !important;\n}',
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
+        "favicon": ""
+      },
+      {
+        "id": "official-monica-input-z-index",
+        "name": "Monica - Raise input layer",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "monica.im"
+          }
+        ],
+        "cssCode": 'body[monica-version] div[class*="chat-input-v2--"][class*="chat-input--"],\nbody[monica-version] div[class*="chat-input-v2-"][class*="chat-input-"],\nbody[monica-version] div[class*="chat-input--"] {\n    position: relative;\n    z-index: 110 !important;\n}',
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-monica-search-hide-toolbar",
+        "name": "Monica - Hide toolbar on home search",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://monica.im/home/search"
+          }
+        ],
+        "cssCode": '#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}\n\n#root {\n    padding-bottom: 0px !important;\n}\n\nbody[monica-version] {\n    --cttf-monica-toolbar-reserve: 0px;\n}\n\nbody[monica-version] div[class*="view-wrapper--"][data-key="chat"],\nbody[monica-version] div[class*="view-wrapper--"][data-key="search"] {\n    padding-bottom: 0 !important;\n}',
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-chat01-account-hide-toolbar",
+        "name": "Chat01 - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "^https://chat01\\.ai/[^/]+/history(?:/?(?:[?#].*)?)$"
+          },
+          {
+            "type": "regexp",
+            "value": "^https://chat01\\.ai/[^/]+/pricing(?:/?(?:[?#].*)?)$"
+          },
+          {
+            "type": "regexp",
+            "value": "^https://chat01\\.ai/[^/]+/credits(?:/?(?:[?#].*)?)$"
+          },
+          {
+            "type": "regexp",
+            "value": "^https://chat01\\.ai/[^/]+/keys(?:/?(?:[?#].*)?)$"
+          },
+          {
+            "type": "regexp",
+            "value": "^https://chat01\\.ai/[^/]+/discover(?:/?(?:[?#].*)?)$"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-claude-login-hide-toolbar",
+        "name": "Claude - Hide toolbar on login, settings, upgrade, gift, and downloads pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://claude.ai/login"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://claude.ai/settings"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://claude.ai/upgrade"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://claude.ai/gift"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://claude.ai/downloads"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-gemini-hide-toolbar-special-pages",
+        "name": "Gemini - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/mystuff"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/gems"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/personalization-settings"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/saved-info"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/sharing"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gemini.google.com/import"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-aistudio-prompts-toolbar-space",
+        "name": "AI Studio - Reserve toolbar space",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "^https://aistudio\\.google\\.com/(?:app/)?prompts(?:$|[/?#]).*"
+          }
+        ],
+        "cssCode": ":root {\n    --cttf-aistudio-toolbar-reserve: calc(54px + env(safe-area-inset-bottom, 0px));\n}\n\n#cttf-ui-host {\n    z-index: 2147483647 !important;\n}\n\nbody:has(ms-prompt-input-wrapper) main,\nbody:has(.prompt-input-wrapper-container) main {\n    padding-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nfooter:has(ms-prompt-input-wrapper),\nfooter:has(.prompt-input-wrapper-container),\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}\n\nms-prompt-input-wrapper,\n.prompt-input-wrapper-container {\n    scroll-margin-bottom: var(--cttf-aistudio-toolbar-reserve) !important;\n}",
+        "layout": {
+          "height": 40,
+          "bottomSpacing": 6
+        },
+        "favicon": ""
+      },
+      {
+        "id": "official-aistudio-non-prompts-hide-toolbar",
+        "name": "AI Studio - Hide toolbar outside prompts",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "^https://aistudio\\.google\\.com/(?!app/prompts(?:$|[/?#])|prompts(?:$|[/?#])).*"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-manus-hide-toolbar-special-pages",
+        "name": "Manus - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://manus.im/app/agents"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://manus.im/app/library"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-arena-hide-toolbar-special-pages",
+        "name": "Arena - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://arena.ai/history/search"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://arena.ai/leaderboard/text"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-grok-hide-toolbar-special-pages",
+        "name": "Grok - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "^https://grok\\.com/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://grok.com/files"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://grok.com/share-links"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-grok-dairoot-admin-hide-toolbar",
+        "name": "Grok Dairoot - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://gk.dairoot.cn/admin"
+          },
+          {
+            "type": "regexp",
+            "value": "^https://gk\\.dairoot\\.cn/(?:\\?[^#]*)?#subscribe(?:$|[/?#].*)"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gk.dairoot.cn/files"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://gk.dairoot.cn/share-links"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-x-non-grok-hide-toolbar",
+        "name": "X - Hide toolbar outside Grok",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "https://x\\.com/(?!i/grok(?:$|[/?#])).*"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-chatgpt-special-pages-hide-toolbar",
+        "name": "ChatGPT - Hide toolbar on special pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/codex"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/gpts"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/admin"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/payments"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/library"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/apps"
+          },
+          {
+            "type": "url-prefix",
+            "value": "https://chatgpt.com/#pricing"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-chatgpt-thread-bottom-compact",
+        "name": "ChatGPT - Compact bottom disclaimer",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "domain",
+            "value": "chatgpt.com"
+          }
+        ],
+        "cssCode": "#thread-bottom-container > .text-xs > div {\n    min-height: 0 !important;\n    padding: 4px 0 !important;\n}\n\n#thread-bottom-container > .text-xs > div > div {\n    flex: 1 1 auto !important;\n    min-width: 0 !important;\n    overflow: hidden !important;\n    text-overflow: ellipsis !important;\n    white-space: nowrap !important;\n    padding-left: 8px !important;\n    padding-right: 8px !important;\n}",
+        "layout": {},
+        "favicon": ""
+      },
+      {
+        "id": "official-notion-non-ai-hide-toolbar",
+        "name": "Notion - Hide toolbar outside AI pages",
+        "source": "official",
+        "enabled": true,
+        "matchers": [
+          {
+            "type": "regexp",
+            "value": "https://www\\.notion\\.so/(?!ai|chat).*"
+          },
+          {
+            "type": "regexp",
+            "value": "https://app\\.notion\\.com/(?!ai|chat).*"
+          }
+        ],
+        "cssCode": "#cttf-ui-host {\n    visibility: hidden !important;\n    pointer-events: none !important;\n}",
+        "layout": {},
+        "favicon": ""
+      }
+    ]
+  };
+
+  // sites/chat/lib/styleformat.js
+  var STYLE_RULE_SOURCE = {
+    OFFICIAL: "official",
+    CUSTOM: "custom"
+  };
+  var STYLE_MATCHER_TYPE = {
+    DOMAIN: "domain",
+    URL_PREFIX: "url-prefix",
+    URL: "url",
+    REGEXP: "regexp"
+  };
+  var SUPPORTED_MATCHER_TYPES = new Set(Object.values(STYLE_MATCHER_TYPE));
+  var RULE_METADATA_KEYS = /* @__PURE__ */ new Set([
+    "rule-id",
+    "name",
+    "source",
+    "enabled",
+    "toolbar-height",
+    "toolbar-bottom-spacing",
+    "favicon"
+  ]);
+  var GLOBAL_METADATA_KEYS = /* @__PURE__ */ new Set([
+    "official-version",
+    "official-source-url",
+    "official-last-fetched-at"
+  ]);
+  var USERSTYLE_HEADER_START = "==UserStyle==";
+  var USERSTYLE_HEADER_END = "==/UserStyle==";
+  var normalizeWhitespace = (value) => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+  var normalizeRuleSource = (source, fallback = STYLE_RULE_SOURCE.CUSTOM) => {
+    const normalized = normalizeWhitespace(source).toLowerCase();
+    return normalized === STYLE_RULE_SOURCE.OFFICIAL || normalized === STYLE_RULE_SOURCE.CUSTOM ? normalized : fallback;
+  };
+  var clampStyleHeight = (value, fallback = void 0) => {
+    if (value === "" || value == null) {
+      return fallback;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(20, Math.min(200, Math.round(parsed)));
+  };
+  var clampBottomSpacing = (value, fallback = void 0) => {
+    if (value === "" || value == null) {
+      return fallback;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(-200, Math.min(200, Math.round(parsed)));
+  };
+  var createStableHash = (input) => {
+    const text = String(input == null ? "" : input);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  };
+  var createStyleRuleId = (seed, prefix2 = "cttf-style") => `${prefix2}-${createStableHash(seed)}`;
+  var toMetadataBoolean = (value, fallback = true) => {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    const normalized = normalizeWhitespace(value).toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") {
+      return false;
+    }
+    return fallback;
+  };
+  var normalizeMatcherType = (type) => {
+    const normalized = normalizeWhitespace(type).toLowerCase();
+    return SUPPORTED_MATCHER_TYPES.has(normalized) ? normalized : "";
+  };
+  var normalizeStyleMatcher = (matcher) => {
+    if (!matcher || typeof matcher !== "object") {
+      return null;
+    }
+    const type = normalizeMatcherType(matcher.type);
+    const value = typeof matcher.value === "string" ? matcher.value.trim() : "";
+    if (!type || !value) {
+      return null;
+    }
+    if (type === STYLE_MATCHER_TYPE.REGEXP) {
+      try {
+        new RegExp(value);
+      } catch (error) {
+        throw new Error(`Invalid regexp matcher: ${value}`);
+      }
+    }
+    return { type, value };
+  };
+  var getPrimaryHostFromMatchers = (matchers = []) => {
+    for (const matcher of matchers) {
+      if (!matcher || typeof matcher !== "object") {
+        continue;
+      }
+      if (matcher.type === STYLE_MATCHER_TYPE.DOMAIN) {
+        return matcher.value.trim();
+      }
+      if (matcher.type === STYLE_MATCHER_TYPE.URL || matcher.type === STYLE_MATCHER_TYPE.URL_PREFIX) {
+        try {
+          return new URL(matcher.value).hostname || "";
+        } catch (_3) {
+          continue;
+        }
+      }
+    }
+    return "";
+  };
+  var ensureStyleRule = (rule, options = {}) => {
+    if (!rule || typeof rule !== "object") {
+      return null;
+    }
+    const fallbackSource = normalizeRuleSource(options.fallbackSource, STYLE_RULE_SOURCE.CUSTOM);
+    const legacyDomain = typeof rule.domain === "string" ? rule.domain.trim() : "";
+    const rawMatchers = Array.isArray(rule.matchers) ? rule.matchers : legacyDomain ? [{ type: STYLE_MATCHER_TYPE.DOMAIN, value: legacyDomain }] : [];
+    const matchers = [];
+    rawMatchers.forEach((matcher) => {
+      const normalizedMatcher = normalizeStyleMatcher(matcher);
+      if (normalizedMatcher) {
+        matchers.push(normalizedMatcher);
+      }
+    });
+    if (!matchers.length) {
+      return null;
+    }
+    const layout = {};
+    const height = clampStyleHeight(rule.layout?.height ?? rule.height);
+    const bottomSpacing = clampBottomSpacing(rule.layout?.bottomSpacing ?? rule.bottomSpacing);
+    if (typeof height === "number") {
+      layout.height = height;
+    }
+    if (typeof bottomSpacing === "number") {
+      layout.bottomSpacing = bottomSpacing;
+    }
+    const cssCode = typeof rule.cssCode === "string" ? rule.cssCode.trim() : "";
+    const name = typeof rule.name === "string" ? rule.name.trim() : "";
+    const source = normalizeRuleSource(rule.source, fallbackSource);
+    const favicon = typeof rule.favicon === "string" ? rule.favicon.trim() : "";
+    const seed = [
+      source,
+      name,
+      matchers.map((matcher) => `${matcher.type}:${matcher.value}`).join("|"),
+      cssCode,
+      layout.height ?? "",
+      layout.bottomSpacing ?? ""
+    ].join("\n");
+    return {
+      id: typeof rule.id === "string" && rule.id.trim() ? rule.id.trim() : createStyleRuleId(seed, source === STYLE_RULE_SOURCE.OFFICIAL ? "cttf-official-style" : "cttf-custom-style"),
+      name,
+      source,
+      enabled: toMetadataBoolean(rule.enabled, true),
+      matchers,
+      cssCode,
+      layout,
+      favicon
+    };
+  };
+  var ensureStyleBundle = (bundle, options = {}) => {
+    const rawBundle = bundle && typeof bundle === "object" ? bundle : {};
+    const fallbackSource = normalizeRuleSource(options.fallbackSource, STYLE_RULE_SOURCE.OFFICIAL);
+    const rules = Array.isArray(rawBundle.rules) ? rawBundle.rules : Array.isArray(options.rules) ? options.rules : [];
+    const normalizedRules = [];
+    rules.forEach((rule, index) => {
+      const normalizedRule = ensureStyleRule(rule, {
+        fallbackSource,
+        index
+      });
+      if (normalizedRule) {
+        normalizedRules.push(normalizedRule);
+      }
+    });
+    return {
+      version: typeof rawBundle.version === "string" ? rawBundle.version.trim() : typeof options.version === "string" ? options.version.trim() : "",
+      sourceUrl: typeof rawBundle.sourceUrl === "string" ? rawBundle.sourceUrl.trim() : typeof options.sourceUrl === "string" ? options.sourceUrl.trim() : "",
+      lastFetchedAt: Number.isFinite(Number(rawBundle.lastFetchedAt)) ? Number(rawBundle.lastFetchedAt) : Number.isFinite(Number(options.lastFetchedAt)) ? Number(options.lastFetchedAt) : 0,
+      rules: normalizedRules
+    };
+  };
+  var splitRulesBySource = (rules = []) => {
+    const grouped = {
+      official: [],
+      custom: []
+    };
+    if (!Array.isArray(rules)) {
+      return grouped;
+    }
+    rules.forEach((rule) => {
+      if (!rule || typeof rule !== "object") {
+        return;
+      }
+      if (rule.source === STYLE_RULE_SOURCE.OFFICIAL) {
+        grouped.official.push(rule);
+        return;
+      }
+      grouped.custom.push(rule);
+    });
+    return grouped;
+  };
+  var summarizeMatchers = (matchers = [], options = {}) => {
+    if (!Array.isArray(matchers) || !matchers.length) {
+      return options.emptyLabel || "";
+    }
+    const maxItems = Math.max(1, Number(options.maxItems) || 2);
+    const labels = matchers.map((matcher) => {
+      if (!matcher || typeof matcher !== "object") {
+        return "";
+      }
+      const prefix2 = matcher.type === STYLE_MATCHER_TYPE.DOMAIN ? "domain" : matcher.type === STYLE_MATCHER_TYPE.URL_PREFIX ? "prefix" : matcher.type === STYLE_MATCHER_TYPE.URL ? "url" : "regexp";
+      return `${prefix2}: ${matcher.value}`;
+    }).filter(Boolean);
+    if (labels.length <= maxItems) {
+      return labels.join(" | ");
+    }
+    return `${labels.slice(0, maxItems).join(" | ")} | +${labels.length - maxItems}`;
+  };
+  var escapeUserStyleString = (value) => String(value == null ? "" : value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  var serializeMatcher = (matcher) => {
+    if (!matcher || typeof matcher !== "object") {
+      return "";
+    }
+    return `${matcher.type}("${escapeUserStyleString(matcher.value)}")`;
+  };
+  var parseUserStyleHeaderMetadata = (commentContent) => {
+    const metadata = {};
+    if (!commentContent || !commentContent.includes(USERSTYLE_HEADER_START)) {
+      return metadata;
+    }
+    const normalized = commentContent.replace(/\r\n/g, "\n");
+    const startIndex = normalized.indexOf(USERSTYLE_HEADER_START);
+    const endIndex = normalized.indexOf(USERSTYLE_HEADER_END);
+    if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+      return metadata;
+    }
+    const body = normalized.slice(startIndex + USERSTYLE_HEADER_START.length, endIndex);
+    body.split("\n").forEach((line) => {
+      const match = /^\s*@([A-Za-z0-9_-]+)\s+(.+?)\s*$/.exec(line);
+      if (!match) {
+        return;
+      }
+      metadata[match[1].toLowerCase()] = match[2];
+    });
+    return metadata;
+  };
+  var parseMetadataComment = (commentContent) => {
+    const ruleMetadata = {};
+    const globalMetadata = {};
+    let firstPlainComment = "";
+    const normalized = String(commentContent == null ? "" : commentContent).replace(/\r\n/g, "\n").split("\n").map((line) => line.replace(/^\s*\* ?/, "").trim()).filter(Boolean);
+    normalized.forEach((line) => {
+      const metadataMatch = /^@cttf-([a-z0-9-]+)\s*:?\s*(.*)$/i.exec(line);
+      if (!metadataMatch) {
+        if (!firstPlainComment) {
+          firstPlainComment = line;
+        }
+        return;
+      }
+      const key = metadataMatch[1].toLowerCase();
+      const rawValue = metadataMatch[2] || "";
+      if (RULE_METADATA_KEYS.has(key)) {
+        ruleMetadata[key] = rawValue;
+        return;
+      }
+      if (GLOBAL_METADATA_KEYS.has(key)) {
+        globalMetadata[key] = rawValue;
+      }
+    });
+    return {
+      ruleMetadata,
+      globalMetadata,
+      firstPlainComment
+    };
+  };
+  var readBlockComment = (source, startIndex) => {
+    const closeIndex = source.indexOf("*/", startIndex + 2);
+    if (closeIndex === -1) {
+      throw new Error("Unterminated block comment in .user.css");
+    }
+    return {
+      content: source.slice(startIndex + 2, closeIndex),
+      endIndex: closeIndex + 2
+    };
+  };
+  var skipQuotedString = (source, startIndex, quoteChar) => {
+    let index = startIndex + 1;
+    while (index < source.length) {
+      const char = source[index];
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === quoteChar) {
+        return index + 1;
+      }
+      index += 1;
+    }
+    throw new Error("Unterminated string in .user.css");
+  };
+  var splitTopLevelCommaSegments = (text) => {
+    const segments = [];
+    let start = 0;
+    let parenDepth = 0;
+    let index = 0;
+    while (index < text.length) {
+      const char = text[index];
+      if (char === '"' || char === "'") {
+        index = skipQuotedString(text, index, char);
+        continue;
+      }
+      if (char === "/" && text[index + 1] === "*") {
+        const comment = readBlockComment(text, index);
+        index = comment.endIndex;
+        continue;
+      }
+      if (char === "(") {
+        parenDepth += 1;
+        index += 1;
+        continue;
+      }
+      if (char === ")") {
+        parenDepth = Math.max(0, parenDepth - 1);
+        index += 1;
+        continue;
+      }
+      if (char === "," && parenDepth === 0) {
+        segments.push(text.slice(start, index).trim());
+        start = index + 1;
+      }
+      index += 1;
+    }
+    const trailing = text.slice(start).trim();
+    if (trailing) {
+      segments.push(trailing);
+    }
+    return segments.filter(Boolean);
+  };
+  var parseMozDocumentMatchers = (text) => {
+    const segments = splitTopLevelCommaSegments(text);
+    if (!segments.length) {
+      throw new Error("Empty @-moz-document matcher list in .user.css");
+    }
+    return segments.map((segment) => {
+      const match = /^([a-z-]+)\s*\(\s*"((?:\\.|[^"])*)"\s*\)\s*$/i.exec(segment);
+      if (!match) {
+        throw new Error(`Unsupported @-moz-document matcher: ${segment}`);
+      }
+      const type = normalizeMatcherType(match[1]);
+      if (!type) {
+        throw new Error(`Unsupported @-moz-document matcher type: ${match[1]}`);
+      }
+      const rawValue = match[2].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+      return normalizeStyleMatcher({
+        type,
+        value: rawValue
+      });
+    });
+  };
+  var extractLeadingRuleMetadata = (cssCode) => {
+    const source = String(cssCode == null ? "" : cssCode);
+    let index = 0;
+    const pendingComments = [];
+    while (index < source.length) {
+      const char = source[index];
+      if (/\s/.test(char)) {
+        index += 1;
+        continue;
+      }
+      if (char === "/" && source[index + 1] === "*") {
+        const comment = readBlockComment(source, index);
+        pendingComments.push(comment.content);
+        index = comment.endIndex;
+        continue;
+      }
+      break;
+    }
+    const aggregated = {
+      ruleMetadata: {},
+      firstPlainComment: ""
+    };
+    pendingComments.forEach((commentContent) => {
+      const parsed = parseMetadataComment(commentContent);
+      Object.assign(aggregated.ruleMetadata, parsed.ruleMetadata);
+      if (!aggregated.firstPlainComment && parsed.firstPlainComment) {
+        aggregated.firstPlainComment = parsed.firstPlainComment;
+      }
+    });
+    return {
+      cssCode: source.slice(index).trim(),
+      ruleMetadata: aggregated.ruleMetadata,
+      firstPlainComment: aggregated.firstPlainComment
+    };
+  };
+  var readMozDocumentBlock = (source, startIndex, pendingComments, options = {}) => {
+    const directive = "@-moz-document";
+    let index = startIndex + directive.length;
+    let parenDepth = 0;
+    while (index < source.length) {
+      const char = source[index];
+      if (char === '"' || char === "'") {
+        index = skipQuotedString(source, index, char);
+        continue;
+      }
+      if (char === "/" && source[index + 1] === "*") {
+        const comment = readBlockComment(source, index);
+        index = comment.endIndex;
+        continue;
+      }
+      if (char === "(") {
+        parenDepth += 1;
+        index += 1;
+        continue;
+      }
+      if (char === ")") {
+        parenDepth = Math.max(0, parenDepth - 1);
+        index += 1;
+        continue;
+      }
+      if (char === "{" && parenDepth === 0) {
+        break;
+      }
+      index += 1;
+    }
+    if (source[index] !== "{") {
+      throw new Error("Invalid @-moz-document block: missing opening brace");
+    }
+    const matcherText = source.slice(startIndex + directive.length, index).trim();
+    const matchers = parseMozDocumentMatchers(matcherText);
+    let bodyIndex = index + 1;
+    let braceDepth = 1;
+    while (bodyIndex < source.length) {
+      const char = source[bodyIndex];
+      if (char === '"' || char === "'") {
+        bodyIndex = skipQuotedString(source, bodyIndex, char);
+        continue;
+      }
+      if (char === "/" && source[bodyIndex + 1] === "*") {
+        const comment = readBlockComment(source, bodyIndex);
+        bodyIndex = comment.endIndex;
+        continue;
+      }
+      if (char === "{") {
+        braceDepth += 1;
+        bodyIndex += 1;
+        continue;
+      }
+      if (char === "}") {
+        braceDepth -= 1;
+        if (braceDepth === 0) {
+          break;
+        }
+      }
+      bodyIndex += 1;
+    }
+    if (braceDepth !== 0) {
+      throw new Error("Invalid @-moz-document block: missing closing brace");
+    }
+    const rawCssCode = source.slice(index + 1, bodyIndex);
+    const leadingMetadata = extractLeadingRuleMetadata(rawCssCode);
+    const metadataAccumulator = {
+      ruleMetadata: {},
+      firstPlainComment: ""
+    };
+    pendingComments.forEach((commentContent) => {
+      const parsed = parseMetadataComment(commentContent);
+      Object.assign(metadataAccumulator.ruleMetadata, parsed.ruleMetadata);
+      if (!metadataAccumulator.firstPlainComment && parsed.firstPlainComment) {
+        metadataAccumulator.firstPlainComment = parsed.firstPlainComment;
+      }
+    });
+    Object.assign(metadataAccumulator.ruleMetadata, leadingMetadata.ruleMetadata);
+    if (!metadataAccumulator.firstPlainComment && leadingMetadata.firstPlainComment) {
+      metadataAccumulator.firstPlainComment = leadingMetadata.firstPlainComment;
+    }
+    const sourceFallback = normalizeRuleSource(options.defaultSource, STYLE_RULE_SOURCE.CUSTOM);
+    const ruleMetadata = metadataAccumulator.ruleMetadata;
+    const fallbackName = metadataAccumulator.firstPlainComment || summarizeMatchers(matchers, { maxItems: 1 });
+    const fallbackSeed = [
+      sourceFallback,
+      matcherText,
+      leadingMetadata.cssCode.trim(),
+      fallbackName
+    ].join("\n");
+    const normalizedRule = ensureStyleRule({
+      id: ruleMetadata["rule-id"],
+      name: ruleMetadata.name || fallbackName,
+      source: ruleMetadata.source || sourceFallback,
+      enabled: ruleMetadata.enabled,
+      matchers,
+      cssCode: leadingMetadata.cssCode,
+      layout: {
+        height: ruleMetadata["toolbar-height"],
+        bottomSpacing: ruleMetadata["toolbar-bottom-spacing"]
+      },
+      favicon: ruleMetadata.favicon || ""
+    }, {
+      fallbackSource: sourceFallback,
+      seed: fallbackSeed
+    });
+    if (!normalizedRule) {
+      throw new Error("Failed to normalize parsed style rule");
+    }
+    return {
+      rule: normalizedRule,
+      endIndex: bodyIndex + 1
+    };
+  };
+  var parseUserStyleFile = (source, options = {}) => {
+    const text = String(source == null ? "" : source);
+    const rules = [];
+    const pendingComments = [];
+    const globalMetadata = {};
+    let userStyleMetadata = {};
+    let index = 0;
+    while (index < text.length) {
+      const char = text[index];
+      if (/\s/.test(char)) {
+        index += 1;
+        continue;
+      }
+      if (char === "/" && text[index + 1] === "*") {
+        const comment = readBlockComment(text, index);
+        const parsedHeader = parseUserStyleHeaderMetadata(comment.content);
+        const isUserStyleHeader = Object.keys(parsedHeader).length > 0;
+        if (isUserStyleHeader) {
+          userStyleMetadata = {
+            ...userStyleMetadata,
+            ...parsedHeader
+          };
+        }
+        const parsedComment = parseMetadataComment(comment.content);
+        Object.assign(globalMetadata, parsedComment.globalMetadata);
+        if (!isUserStyleHeader) {
+          pendingComments.push(comment.content);
+        }
+        index = comment.endIndex;
+        continue;
+      }
+      if (text.startsWith("@-moz-document", index)) {
+        const block = readMozDocumentBlock(text, index, pendingComments, {
+          defaultSource: options.defaultSource || STYLE_RULE_SOURCE.CUSTOM
+        });
+        rules.push(block.rule);
+        pendingComments.length = 0;
+        index = block.endIndex;
+        continue;
+      }
+      index += 1;
+    }
+    return {
+      metadata: {
+        userStyle: userStyleMetadata,
+        officialVersion: typeof globalMetadata["official-version"] === "string" && globalMetadata["official-version"].trim() ? globalMetadata["official-version"].trim() : typeof userStyleMetadata.version === "string" ? userStyleMetadata.version.trim() : "",
+        officialSourceUrl: typeof globalMetadata["official-source-url"] === "string" ? globalMetadata["official-source-url"].trim() : "",
+        officialLastFetchedAt: Number.isFinite(Number(globalMetadata["official-last-fetched-at"])) ? Number(globalMetadata["official-last-fetched-at"]) : 0
+      },
+      rules
+    };
+  };
+  var serializeRuleMetadataComment = (key, value) => `/* @cttf-${key}: ${value} */`;
+  var serializeStyleRule = (rule) => {
+    const normalizedRule = ensureStyleRule(rule, {
+      fallbackSource: rule?.source || STYLE_RULE_SOURCE.CUSTOM
+    });
+    if (!normalizedRule) {
+      return "";
+    }
+    const lines = [];
+    lines.push(serializeRuleMetadataComment("rule-id", normalizedRule.id));
+    if (normalizedRule.name) {
+      lines.push(serializeRuleMetadataComment("name", normalizedRule.name));
+    }
+    lines.push(serializeRuleMetadataComment("source", normalizedRule.source));
+    lines.push(serializeRuleMetadataComment("enabled", normalizedRule.enabled ? "true" : "false"));
+    if (typeof normalizedRule.layout?.height === "number") {
+      lines.push(serializeRuleMetadataComment("toolbar-height", normalizedRule.layout.height));
+    }
+    if (typeof normalizedRule.layout?.bottomSpacing === "number") {
+      lines.push(serializeRuleMetadataComment("toolbar-bottom-spacing", normalizedRule.layout.bottomSpacing));
+    }
+    if (normalizedRule.favicon) {
+      lines.push(serializeRuleMetadataComment("favicon", normalizedRule.favicon));
+    }
+    lines.push(`@-moz-document ${normalizedRule.matchers.map(serializeMatcher).join(", ")} {`);
+    if (normalizedRule.cssCode) {
+      lines.push(normalizedRule.cssCode);
+    }
+    lines.push("}");
+    return lines.join("\n");
+  };
+  var formatTimestampForExport = (value) => {
+    const date = value ? new Date(value) : /* @__PURE__ */ new Date();
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}${mm}${dd}`;
+  };
+  var serializeStylePackageToUserCss = (options = {}) => {
+    const officialStyleBundle = ensureStyleBundle(options.officialStyleBundle, {
+      fallbackSource: STYLE_RULE_SOURCE.OFFICIAL
+    });
+    const customStyleRules = Array.isArray(options.customStyleRules) ? options.customStyleRules.map((rule) => ensureStyleRule(rule, { fallbackSource: STYLE_RULE_SOURCE.CUSTOM })).filter(Boolean) : [];
+    const allRules = [...officialStyleBundle.rules, ...customStyleRules];
+    const version2 = officialStyleBundle.version || `[${formatTimestampForExport(Date.now())}] exported`;
+    const headerLines = [
+      "/* ==UserStyle==",
+      "@name           [Chat] Template Text Folders Styles",
+      "@namespace      https://github.com/0-V-linuxdo/Chat_Template_Text_Folders",
+      "@description    Exported official and custom styles for [Chat] Template Text Folders.",
+      `@version        ${version2}`,
+      "@license        MIT",
+      "==/UserStyle== */",
+      "",
+      `/* @cttf-official-version: ${officialStyleBundle.version || ""} */`,
+      `/* @cttf-official-source-url: ${officialStyleBundle.sourceUrl || ""} */`,
+      `/* @cttf-official-last-fetched-at: ${officialStyleBundle.lastFetchedAt || 0} */`,
+      ""
+    ];
+    const body = allRules.map((rule) => serializeStyleRule(rule)).filter(Boolean).join("\n\n");
+    return `${headerLines.join("\n")}${body}
+`;
+  };
+  var buildOfficialStyleBundleFromUserCss = (source, options = {}) => {
+    const parsed = parseUserStyleFile(source, {
+      defaultSource: STYLE_RULE_SOURCE.OFFICIAL
+    });
+    return ensureStyleBundle({
+      version: parsed.metadata.officialVersion || options.version || "",
+      sourceUrl: options.sourceUrl || parsed.metadata.officialSourceUrl || "",
+      lastFetchedAt: Number.isFinite(Number(options.lastFetchedAt)) ? Number(options.lastFetchedAt) : parsed.metadata.officialLastFetchedAt || 0,
+      rules: parsed.rules.map((rule) => ({
+        ...rule,
+        source: STYLE_RULE_SOURCE.OFFICIAL,
+        enabled: typeof rule.enabled === "boolean" ? rule.enabled : true
+      }))
+    }, {
+      fallbackSource: STYLE_RULE_SOURCE.OFFICIAL
+    });
+  };
+
+  // sites/chat/lib/stylerules.js
+  var BAR_SEL = '[data-uspp-cttf="bar"]';
+  var mapCss = (css) => String(css || "").replace(/#cttf-ui-host\b/g, BAR_SEL);
+  var clone = (v3) => JSON.parse(JSON.stringify(v3));
+  var snapshot = () => ({ ...clone(OFFICIAL_STYLE_BUNDLE), lastFetchedAt: 0 });
+  var OFFICIAL_REPO = "0-v-linuxdo/chat_template_text_folders";
+  var OFFICIAL_FILE = "/userstyle/[chat] template text folders.user.css";
+  function isOfficialSource(url) {
+    const u3 = typeof url === "string" ? url.trim().replace(/\/+$/, "") : "";
+    if (!u3 || u3 === OFFICIAL_STYLE_SOURCE_URL) return true;
+    try {
+      const x4 = new URL(u3);
+      const parts = decodeURIComponent(x4.pathname).toLowerCase().replace(/\/+/g, "/").split("/").filter(Boolean);
+      if (x4.hostname === "github.com" && parts[2] === "raw") {
+        const file = parts[3] === "refs" && parts[4] === "heads" ? parts.slice(6) : parts.slice(4);
+        return `${parts[0]}/${parts[1]}` === OFFICIAL_REPO && "/" + file.join("/") === OFFICIAL_FILE;
+      }
+      if (x4.hostname === "raw.githubusercontent.com") return `${parts[0]}/${parts[1]}` === OFFICIAL_REPO && "/" + parts.slice(3).join("/") === OFFICIAL_FILE;
+    } catch {
+    }
+    return false;
+  }
+  function parseVersion(v3) {
+    const text = typeof v3 === "string" ? v3.trim() : "";
+    const d3 = text.match(/\[(\d{8})\]/), s3 = text.match(/\bv(\d+)(?:\.(\d+))?(?:\.(\d+))?\b/i);
+    return { text, date: d3 ? Number(d3[1]) : 0, parts: s3 ? [1, 2, 3].map((i3) => Number(s3[i3] || 0)) : [] };
+  }
+  function compareVersions(a3, b3) {
+    const l3 = parseVersion(a3), r3 = parseVersion(b3);
+    if (!l3.text && !r3.text) return 0;
+    if (!l3.text) return -1;
+    if (!r3.text) return 1;
+    if (l3.date && r3.date && l3.date !== r3.date) return l3.date - r3.date;
+    for (let i3 = 0; i3 < Math.max(l3.parts.length, r3.parts.length); i3++) if ((l3.parts[i3] || 0) !== (r3.parts[i3] || 0)) return (l3.parts[i3] || 0) - (r3.parts[i3] || 0);
+    return l3.text.localeCompare(r3.text, void 0, { numeric: true, sensitivity: "base" });
+  }
+  var withFavicon = (rule) => {
+    if (!rule.favicon) {
+      const host2 = getPrimaryHostFromMatchers(rule.matchers);
+      if (host2) rule.favicon = faviconFor(host2);
+    }
+    return rule;
+  };
+  function normalizeBundle(b3) {
+    try {
+      const n2 = ensureStyleBundle(b3, { fallbackSource: STYLE_RULE_SOURCE.OFFICIAL });
+      n2.rules = n2.rules.map((r3) => withFavicon({ ...r3, source: STYLE_RULE_SOURCE.OFFICIAL }));
+      return n2;
+    } catch {
+      return null;
+    }
+  }
+  function officialBundle(cfg2 = config.data) {
+    const stored = cfg2.officialStyleBundle && typeof cfg2.officialStyleBundle === "object" ? normalizeBundle(cfg2.officialStyleBundle) : null;
+    const snap = normalizeBundle(snapshot());
+    if (!stored) return snap;
+    const fetched = Number(stored.lastFetchedAt) > 0;
+    if (isOfficialSource(stored.sourceUrl) && (!fetched || compareVersions(stored.version, snap.version) < 0)) {
+      const enabled = new Map(stored.rules.map((r3) => [r3.id, r3.enabled !== false]));
+      snap.rules = snap.rules.map((r3) => ({ ...r3, enabled: enabled.has(r3.id) ? enabled.get(r3.id) : r3.enabled !== false }));
+      return snap;
+    }
+    return stored;
+  }
+  function customRules(cfg2 = config.data) {
+    const list = Array.isArray(cfg2.customStyleRules) ? cfg2.customStyleRules : [];
+    const out = [];
+    list.forEach((r3, index) => {
+      let n2 = null;
+      try {
+        n2 = ensureStyleRule({ ...r3, source: STYLE_RULE_SOURCE.CUSTOM }, { fallbackSource: STYLE_RULE_SOURCE.CUSTOM });
+      } catch {
+        n2 = null;
+      }
+      if (!n2) return;
+      if (!n2.name) n2.name = summarizeMatchers(n2.matchers, { maxItems: 1, emptyLabel: "Custom Style" });
+      out.push({ rule: withFavicon(n2), index });
+    });
+    return out;
+  }
+  var matchesDomain = (host2, d3) => {
+    host2 = String(host2 || "").toLowerCase();
+    d3 = String(d3 || "").trim().toLowerCase();
+    return !!host2 && !!d3 && (host2 === d3 || host2.endsWith("." + d3));
+  };
+  function matcherHits(m3, loc) {
+    const href = String(loc.href || ""), host2 = String(loc.hostname || "");
+    if (m3.type === "domain") return matchesDomain(host2, m3.value);
+    if (m3.type === "url-prefix") return href.startsWith(m3.value);
+    if (m3.type === "url") return href === m3.value;
+    if (m3.type === "regexp") {
+      try {
+        return new RegExp(m3.value).test(href);
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  var ruleHits = (r3, loc) => r3 && r3.enabled !== false && Array.isArray(r3.matchers) && r3.matchers.some((m3) => matcherHits(m3, loc));
+  function matching(loc = location, cfg2 = config.data) {
+    return {
+      official: officialBundle(cfg2).rules.filter((r3) => ruleHits(r3, loc)),
+      custom: customRules(cfg2).map((x4) => x4.rule).filter((r3) => ruleHits(r3, loc))
+    };
+  }
+  function layoutOverride(loc = location, cfg2 = config.data) {
+    const m3 = matching(loc, cfg2);
+    const pick = (key) => {
+      for (const list of [m3.custom, m3.official]) for (let i3 = list.length - 1; i3 >= 0; i3--) {
+        const v3 = list[i3]?.layout?.[key];
+        if (typeof v3 === "number") return v3;
+      }
+      return void 0;
+    };
+    return { height: pick("height"), bottom: pick("bottomSpacing") };
+  }
+  var lastKey = "";
+  function applyStyles(loc = location, cfg2 = config.data) {
+    const head = document.head || document.documentElement;
+    if (!head) return;
+    const m3 = matching(loc, cfg2);
+    const items = [...m3.official.map((r3) => ["official", r3]), ...m3.custom.map((r3) => ["custom", r3])].filter(([, r3]) => r3.cssCode);
+    const key = JSON.stringify(items.map(([s3, r3]) => [s3, r3.id, r3.cssCode]));
+    if (key === lastKey && document.querySelector("style[data-cttf-style-rule-id]")) return;
+    lastKey = key;
+    document.querySelectorAll("style[data-cttf-style-rule-id]").forEach((el) => el.remove());
+    for (const [source, r3] of items) {
+      const el = document.createElement("style");
+      el.setAttribute("data-cttf-style-rule-id", r3.id);
+      el.setAttribute("data-cttf-style-source", source);
+      el.textContent = mapCss(r3.cssCode);
+      head.appendChild(el);
+    }
+  }
+  var normHost = (v3) => String(v3 || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+  var siteKey = (host2) => {
+    const h5 = normHost(host2);
+    if (!h5) return "";
+    const p3 = h5.split(".").filter(Boolean);
+    return p3.length <= 2 ? h5 : p3.slice(-2).join(".");
+  };
+  var hostFromRegexp = (v3) => {
+    const s3 = String(v3 || "").replace(/\\\./g, ".").replace(/\\\//g, "/");
+    return s3.match(/https?:\/\/([^/)\]\s]+)/i)?.[1] || s3.match(/([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i)?.[1] || "";
+  };
+  var labelFromHost = (host2) => {
+    const k4 = siteKey(host2);
+    if (!k4) return "";
+    return (k4.split(".")[0] || k4).split(/[-_]+/).filter(Boolean).map((s3) => s3[0].toUpperCase() + s3.slice(1)).join(" ");
+  };
+  var labelFromName = (name) => (String(name || "").trim().split(/\s+-\s+/, 1)[0] || "").trim();
+  var stripLabel = (name, label) => {
+    const text = String(name || "").trim();
+    if (!text || !label) return text;
+    const esc = String(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return text.replace(new RegExp(`^${esc}\\s*[-–—:]\\s*`, "i"), "").trim() || text;
+  };
+  function siteInfo(rule, otherLabel) {
+    const ms = Array.isArray(rule?.matchers) ? rule.matchers : [];
+    const direct = getPrimaryHostFromMatchers(ms);
+    const rx = direct || ms.filter((m3) => m3?.type === "regexp").map((m3) => hostFromRegexp(m3.value)).find(Boolean) || "";
+    const key = siteKey(rx);
+    const label = labelFromName(rule?.name) || labelFromHost(key || rx) || otherLabel;
+    const host2 = normHost(direct || rx || key);
+    return { key: key || `other:${label.toLowerCase()}`, host: host2, label, favicon: rule?.favicon || (host2 || key ? faviconFor(host2 || key) : "") };
+  }
+  function siteGroups(otherLabel, cfg2 = config.data) {
+    const groups = /* @__PURE__ */ new Map();
+    const ensure = (info) => {
+      if (!groups.has(info.key)) groups.set(info.key, { ...info, official: [], custom: [] });
+      const g4 = groups.get(info.key);
+      if (!g4.label && info.label) g4.label = info.label;
+      if (!g4.host && info.host) g4.host = info.host;
+      if (!g4.favicon && info.favicon) g4.favicon = info.favicon;
+      return g4;
+    };
+    officialBundle(cfg2).rules.forEach((rule) => ensure(siteInfo(rule, otherLabel)).official.push({ rule }));
+    customRules(cfg2).forEach(({ rule, index }) => ensure(siteInfo(rule, otherLabel)).custom.push({ rule, index }));
+    const cur = siteKey(location.hostname);
+    return [...groups.values()].sort((a3, b3) => a3.key === cur !== (b3.key === cur) ? a3.key === cur ? -1 : 1 : String(a3.label || a3.host).localeCompare(String(b3.label || b3.host), void 0, { sensitivity: "base" }));
+  }
+  var currentSiteKey = () => siteKey(location.hostname);
+  function groupMatchers(ms = []) {
+    const out = [], map = /* @__PURE__ */ new Map();
+    for (const m3 of ms) {
+      const v3 = String(m3?.value || "").trim();
+      if (!m3?.type || !v3) continue;
+      if (!map.has(m3.type)) {
+        const g4 = { type: m3.type, values: [] };
+        map.set(m3.type, g4);
+        out.push(g4);
+      }
+      map.get(m3.type).values.push(v3);
+    }
+    return out;
+  }
+  function updateOfficial(fn2) {
+    config.update((d3) => {
+      const b3 = officialBundle(d3);
+      fn2(b3);
+      d3.officialStyleBundle = b3;
+    });
+  }
+  function updateCustom(fn2) {
+    config.update((d3) => {
+      if (!Array.isArray(d3.customStyleRules)) d3.customStyleRules = [];
+      fn2(d3.customStyleRules);
+    });
+  }
+  function requestText(url) {
+    return new Promise((resolve2, reject) => {
+      if (typeof GM_xmlhttpRequest === "function") {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url,
+          headers: { "Cache-Control": "no-cache" },
+          onload: (r3) => r3.status >= 200 && r3.status < 300 ? resolve2(r3.responseText || "") : reject(new Error(`HTTP ${r3.status}`)),
+          onerror: (e3) => reject(new Error(e3?.error || e3?.message || "request failed")),
+          ontimeout: () => reject(new Error("timeout"))
+        });
+        return;
+      }
+      if (typeof fetch !== "function") return reject(new Error("no request API"));
+      fetch(url, { cache: "no-store", credentials: "omit" }).then((r3) => r3.ok ? r3.text() : Promise.reject(new Error(`HTTP ${r3.status}`))).then(resolve2, reject);
+    });
+  }
+
   // sites/chat/index.js
   var chat_default = (U4) => {
     bindApi(U4);
@@ -1213,8 +3214,22 @@
     function geometry() {
       const c3 = config.data;
       const o3 = typeof host2.bar === "function" ? host2.bar(location.href) || {} : host2.bar || {};
-      return { height: o3.height ?? c3.buttonBarHeight, bottom: o3.bottom ?? c3.buttonBarBottomSpacing };
+      let s3 = {};
+      try {
+        s3 = layoutOverride(location, c3);
+      } catch {
+        s3 = {};
+      }
+      const height = Math.min(200, Math.max(20, Number(s3.height ?? o3.height ?? c3.buttonBarHeight) || 40));
+      return { height, bottom: s3.bottom ?? o3.bottom ?? c3.buttonBarBottomSpacing };
     }
+    const restyle = () => {
+      try {
+        applyStyles(location, config.data);
+      } catch (e3) {
+        console.warn("[cttf] site styles", e3);
+      }
+    };
     let regionEl = null, ro = null;
     function region() {
       const sels = host2.region || [];
@@ -1384,9 +3399,12 @@
         U4.registerStyle("uspp-cttf-chat-bar", BAR_CSS + PANEL_CSS + (host2.css || ""));
         U4.onSlotChange("bar", schedule);
         config.subscribe(schedule);
+        restyle();
+        config.subscribe(restyle);
         const sel = [.../* @__PURE__ */ new Set([...host2.input || [], "textarea", "[contenteditable='true']"])].join(",");
         U4.observe(sel, { added: schedule, removed: schedule });
         U4.onRouteChange(() => {
+          restyle();
           schedule();
           setTimeout(schedule, 350);
         });
@@ -1451,9 +3469,11 @@
     setSyncDesc: "WebDAV 服务器、测试连接、上传 / 拉取与自动同步。",
     scriptConfig: "🛠️ 脚本配置",
     close: "关闭",
-    toggleSidebar: "折叠 / 展开文件夹列表",
+    toggleSidebar: "折叠左侧设置区域",
+    expandSidebar: "展开左侧设置区域",
     colFolderName: "文件夹名称",
     colShow: "显示",
+    colIcon: "图标",
     colEdit: "修改",
     colDelete: "删除",
     colPreview: "按钮预览",
@@ -1464,49 +3484,58 @@
     noFolderSelected: "请选择左侧的文件夹",
     none: "无",
     // 文件夹编辑
-    newFolderTitle: "🆕 新建文件夹",
-    editFolderTitle: "✏️ 编辑文件夹",
-    folderName: "文件夹名称",
-    bgColor: "按钮背景颜色",
-    textColor: "按钮文字颜色",
+    newFolderTitle: "🆕 新建文件夹：",
+    editFolderTitle: "✏️ 编辑文件夹：",
+    folderName: "文件夹名称：",
+    bgColor: "按钮背景颜色：",
+    textColor: "按钮文字颜色：",
     errFolderName: "请输入文件夹名称",
     errFolderExists: "该文件夹已存在!",
     save: "保存",
     cancel: "取消",
     confirm: "确认",
     delete: "删除",
-    delFolderTitle: '确认删除文件夹 "{name}"?',
-    irreversible: "此操作无法撤销!",
-    delFolderWarn: "删除文件夹将同时删除其中的所有自定义按钮!",
+    delFolderTitle: '🗑️ 确认删除文件夹 "{name}"？',
+    irreversible: "❗️ 注意：此操作无法撤销！",
+    delFolderWarn: "（删除文件夹将同时删除其中的所有自定义按钮！）",
+    delFolderPreview: "1️⃣ 文件夹按钮外观：",
+    delFolderAll: "2️⃣ 文件夹内，全部自定义按钮：",
+    delBtnPreview: "1️⃣ 自定义按钮外观：",
+    delBtnTpl: "2️⃣ 按钮对应的文本模板：",
+    liName: "按钮名称：",
+    liBg: "背景颜色：",
+    liFg: "文字颜色：",
+    liBtnBg: "按钮背景颜色：",
+    liBtnFg: "按钮文字颜色：",
     delToolFolderNote: "工具文件夹删除后,下次加载时会自动重建。",
     folderAppearance: "名称:{name} · 背景:{bg} · 文字:{fg}",
     // 按钮编辑
-    newButtonTitle: "🆕 新建按钮",
-    editButtonTitle: "✏️ 编辑按钮",
+    newButtonTitle: "🆕 新建按钮：",
+    editButtonTitle: "✏️ 编辑按钮：",
     tabTemplate: "文本模板",
     tabStyle: "样式设置",
     tabSubmit: "提交设置",
-    insertVar: "插入变量:",
+    insertVar: "插入变量：",
     varInput: "📝 输入框",
     varClipboard: "📋 剪贴板",
     varSelection: "🔍 选中",
     varInputOrClip: "🔄 输入框/剪贴板",
     templatePlaceholder: "输入模板文本,可插入上方的变量",
-    buttonName: "按钮名称",
-    buttonIcon: "按钮图标",
-    buttonIconHint: "URL 或 data: URL;留空时将根据按钮名称中的符号展示默认图标",
-    autoSubmitLabel: "自动提交(在填充后自动提交内容)",
+    buttonName: "按钮名称：",
+    buttonIcon: "按钮图标：",
+    buttonIconHint: "留空时将根据按钮名称中的符号展示默认图标。",
+    autoSubmitLabel: "自动提交 (在填充后自动提交内容)",
     errButtonName: "请输入按钮名称!",
     errColor: "请选择有效的颜色!",
     errButtonExists: "按钮名称已存在!",
     toolLocked: "工具文件夹中的工具按钮无法编辑或删除",
-    delButtonTitle: '确认删除按钮 "{name}"?',
+    delButtonTitle: '🗑️ 确认删除按钮 "{name}"？',
     template: "模板文本",
     yes: "是",
     no: "否",
     moveConflict: '目标文件夹已有同名按钮 "{name}",已取消移动',
     // 自动化
-    autoTitle: "⚡ 自动化规则",
+    autoTitle: "⚡ 自动化设置",
     newRule: "+ 新建",
     colSite: "网站｜网址",
     colMethod: "提交方式",
@@ -1515,24 +3544,84 @@
     clickSubmit: "模拟点击提交按钮",
     newRuleTitle: "🆕 新建自动化规则",
     editRuleTitle: "✏️ 编辑自动化规则",
-    ruleUrl: "网址",
-    ruleName: "备注名称",
-    ruleIcon: "站点图标",
+    ruleUrl: "网址：",
+    ruleName: "备注名称：",
+    ruleIcon: "站点图标：",
+    ruleIconHint: "留空时将自动根据网址生成 Google Favicon。",
+    faviconPh: "支持 https:// 链接或 data: URL",
     fetchIcon: "自动获取站点图标",
-    submitMethod: "自动提交方式",
+    submitMethod: "自动提交方式:",
     advanced: "高级选项",
+    advancedTitle: "高级选项:",
+    advancedToggle: "展开/折叠高级选项",
+    modCmdDesc: "使用 macOS / Meta 键组合模拟提交",
+    modCtrlDesc: "使用 Windows / Linux 控制键组合模拟提交",
+    clickDefaultDesc: "自动匹配常见的提交按钮进行点击。",
+    clickSelectorDesc: "使用自定义选择器定位需要点击的提交按钮。",
+    selectorHint: "请输入能唯一定位提交按钮的 CSS 选择器。",
     modifierKey: "修饰键",
-    clickDefault: "默认",
+    clickDefault: "默认方法",
     clickSelector: "自定义 CSS 选择器",
-    selectorPlaceholder: '如:button.send-btn 或 form button[type="submit"]',
-    enterNoOptions: "Enter 提交方式没有额外配置",
+    selectorPlaceholder: '如：button.send-btn 或 form button[type="submit"]',
+    enterNoOptions: "Enter 提交方式没有额外配置。",
     errRuleRequired: "请输入网址和备注名称!",
     errSelectorEmpty: "请输入有效的 CSS 选择器!",
     errSelectorSyntax: "CSS 选择器语法错误,请检查后再试!",
     delRuleConfirm: '确认删除自动化规则 "{name}"?此操作无法撤销',
+    delRuleTitle: '🗑️ 确认删除自动化规则 "{name}"？',
+    liMethod: "自动提交方式：",
+    clickBadge: "模拟点击",
     autoSubmitTimeout: "自动提交:等待输入框内容超时,未发送",
     autoSubmitFail: "自动提交失败:没有找到发送方式",
     // 脚本配置
+    // Google Drive 同步(原版文案)
+    dTitle: "☁️ Google Drive 同步",
+    dToggleTip: "开启后启用 Drive 同步配置",
+    dRequestMode: "读取方式",
+    dModeDefault: "默认",
+    dModeDefaultTip: "优先 GM 请求",
+    dModeAdguard: "适配：AdGuard",
+    dModeAdguardTip: "优先 fetch",
+    dConfigInfo: "配置信息",
+    dClientId: "客户端 ID",
+    dClientSecret: "客户端密钥",
+    dRefreshToken: "Refresh Token",
+    dFileName: "目标文件名",
+    dSave: "💾 保存 Drive 设置",
+    dUpload: "📤 上传配置",
+    dPull: "📥 拉取配置",
+    dNoApi: "当前环境不支持跨域请求，请在脚本管理器中启用 GM_xmlhttpRequest。",
+    dNotFound: "未找到云端配置文件。",
+    dInvalid: "云端配置格式无效！",
+    dOffDefault: "Drive 同步默认关闭，开启后再启用。",
+    dSaved: "Drive 设置已保存。",
+    dNeedCreds: "请先填写完整的 Drive 凭据。",
+    dChecking: "正在检查云端配置…",
+    dUploaded: "已将本地配置上传到 Drive。",
+    dSame: "云端配置与本地完全相同，无需更新。",
+    dCancelled: "操作已取消，配置保持不变。",
+    dUsedRemoteNoUpload: "已使用云端配置覆盖本地，未上传本地修改。",
+    dUsedRemote: "已使用云端配置覆盖本地，并完成同步。",
+    dOpUpload: "当前操作：上传到 Drive",
+    dOpPull: "当前操作：从 Drive 拉取",
+    dDiffTitle: "检测到云端与本地配置存在差异",
+    dDiffDesc: "请选择以本地或云端配置为准，点击“查看差异”可展开详细对比。",
+    dLocal: "当前配置",
+    dRemote: "云端配置",
+    dFolderCount: "个文件夹",
+    dBtnCount: "个按钮",
+    dUseLocal: "以本地为准（上传到云端）",
+    dUseRemote: "以云端为准（覆盖本地）",
+    dUnsavedTitle: "Drive 设置尚未保存",
+    dUnsavedMsg: "当前 Drive 草稿有未保存改动。你可以先保存再关闭，也可以放弃这些改动。",
+    dContinue: "继续编辑",
+    dDiscard: "放弃并关闭",
+    dSaveClose: "保存并关闭",
+    dToggleVis: "切换可见性",
+    dShow: "显示",
+    dHide: "隐藏",
+    previewDrive: "Google Drive 同步开关与上次同步时间(不显示凭据)。",
+    setDriveDesc: "Google Drive 凭据、上传 / 拉取配置。",
     configTitle: "🛠️ 脚本配置",
     tabAppearance: "外观",
     tabConfig: "配置",
@@ -1555,10 +3644,13 @@
     resetConfirm: "确认重置所有配置为默认设置吗?",
     resetDone: "已重置为默认配置",
     importTitle: "📥 确认导入配置",
+    cmpTitle: "📊 配置对比",
     currentConfig: "当前配置",
     importedConfig: "导入配置",
     stats: "{f} 个文件夹 · {b} 个按钮",
-    importWarn: "导入配置将完全替换当前配置,此操作无法撤销!",
+    importWarn: "注意：导入配置将完全替换当前配置，此操作无法撤销！",
+    unitFolders: "个文件夹",
+    unitButtons: "个按钮",
     viewDiff: "查看差异",
     hideDiff: "收起差异",
     confirmImport: "确认导入",
@@ -1620,7 +3712,104 @@
     autoPulled: "已从 WebDAV 更新配置",
     autoConflict: "WebDAV 有冲突,点击处理",
     handle: "处理",
-    syncFailed: "WebDAV 同步失败:{msg}"
+    syncFailed: "WebDAV 同步失败:{msg}",
+    // 网站样式
+    siteStyles: "🎨 网站样式",
+    siteStylesShort: "网站样式",
+    pullOfficial: "拉取官方最新",
+    infoVersion: "官方版本",
+    infoFetched: "最近拉取",
+    infoSnapshot: "内置快照",
+    infoSource: "来源",
+    colOfficialStyles: "官方内置样式",
+    colCustomStyles: "用户自定义样式",
+    currentSite: "当前站点",
+    siteRulesTitle: "站点规则",
+    tabOfficialRules: "官方内置",
+    tabCustomRules: "自定义",
+    noCustomRules: "该站点下暂无自定义规则。",
+    noOfficialRules: "该站点下暂无官方规则。",
+    otherSite: "其他规则",
+    stylesEmpty: "当前还没有任何样式规则。",
+    importCss: "导入",
+    exportCss: "导出",
+    importCssTip: "导入 .user.css",
+    exportCssTip: "导出 .user.css",
+    newStyleTitle: "🆕 新建自定义样式",
+    editStyleTitle: "✏️ 编辑自定义样式",
+    styleTabBasic: "基础信息",
+    styleTabLayout: "布局设置",
+    styleTabCss: "自定义 CSS",
+    styleName: "备注名称：",
+    matchersLabel: "匹配规则",
+    addMatcher: "+ 添加匹配规则",
+    removeMatcher: "移除匹配规则",
+    mDomain: "域名",
+    mUrlPrefix: "网址前缀",
+    mUrl: "完整网址",
+    mRegexp: "正则",
+    styleIcon: "站点图标：",
+    styleIconHint: "留空时系统将使用该网址的默认 Favicon。",
+    styleIconPh: "可填写自定义图标地址",
+    heightOpt: "按钮栏高度 (px，可留空继承)：",
+    bottomOpt: "按钮距页面底部间距 (px，可留空继承)：",
+    inherit: "继承",
+    cssLabel: "自定义 CSS：",
+    create: "创建",
+    noMatcher: "至少需要一条有效的匹配规则。",
+    badRegexp: "正则表达式无效：{v}",
+    delStyleConfirm: "确认删除自定义样式“{name}”？",
+    untitledCustom: "未命名自定义样式",
+    untitledOfficial: "未命名官方样式",
+    urlLabel: "网址：",
+    cssShort: "CSS",
+    layoutShort: "布局",
+    layoutInherit: "继承",
+    heightShort: "按钮栏高度",
+    bottomShort: "距页面底部",
+    enableRuleTip: "当前已停用，点击启用此规则",
+    disableRuleTip: "当前已启用，点击停用此规则",
+    fetchOk: "✅ 官方样式已更新到 {version}。",
+    fetchFail: "拉取官方样式失败：{msg}",
+    fetching: "正在拉取…",
+    importCssOk: "✅ 已导入 .user.css 样式包。",
+    importCssFail: "导入 .user.css 失败：{msg}",
+    exportCssOk: "📤 样式包已导出为 .user.css。",
+    importCssTitle: "📥 导入样式包",
+    importCssSummary: "官方规则：{o} 条 · 自定义规则：{c} 条 · 官方版本：{v}",
+    importCssWarn: "这会替换当前样式系统配置，是否继续？",
+    // 配置差异预览
+    folderIconsLabel: "文件夹图标：",
+    iconsVisible: "显示",
+    iconsHidden: "隐藏",
+    restoreDefaults: "恢复默认设置：",
+    importExport: "配置导入导出：",
+    previewFolderLabel: "预览文件夹",
+    previewButtonLabel: "预览按钮",
+    diffTitle: "🔍 配置差异预览",
+    diffNone: "暂无差异，导入配置的结构与当前一致。",
+    diffFolders: "文件夹",
+    dButtons: "按钮",
+    dOrder: "顺序",
+    dSettings: "设置",
+    dRenamed: "重命名",
+    dFields: "字段",
+    dAdded: "新增",
+    dRemoved: "移除",
+    dChanged: "变更",
+    dChangedTypes: "变更：{types}",
+    dChangedFields: "变更字段：{fields}",
+    dFolderAdded: "+{n}",
+    dFolderRemoved: "移除文件夹 {n} 个",
+    dFolderChanged: "变更文件夹 {n} 个",
+    dBtnAdded: "+{n}",
+    dBtnRemoved: "移除按钮 {n} 个",
+    dBtnChanged: "变更按钮 {n} 个",
+    dPick: "请选择左侧文件夹查看差异",
+    dWillAdd: "导入后将新增此文件夹",
+    dWillRemove: "导入后将移除此文件夹",
+    dNoCur: "当前配置中无此文件夹。",
+    dNoImp: "导入配置中无此文件夹。"
   };
   var EN = {
     appName: "[Chat] Template Text Folders",
@@ -1660,9 +3849,11 @@
     setSyncDesc: "WebDAV server, connection test, upload / pull and auto sync.",
     scriptConfig: "🛠️ Script config",
     close: "Close",
-    toggleSidebar: "Collapse / expand folder list",
+    toggleSidebar: "Collapse left settings panel",
+    expandSidebar: "Expand left settings panel",
     colFolderName: "Folder",
     colShow: "Show",
+    colIcon: "Icon",
     colEdit: "Edit",
     colDelete: "Delete",
     colPreview: "Preview",
@@ -1672,24 +3863,33 @@
     newButton: "+ New button",
     noFolderSelected: "Select a folder on the left",
     none: "None",
-    newFolderTitle: "🆕 New folder",
-    editFolderTitle: "✏️ Edit folder",
-    folderName: "Folder name",
-    bgColor: "Background color",
-    textColor: "Text color",
+    newFolderTitle: "🆕 New Folder:",
+    editFolderTitle: "✏️ Edit Folder:",
+    folderName: "Folder Name:",
+    bgColor: "Button Background Color:",
+    textColor: "Button Text Color:",
     errFolderName: "Please enter a folder name",
     errFolderExists: "A folder with this name already exists!",
     save: "Save",
     cancel: "Cancel",
     confirm: "Confirm",
     delete: "Delete",
-    delFolderTitle: 'Delete folder "{name}"?',
-    irreversible: "This cannot be undone!",
-    delFolderWarn: "Deleting the folder also deletes all of its buttons!",
+    delFolderTitle: '🗑️ Delete folder "{name}"?',
+    irreversible: "❗️ Warning: This action cannot be undone!",
+    delFolderWarn: "(Deleting the folder will also remove all custom buttons inside.)",
+    delFolderPreview: "1️⃣ Folder button preview:",
+    delFolderAll: "2️⃣ All custom buttons in the folder:",
+    delBtnPreview: "1️⃣ Custom button preview:",
+    delBtnTpl: "2️⃣ Button text template:",
+    liName: "Button Name:",
+    liBg: "Background Color:",
+    liFg: "Text Color:",
+    liBtnBg: "Button Background Color:",
+    liBtnFg: "Button Text Color:",
     delToolFolderNote: "The tool folder will be recreated the next time the script loads.",
     folderAppearance: "Name: {name} · Background: {bg} · Text: {fg}",
-    newButtonTitle: "🆕 New button",
-    editButtonTitle: "✏️ Edit button",
+    newButtonTitle: "🆕 New Button:",
+    editButtonTitle: "✏️ Edit Button:",
     tabTemplate: "Template",
     tabStyle: "Style",
     tabSubmit: "Submit",
@@ -1699,20 +3899,20 @@
     varSelection: "🔍 Selection",
     varInputOrClip: "🔄 Input/Clipboard",
     templatePlaceholder: "Template text; you can insert the variables above",
-    buttonName: "Button name",
-    buttonIcon: "Button icon",
-    buttonIconHint: "URL or data: URL. When empty, the symbol in the button name is used.",
-    autoSubmitLabel: "Auto submit (send after filling)",
+    buttonName: "Button Name:",
+    buttonIcon: "Button Icon:",
+    buttonIconHint: "Leave blank to derive the default icon from the button name.",
+    autoSubmitLabel: "Auto submit (submit automatically after filling)",
     errButtonName: "Please enter a button name!",
     errColor: "Please choose a valid color!",
     errButtonExists: "A button with this name already exists!",
     toolLocked: "Tool buttons in the tool folder cannot be edited or deleted",
-    delButtonTitle: 'Delete button "{name}"?',
+    delButtonTitle: '🗑️ Delete button "{name}"?',
     template: "Template",
     yes: "Yes",
     no: "No",
     moveConflict: 'The target folder already has a button named "{name}"; move cancelled',
-    autoTitle: "⚡ Automation rules",
+    autoTitle: "⚡ Automation Settings",
     newRule: "+ New",
     colSite: "Site | URL",
     colMethod: "Submit method",
@@ -1721,12 +3921,21 @@
     clickSubmit: "Click the send button",
     newRuleTitle: "🆕 New automation rule",
     editRuleTitle: "✏️ Edit automation rule",
-    ruleUrl: "URL",
-    ruleName: "Name",
-    ruleIcon: "Site icon",
+    ruleUrl: "URL:",
+    ruleName: "Label:",
+    ruleIcon: "Site Icon:",
+    ruleIconHint: "Leave blank to auto-generate a Google favicon.",
+    faviconPh: "Supports https:// links or data: URLs",
     fetchIcon: "Fetch site icon",
-    submitMethod: "Submit method",
+    submitMethod: "Auto-submit Method:",
     advanced: "Advanced",
+    advancedTitle: "Advanced Options:",
+    advancedToggle: "Expand/Collapse advanced options",
+    modCmdDesc: "Use macOS/Meta key combo to submit",
+    modCtrlDesc: "Use Windows/Linux control key combo to submit",
+    clickDefaultDesc: "Automatically match and click common submit buttons.",
+    clickSelectorDesc: "Use a custom selector to locate the submit button.",
+    selectorHint: "Enter a CSS selector that uniquely locates the submit button.",
     modifierKey: "Modifier key",
     clickDefault: "Default",
     clickSelector: "Custom CSS selector",
@@ -1736,8 +3945,59 @@
     errSelectorEmpty: "Please enter a valid CSS selector!",
     errSelectorSyntax: "Invalid CSS selector, please check it!",
     delRuleConfirm: 'Delete automation rule "{name}"? This cannot be undone',
+    delRuleTitle: '🗑️ Delete automation rule "{name}"?',
+    liMethod: "Auto-submit Method:",
+    clickBadge: "Simulated Click",
     autoSubmitTimeout: "Auto submit: timed out waiting for the input; not sent",
     autoSubmitFail: "Auto submit failed: no way to send was found",
+    // Google Drive sync (original wording)
+    dTitle: "☁️ Google Drive Sync",
+    dToggleTip: "Enable to show Drive sync settings",
+    dRequestMode: "Request mode",
+    dModeDefault: "Default",
+    dModeDefaultTip: "Prefer GM request",
+    dModeAdguard: "AdGuard-friendly",
+    dModeAdguardTip: "Prefer fetch",
+    dConfigInfo: "Configuration",
+    dClientId: "Client ID",
+    dClientSecret: "Client Secret",
+    dRefreshToken: "Refresh Token",
+    dFileName: "Target File Name",
+    dSave: "💾 Save Drive Settings",
+    dUpload: "📤 Upload Config",
+    dPull: "📥 Pull Config",
+    dNoApi: "Cross-origin requests are unavailable; please enable GM_xmlhttpRequest in your userscript manager.",
+    dNotFound: "No Drive config file found.",
+    dInvalid: "Drive config has an invalid format!",
+    dOffDefault: "Drive sync is off by default; enable it to turn on.",
+    dSaved: "Drive settings saved.",
+    dNeedCreds: "Please fill in all Drive credentials.",
+    dChecking: "Checking Drive config…",
+    dUploaded: "Uploaded local config to Drive.",
+    dSame: "Drive config matches local; no update needed.",
+    dCancelled: "Operation cancelled, configuration unchanged.",
+    dUsedRemoteNoUpload: "Applied Drive config locally (kept cloud version, skipped local upload).",
+    dUsedRemote: "Applied Drive config locally and completed sync.",
+    dOpUpload: "Current action: Upload to Drive",
+    dOpPull: "Current action: Pull from Drive",
+    dDiffTitle: "Drive and local configs differ",
+    dDiffDesc: 'Choose whether to keep local or Drive config. Click "View Diff" for details.',
+    dLocal: "Current configuration",
+    dRemote: "Drive config",
+    dFolderCount: "folders",
+    dBtnCount: "buttons",
+    dUseLocal: "Use local (upload to Drive)",
+    dUseRemote: "Use Drive version (overwrite local)",
+    dUnsavedTitle: "Unsaved Drive Settings",
+    dUnsavedMsg: "Your Drive draft has unsaved changes. Save before closing, or discard those edits.",
+    dContinue: "Continue Editing",
+    dDiscard: "Discard & Close",
+    dSaveClose: "Save & Close",
+    dToggleVis: "Toggle visibility",
+    dShow: "Visible",
+    dHide: "Hidden",
+    previewDrive: "Google Drive sync switch and last sync time (credentials are not shown).",
+    setDriveDesc: "Google Drive credentials, upload / pull the config.",
     configTitle: "🛠️ Script config",
     tabAppearance: "Appearance",
     tabConfig: "Config",
@@ -1760,10 +4020,13 @@
     resetConfirm: "Reset all settings to defaults?",
     resetDone: "Reset to defaults",
     importTitle: "📥 Confirm import",
+    cmpTitle: "📊 Configuration Comparison",
     currentConfig: "Current",
     importedConfig: "Imported",
     stats: "{f} folders · {b} buttons",
-    importWarn: "Importing replaces the whole current config. This cannot be undone!",
+    importWarn: "Warning: Importing configuration will completely replace the current setup and cannot be undone!",
+    unitFolders: "folders",
+    unitButtons: "buttons",
     viewDiff: "View diff",
     hideDiff: "Hide diff",
     confirmImport: "Import",
@@ -1824,7 +4087,102 @@
     autoPulled: "Config updated from WebDAV",
     autoConflict: "WebDAV conflict. Click to resolve",
     handle: "Resolve",
-    syncFailed: "WebDAV sync failed: {msg}"
+    syncFailed: "WebDAV sync failed: {msg}",
+    siteStyles: "🎨 Site Styles",
+    siteStylesShort: "Site styles",
+    pullOfficial: "Pull Latest Official",
+    infoVersion: "Official version",
+    infoFetched: "Last fetched",
+    infoSnapshot: "Bundled snapshot",
+    infoSource: "Source",
+    colOfficialStyles: "Official Built-in Styles",
+    colCustomStyles: "Custom Styles",
+    currentSite: "Current Site",
+    siteRulesTitle: "Site Rules",
+    tabOfficialRules: "Official",
+    tabCustomRules: "Custom",
+    noCustomRules: "No custom rules for this site yet.",
+    noOfficialRules: "No official rules for this site.",
+    otherSite: "Other Rules",
+    stylesEmpty: "There are no style rules yet.",
+    importCss: "Import",
+    exportCss: "Export",
+    importCssTip: "Import .user.css",
+    exportCssTip: "Export .user.css",
+    newStyleTitle: "🆕 New Custom Style",
+    editStyleTitle: "✏️ Edit Custom Style",
+    styleTabBasic: "Basics",
+    styleTabLayout: "Layout",
+    styleTabCss: "Custom CSS",
+    styleName: "Label:",
+    matchersLabel: "Matchers",
+    addMatcher: "+ Add Matcher",
+    removeMatcher: "Remove matcher",
+    mDomain: "Domain",
+    mUrlPrefix: "URL Prefix",
+    mUrl: "Exact URL",
+    mRegexp: "Regexp",
+    styleIcon: "Site Icon:",
+    styleIconHint: "Leave blank to use the site's default favicon.",
+    styleIconPh: "Enter a custom icon URL",
+    heightOpt: "Toolbar height (px, leave blank to inherit):",
+    bottomOpt: "Toolbar bottom spacing (px, leave blank to inherit):",
+    inherit: "Inherit",
+    cssLabel: "Custom CSS:",
+    create: "Create",
+    noMatcher: "At least one valid matcher is required.",
+    badRegexp: "Invalid regexp: {v}",
+    delStyleConfirm: 'Delete custom style "{name}"?',
+    untitledCustom: "Untitled Custom Style",
+    untitledOfficial: "Untitled Official Style",
+    urlLabel: "URL:",
+    cssShort: "CSS",
+    layoutShort: "Layout",
+    layoutInherit: "Inherit",
+    heightShort: "Toolbar Height",
+    bottomShort: "Bottom Offset",
+    enableRuleTip: "Rule is disabled. Click to enable it.",
+    disableRuleTip: "Rule is enabled. Click to disable it.",
+    fetchOk: "✅ Official styles updated to {version}.",
+    fetchFail: "Failed to pull official styles: {msg}",
+    fetching: "Pulling…",
+    importCssOk: "✅ Imported .user.css style package.",
+    importCssFail: "Failed to import .user.css: {msg}",
+    exportCssOk: "📤 Style package exported as .user.css.",
+    importCssTitle: "📥 Import style package",
+    importCssSummary: "Official rules: {o} · Custom rules: {c} · Official version: {v}",
+    importCssWarn: "This replaces the current style-system configuration. Continue?",
+    folderIconsLabel: "Folder Icons:",
+    iconsVisible: "Visible",
+    iconsHidden: "Hidden",
+    restoreDefaults: "Restore defaults:",
+    importExport: "Import / Export:",
+    previewFolderLabel: "Preview Folder",
+    previewButtonLabel: "Preview Button",
+    diffTitle: "🔍 Configuration Diff Preview",
+    diffNone: "No differences; imported structure matches the current configuration.",
+    diffFolders: "Folders",
+    dButtons: "Buttons",
+    dOrder: "Order",
+    dSettings: "Settings",
+    dRenamed: "Renamed",
+    dFields: "Fields",
+    dAdded: "Added",
+    dRemoved: "Removed",
+    dChanged: "Changed",
+    dChangedTypes: "Changed: {types}",
+    dChangedFields: "Changed fields: {fields}",
+    dFolderAdded: "+{n}",
+    dFolderRemoved: "{n} folder(s) removed",
+    dFolderChanged: "{n} folder(s) changed",
+    dBtnAdded: "+{n}",
+    dBtnRemoved: "{n} button(s) removed",
+    dBtnChanged: "{n} button(s) changed",
+    dPick: "Select a folder on the left to inspect differences",
+    dWillAdd: "This folder will be added after import",
+    dWillRemove: "This folder will be removed after import",
+    dNoCur: "This folder does not exist in the current configuration.",
+    dNoImp: "This folder does not exist in the imported configuration."
   };
   function lang() {
     const p3 = prefs.get().language;
@@ -1852,16 +4210,16 @@
       };
     }, []);
   }
-  function openDialog(Component, props = {}, { key, dismissable = true, width = 560 } = {}) {
+  function openDialog(Component, props = {}, { key, dismissable = true, width = 560, className = "" } = {}) {
     let closeFn = () => {
     };
     const k4 = U.openModal(({ onClose }) => {
       closeFn = onClose;
-      return h(DialogFrame, { Component, props, onClose, dismissable, width });
+      return h(DialogFrame, { Component, props, onClose, dismissable, width, className });
     }, { modalKey: key ? `cttf-${key}` : void 0 });
     return () => U.closeModal(k4);
   }
-  function DialogFrame({ Component, props, onClose, dismissable, width }) {
+  function DialogFrame({ Component, props, onClose, dismissable, width, className }) {
     useLive();
     return h(
       Fragment,
@@ -1873,20 +4231,20 @@
       // 外壳即框架 ModalCard 的结构与样式(uspp-cttf-modal / -header / -body / -footer / -close)
       h(
         "div",
-        { className: "uspp-cttf-modal uspp-cttf-dlg", role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 100%)` }, onClick: (e3) => e3.stopPropagation() },
+        { className: "uspp-cttf-modal uspp-cttf-dlg" + (className ? " " + className : ""), role: "dialog", "aria-modal": "true", style: { width: `min(${width}px, 100%)` }, onClick: (e3) => e3.stopPropagation() },
         h(Component, { ...props, close: onClose })
       )
     );
   }
   var CloseSvg = () => U.icons?.CloseIcon ? h(U.icons.CloseIcon, { size: 4 }) : h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", "aria-hidden": "true" }, h("path", { d: "M18 6 6 18M6 6l12 12" }));
-  function DialogHeader({ title, subtitle, children, close, lead }) {
+  function DialogHeader({ title, subtitle, children, close, lead, bar }) {
     return h(
       Fragment,
       null,
       close && h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-modal-close uspp-cttf-x", title: t("close"), "aria-label": t("close"), onClick: close }, h(CloseSvg)),
       h(
         "div",
-        { className: "uspp-cttf-modal-header uspp-cttf-dlg-head" },
+        { className: "uspp-cttf-modal-header uspp-cttf-dlg-head" + (bar ? " uspp-cttf-dlg-titlebar" : "") },
         lead,
         h("h2", { className: "uspp-cttf-modal-title uspp-cttf-dlg-title" }, title),
         subtitle && h("div", { className: "uspp-cttf-modal-subtitle" }, subtitle),
@@ -1895,12 +4253,13 @@
     );
   }
   var DialogBody = ({ children, className }) => h("div", { className: "uspp-cttf-modal-body uspp-cttf-dlg-body " + (className || "") }, children);
-  var DialogFooter = ({ children }) => h("div", { className: "uspp-cttf-modal-footer uspp-cttf-dlg-foot" }, children);
+  var DialogFooter = ({ children, split }) => h("div", { className: "uspp-cttf-modal-footer uspp-cttf-dlg-foot" + (split ? " uspp-cttf-dlg-foot-split" : "") }, children);
   function Btn({ kind = "plain", size, children, className, ...rest }) {
     const v3 = { primary: "uspp-cttf-btn-primary", success: "uspp-cttf-btn-primary", danger: "uspp-cttf-btn-danger", add: "uspp-cttf-btn-add", ghost: "uspp-cttf-btn-ghost", icon: "uspp-cttf-btn-icon" }[kind] || "";
-    return h("button", { type: "button", className: ["uspp-cttf-btn", v3, size === "sm" && "uspp-cttf-btn-sm", className].filter(Boolean).join(" "), ...rest }, children);
+    return h("button", { type: "button", className: ["uspp-cttf-btn", v3, `uspp-cttf-k-${kind}`, size === "sm" && "uspp-cttf-btn-sm", className].filter(Boolean).join(" "), ...rest }, children);
   }
   var Switch = (props) => h(U.components.Switch, props);
+  var Checkbox = ({ checked, onChange, label }) => h("input", { type: "checkbox", className: "uspp-cttf-cb", checked: !!checked, title: label, "aria-label": label, onChange: (e3) => onChange?.(e3.target.checked) });
   var SettingRow = ({ title, description, children }) => h("div", { className: "uspp-cttf-setting" }, h(U.components.Row, { title, description }, children));
   var SwitchRow = ({ title, description, checked, onChange }) => h(SettingRow, { title, description }, h(Switch, { checked, onChange, label: typeof title === "string" ? title : void 0 }));
   var Choices = ({ options, value, onChange, label }) => h(U.components.Select, { value, options, onChange, label });
@@ -1913,7 +4272,8 @@
       return caption?.();
     }
   });
-  var IconBtn = ({ icon, label, onClick, className }) => h(U.components.IconButton, { icon: U.icons[icon], label, onClick, className });
+  var EMOJI_ICONS = { EditIcon: "✏️", TrashIcon: "🗑️" };
+  var IconBtn = ({ icon, label, onClick, className }) => EMOJI_ICONS[icon] ? h("button", { type: "button", className: "uspp-cttf-emoji-btn " + (className || ""), "data-icon": icon, title: label, "aria-label": label, onClick }, EMOJI_ICONS[icon]) : h(U.components.IconButton, { icon: U.icons[icon], label, onClick, className });
   var openerSetting = ({ description, label, onOpen }) => ({
     type: U.OptionType.COMPONENT,
     get description() {
@@ -1938,7 +4298,60 @@
     useEffect(() => () => onGone(), []);
     return children;
   }
-  function confirmBox({ title, body, confirmText, cancelText, danger = false, width = 400 }) {
+  var Card = ({ children, className, plain, ...rest }) => h("div", { ...rest, className: "uspp-cttf-card" + (plain ? " uspp-cttf-card-plain" : "") + (className ? " " + className : "") }, children);
+  var DotLi = ({ children }) => h("div", { className: "uspp-cttf-dot-li" }, children);
+  var Swatch = ({ color }) => h("span", { className: "uspp-cttf-swatch", style: { background: color } });
+  var G_PATHS = [
+    ["M23.75,16A7.7446,7.7446,0,0,1,8.7177,18.6259L4.2849,22.1721A13.244,13.244,0,0,0,29.25,16", "#00ac47"],
+    ["M23.75,16a7.7387,7.7387,0,0,1-3.2516,6.2987l4.3824,3.5059A13.2042,13.2042,0,0,0,29.25,16", "#4285f4"],
+    ["M8.25,16a7.698,7.698,0,0,1,.4677-2.6259L4.2849,9.8279a13.177,13.177,0,0,0,0,12.3442l4.4328-3.5462A7.698,7.698,0,0,1,8.25,16Z", "#ffba00"],
+    ["M16,8.25a7.699,7.699,0,0,1,4.558,1.4958l4.06-3.7893A13.2152,13.2152,0,0,0,4.2849,9.8279l4.4328,3.5462A7.756,7.756,0,0,1,16,8.25Z", "#ea4435"],
+    ["M29.25,15v1L27,19.5H16.5V14H28.25A1,1,0,0,1,29.25,15Z", "#4285f4"]
+  ];
+  var GoogleG = () => h("svg", { viewBox: "0 0 32 32", width: 18, height: 18, "aria-hidden": "true", focusable: "false", style: { display: "block" } }, G_PATHS.map(([d3, fill], i3) => h("path", { key: i3, d: d3, fill })));
+  function FavPreview({ src, fallback }) {
+    const [bad, setBad] = useState(false);
+    useEffect(() => setBad(false), [src]);
+    return h("div", { className: "uspp-cttf-fav-prev" }, src && !bad ? h("img", { src, alt: "", referrerPolicy: "no-referrer", onError: () => setBad(true) }) : h("span", null, fallback));
+  }
+  function FaviconField({ value, onChange, preview, fallback = "🌐", placeholder, hint, onAuto, autoLabel }) {
+    const ref = useRef(null);
+    useEffect(() => {
+      const ta = ref.current;
+      if (!ta) return;
+      ta.style.height = "auto";
+      const cs = getComputedStyle(ta);
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2 || 20;
+      const extra2 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      const min = lh + extra2, max = lh * 4 + extra2;
+      let target2 = ta.scrollHeight;
+      if (target2 < min) target2 = min;
+      else if (target2 > max) {
+        target2 = max;
+        ta.style.overflowY = "auto";
+      } else ta.style.overflowY = "hidden";
+      ta.style.minHeight = `${min}px`;
+      ta.style.maxHeight = `${max}px`;
+      ta.style.height = `${target2}px`;
+    }, [value]);
+    return h(
+      "div",
+      { className: "uspp-cttf-fav-field" },
+      h(FavPreview, { src: preview, fallback }),
+      h(
+        "div",
+        { className: "uspp-cttf-fav-col" },
+        h("textarea", { ref, rows: 1, className: "uspp-cttf-textarea uspp-cttf-fav-in", value, placeholder, spellCheck: false, onInput: (e3) => onChange(e3.target.value) }),
+        (hint || onAuto) && h(
+          "div",
+          { className: "uspp-cttf-fav-hint" },
+          h("span", null, hint),
+          onAuto && h("button", { type: "button", className: "uspp-cttf-fav-g", title: autoLabel, "aria-label": autoLabel, onClick: onAuto }, h(GoogleG))
+        )
+      )
+    );
+  }
+  function confirmBox({ title, body, confirmText, cancelText, danger = false, width = 400, className = "" }) {
     return new Promise((resolve2) => {
       let done2 = false;
       const finish2 = (v3) => {
@@ -1951,10 +4364,8 @@
         ({ close }) => h(Gone, { onGone: () => finish2(false) }, h(
           Fragment,
           null,
-          h(DialogHeader, { title: typeof title === "function" ? title() : title, close: () => {
-            finish2(false);
-            close();
-          } }),
+          // 原版确认框(confirm-dialog):无右上角关闭,标题 h3、正文 16px、底部分隔线 + 右对齐按钮
+          h(DialogHeader, { title: danger ? h("span", { className: "uspp-cttf-danger-title" }, typeof title === "function" ? title() : title) : typeof title === "function" ? title() : title }),
           h(DialogBody, null, typeof body === "function" ? body() : body),
           h(
             DialogFooter,
@@ -1970,7 +4381,7 @@
           )
         )),
         {},
-        { width }
+        { width, className: "uspp-cttf-dlg-confirm" + (className ? " " + className : "") }
       );
     });
   }
@@ -2057,12 +4468,7 @@
     return h(
       Field,
       { label },
-      h(
-        "div",
-        { className: "uspp-cttf-color-row" },
-        h("input", { type: "color", className: "uspp-cttf-color", value: hex, onInput: (e3) => onChange(e3.target.value) }),
-        h("input", { type: "text", className: "uspp-cttf-input uspp-cttf-in", value, onInput: (e3) => onChange(e3.target.value), spellCheck: false })
-      )
+      h("input", { type: "color", className: "uspp-cttf-color", value: hex, onInput: (e3) => onChange(e3.target.value) })
     );
   }
   var isValidColor = (c3) => {
@@ -2344,44 +4750,111 @@
   var runButton = (btn) => btn.type === "tool" ? runTool(btn.action) : runTemplate(btn);
 
   // sites/chat/plugins/AutoSubmit/index.js
-  var isMac2 = () => /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || "");
   function methodLabel(r3) {
     if (r3.method === "enter") return "Enter";
     if (r3.method === "modifier_enter") return (r3.methodAdvanced?.variant === "ctrl" ? "Ctrl" : "Cmd") + "+Enter";
     const base = t("clickSubmit");
     return r3.methodAdvanced?.variant === "selector" ? `${base} (${r3.methodAdvanced.selector})` : base;
   }
+  function MethodBadge({ rule: r3 }) {
+    if (r3.method === "click_submit") {
+      const sel = r3.methodAdvanced?.variant === "selector" ? r3.methodAdvanced.selector : "";
+      return h("span", { className: "uspp-cttf-method", title: sel ? `${t("clickSubmit")} (${sel})` : t("clickSubmit") }, h("span", { className: "uspp-cttf-click-badge" }, t("clickBadge")));
+    }
+    const keys = methodLabel(r3).split("+");
+    return h("span", { className: "uspp-cttf-method", title: methodLabel(r3) }, keys.map((k4, i3) => h(Fragment, { key: i3 }, i3 > 0 && h("span", { className: "uspp-cttf-key-plus" }, "+"), h("span", { className: "uspp-cttf-keycap" }, k4))));
+  }
   function SiteIcon({ src }) {
     const [bad, setBad] = useState(false);
     if (!src || bad) return h("span", null, "🌐");
     return h("img", { src, alt: "", referrerPolicy: "no-referrer", loading: "lazy", onError: () => setBad(true) });
   }
+  function MethodSection({ method, setMethod, modVariant, setModVariant, clickVariant, setClickVariant, selector, setSelector, expanded, setExpanded, clearErr }) {
+    const Variant = ({ value, cur, set, label, desc }) => h(
+      "label",
+      { className: "uspp-cttf-rv" },
+      h("input", { type: "radio", checked: cur === value, onChange: () => set(value) }),
+      h("div", { className: "uspp-cttf-rv-text" }, h("span", { className: "uspp-cttf-rv-label" }, label), h("span", { className: "uspp-cttf-rv-desc" }, desc))
+    );
+    return h(
+      "div",
+      { className: "uspp-cttf-rm" },
+      h(
+        "div",
+        { className: "uspp-cttf-rm-head" },
+        h("div", { className: "uspp-cttf-rm-title" }, t("submitMethod")),
+        h("button", { type: "button", className: "uspp-cttf-rm-toggle", title: t("advancedToggle"), "aria-expanded": String(expanded), onClick: () => setExpanded(!expanded) }, expanded ? "▲" : "▼")
+      ),
+      h(
+        "div",
+        { className: "uspp-cttf-rm-opts" },
+        [["enter", "Enter"], ["modifier_enter", "Cmd+Enter"], ["click_submit", t("clickSubmit")]].map(([v3, l3]) => h("label", { key: v3, className: "uspp-cttf-rm-opt" }, h("input", { type: "radio", checked: method === v3, onChange: () => {
+          setMethod(v3);
+          setModVariant("cmd");
+          setClickVariant("default");
+          setSelector("");
+        } }), l3))
+      ),
+      expanded && h(
+        "div",
+        { className: "uspp-cttf-rm-adv" },
+        h("div", { className: "uspp-cttf-rm-adv-title" }, t("advancedTitle")),
+        method === "enter" && h("div", { className: "uspp-cttf-rm-tip" }, t("enterNoOptions")),
+        method === "modifier_enter" && h(
+          "div",
+          { className: "uspp-cttf-rv-group" },
+          h(Variant, { value: "cmd", cur: modVariant, set: setModVariant, label: "Cmd + Enter", desc: t("modCmdDesc") }),
+          h(Variant, { value: "ctrl", cur: modVariant, set: setModVariant, label: "Ctrl + Enter", desc: t("modCtrlDesc") })
+        ),
+        method === "click_submit" && h(
+          Fragment,
+          null,
+          h(
+            "div",
+            { className: "uspp-cttf-rv-group" },
+            h(Variant, { value: "default", cur: clickVariant, set: setClickVariant, label: t("clickDefault"), desc: t("clickDefaultDesc") }),
+            h(Variant, { value: "selector", cur: clickVariant, set: setClickVariant, label: t("clickSelector"), desc: t("clickSelectorDesc") })
+          ),
+          clickVariant === "selector" && h(
+            Fragment,
+            null,
+            h("input", { className: "uspp-cttf-rin", value: selector, placeholder: t("selectorPlaceholder"), spellCheck: false, onInput: (e3) => {
+              setSelector(e3.target.value);
+              clearErr();
+            } }),
+            h("div", { className: "uspp-cttf-rm-tip" }, t("selectorHint"))
+          )
+        )
+      )
+    );
+  }
   function RuleEditor({ close, index }) {
     useEffect(() => editingGuard.enter(), []);
     const cur = index != null ? config.data.domainAutoSubmitSettings[index] : null;
-    const [domain, setDomain] = useState(cur?.domain ?? (index == null ? location.hostname : ""));
-    const [name, setName] = useState(cur?.name ?? "");
-    const [favicon, setFavicon] = useState(cur?.favicon ?? "");
-    const [method, setMethod] = useState(cur?.method ?? "click_submit");
-    const [modVariant, setModVariant] = useState(cur?.method === "modifier_enter" ? cur.methodAdvanced?.variant || "cmd" : isMac2() ? "cmd" : "ctrl");
+    const isEdit = !!cur?.domain;
+    const presetDomain = isEdit ? cur.domain : location.hostname || "";
+    const [domain, setDomain] = useState(presetDomain);
+    const [name, setName] = useState(isEdit ? cur.name || "" : document.title || t("unnamedRule"));
+    const [favicon, setFavicon] = useState(isEdit && cur.favicon ? cur.favicon : faviconFor(presetDomain));
+    const [favTouched, setFavTouched] = useState(false);
+    const [method, setMethod] = useState(cur?.method ?? "enter");
+    const [modVariant, setModVariant] = useState(cur?.method === "modifier_enter" && cur.methodAdvanced?.variant === "ctrl" ? "ctrl" : "cmd");
     const [clickVariant, setClickVariant] = useState(cur?.method === "click_submit" && cur.methodAdvanced?.variant === "selector" ? "selector" : "default");
     const [selector, setSelector] = useState(cur?.methodAdvanced?.selector ?? "");
-    const [showAdv, setShowAdv] = useState(!!cur?.methodAdvanced);
+    const [expanded, setExpanded] = useState(method === "modifier_enter" && modVariant === "ctrl" || method === "click_submit" && clickVariant === "selector" && !!selector);
     const [err, setErr] = useState("");
     const submit = () => {
       if (!domain.trim() || !name.trim()) return setErr(t("errRuleRequired"));
       let adv;
-      if (method === "modifier_enter") adv = { variant: modVariant };
-      if (method === "click_submit") {
-        if (clickVariant === "selector") {
-          if (!selector.trim()) return setErr(t("errSelectorEmpty"));
-          try {
-            document.querySelector(selector);
-          } catch {
-            return setErr(t("errSelectorSyntax"));
-          }
-          adv = { variant: "selector", selector: selector.trim() };
-        } else adv = { variant: "default" };
+      if (method === "modifier_enter" && modVariant !== "cmd") adv = { variant: modVariant };
+      if (method === "click_submit" && clickVariant === "selector") {
+        if (!selector.trim()) return setErr(t("errSelectorEmpty"));
+        try {
+          document.querySelector(selector);
+        } catch {
+          return setErr(t("errSelectorSyntax"));
+        }
+        adv = { variant: "selector", selector: selector.trim() };
       }
       const rule = normalizeRule({ domain: domain.trim(), name: name.trim(), method, ...adv ? { methodAdvanced: adv } : {}, favicon: favicon.trim() || faviconFor(domain) });
       config.update((d3) => {
@@ -2390,66 +4863,70 @@
       });
       close();
     };
+    const onDomain = (v3) => {
+      setDomain(v3);
+      setErr("");
+      if (!favTouched) setFavicon(faviconFor(v3.trim()));
+    };
     return h(
       Fragment,
       null,
-      h(DialogHeader, { title: index != null ? t("editRuleTitle") : t("newRuleTitle"), close }),
+      h(DialogHeader, { title: isEdit ? t("editRuleTitle") : t("newRuleTitle") }),
       h(
         DialogBody,
         null,
         err && h("div", { className: "uspp-cttf-field-err" }, err),
-        h(Field, { label: t("ruleUrl") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: domain, placeholder: "chatgpt.com", onInput: (e3) => {
-          setDomain(e3.target.value);
-          setErr("");
-        } })),
-        h(Field, { label: t("ruleName") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: name, placeholder: "ChatGPT", onInput: (e3) => {
-          setName(e3.target.value);
-          setErr("");
-        } })),
-        h(Field, { label: t("ruleIcon") }, h(
-          "div",
-          { className: "uspp-cttf-color-row" },
-          h("span", { style: { width: "24px", display: "inline-flex" } }, h(SiteIcon, { src: favicon || faviconFor(domain) })),
-          h("input", { className: "uspp-cttf-input uspp-cttf-in", value: favicon, placeholder: faviconFor(domain || "example.com"), onInput: (e3) => setFavicon(e3.target.value) }),
-          h(Btn, { onClick: () => setFavicon(faviconFor(domain)) }, t("fetchIcon"))
-        )),
-        h(Field, { label: t("submitMethod") }, h(Choices, { label: t("submitMethod"), value: method, onChange: setMethod, options: [{ value: "enter", label: "Enter" }, { value: "modifier_enter", label: (isMac2() ? "Cmd" : "Ctrl") + "+Enter" }, { value: "click_submit", label: t("clickSubmit") }] })),
         h(
           "div",
-          null,
-          h(Btn, { kind: "plain", size: "sm", onClick: () => setShowAdv(!showAdv) }, (showAdv ? "▾ " : "▸ ") + t("advanced")),
-          showAdv && h(
-            "div",
-            { className: "uspp-cttf-section uspp-cttf-col-card", style: { marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" } },
-            method === "enter" && h("div", { className: "uspp-cttf-muted2" }, t("enterNoOptions")),
-            method === "modifier_enter" && h(
-              "div",
-              { className: "uspp-cttf-row2" },
-              h("span", { className: "uspp-cttf-muted2" }, t("modifierKey")),
-              h(Choices, { label: t("modifierKey"), value: modVariant, onChange: setModVariant, options: [{ value: "cmd", label: "Cmd" }, { value: "ctrl", label: "Ctrl" }] })
-            ),
-            method === "click_submit" && h(
-              Fragment,
-              null,
-              h(Choices, { value: clickVariant, onChange: setClickVariant, options: [{ value: "default", label: t("clickDefault") }, { value: "selector", label: t("clickSelector") }] }),
-              clickVariant === "selector" && h("input", { className: "uspp-cttf-input uspp-cttf-in", value: selector, placeholder: t("selectorPlaceholder"), spellCheck: false, onInput: (e3) => {
-                setSelector(e3.target.value);
-                setErr("");
-              } })
-            )
-          )
+          { className: "uspp-cttf-rule-card" },
+          h("label", { className: "uspp-cttf-rl" }, t("ruleUrl"), h("input", { className: "uspp-cttf-rin", value: domain, onInput: (e3) => onDomain(e3.target.value) })),
+          h("label", { className: "uspp-cttf-rl" }, t("ruleName"), h("input", { className: "uspp-cttf-rin", value: name, onInput: (e3) => {
+            setName(e3.target.value);
+            setErr("");
+          } })),
+          h("label", { className: "uspp-cttf-rl" }, t("ruleIcon"), h(FaviconField, { value: favicon, onChange: (v3) => {
+            setFavicon(v3);
+            setFavTouched(true);
+          }, preview: favicon.trim() || faviconFor(domain.trim()), fallback: "⚡", placeholder: t("faviconPh"), hint: t("ruleIconHint"), onAuto: () => {
+            setFavicon(faviconFor(domain.trim()));
+            setFavTouched(false);
+          }, autoLabel: t("fetchIcon") })),
+          h(MethodSection, { method, setMethod, modVariant, setModVariant, clickVariant, setClickVariant, selector, setSelector, expanded, setExpanded, clearErr: () => setErr("") })
         )
       ),
-      h(DialogFooter, null, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("save")))
+      h(DialogFooter, { split: true }, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("confirm")))
     );
   }
   function RulesDialog({ close }) {
     useLive();
     const rules = config.data.domainAutoSubmitSettings;
-    const edit = (index) => openDialog(RuleEditor, { index }, { key: "rule-editor", dismissable: false, width: 480 });
+    const edit = (index) => openDialog(RuleEditor, { index }, { key: "rule-editor", dismissable: false, width: 480, className: "uspp-cttf-dlg-u uspp-cttf-dlg-rule" });
     const del = async (i3) => {
       const r3 = rules[i3];
-      const ok = await confirmBox({ title: t("delete"), body: t("delRuleConfirm", { name: r3.name || t("unnamedRule") }), danger: true, confirmText: t("delete"), width: 420 });
+      const ruleName = r3.name || r3.domain || t("unnamedRule");
+      const ok = await confirmBox({
+        title: t("delRuleTitle", { name: ruleName }),
+        danger: true,
+        confirmText: t("delete"),
+        width: 420,
+        className: "uspp-cttf-dlg-pad24",
+        body: () => h(
+          Fragment,
+          null,
+          h("div", { className: "uspp-cttf-del-note" }, t("irreversible")),
+          h(
+            Card,
+            { className: "uspp-cttf-del-rule" },
+            h(
+              "div",
+              { className: "uspp-cttf-del-rule-id" },
+              h("span", { className: "uspp-cttf-del-rule-ic" }, h(SiteIcon, { src: r3.favicon || faviconFor(r3.domain) })),
+              h("div", null, h("div", { className: "uspp-cttf-del-rule-name" }, ruleName), h("div", { className: "uspp-cttf-sub" }, r3.domain || t("noUrl")))
+            ),
+            h(DotLi, null, t("liMethod"), " ", h(MethodBadge, { rule: r3 }))
+          )
+        )
+      });
       if (ok) config.update((d3) => {
         d3.domainAutoSubmitSettings.splice(i3, 1);
       });
@@ -2457,25 +4934,31 @@
     return h(
       Fragment,
       null,
-      h(DialogHeader, { title: t("autoTitle"), close }, h("span", { style: { flex: 1 } }), h(Btn, { kind: "primary", onClick: () => edit(null) }, t("newRule"))),
+      h(DialogHeader, { title: t("autoTitle"), close }),
       h(
         DialogBody,
         null,
-        h("div", { className: "uspp-cttf-rule-row uspp-cttf-tbl-head", style: { position: "static" } }, h("span"), h("span", null, t("colSite")), h("span", null, t("colMethod")), h("span", null, t("colEdit")), h("span", null, t("colDelete"))),
-        rules.map((r3, i3) => h(
+        h(
           "div",
-          { key: i3, className: "uspp-cttf-rule-row" },
-          h(SiteIcon, { src: r3.favicon }),
-          h("div", { style: { minWidth: 0 } }, h("div", null, r3.name || t("unnamedRule")), h("div", { className: "uspp-cttf-sub" }, r3.domain || t("noUrl"))),
-          h("div", { className: "uspp-cttf-muted2", title: methodLabel(r3), style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, methodLabel(r3)),
-          h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => edit(i3) }),
-          h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: () => del(i3) })
-        ))
+          { className: "uspp-cttf-list-frame" },
+          h("div", { className: "uspp-cttf-rule-row uspp-cttf-tbl-head", style: { position: "static" } }, h("span", null, t("colIcon")), h("span", null, t("colSite")), h("span", null, t("colMethod")), h("span", null, t("colEdit")), h("span", null, t("colDelete"))),
+          h("div", { className: "uspp-cttf-list-body" }, rules.map((r3, i3) => h(
+            "div",
+            { key: i3, className: "uspp-cttf-rule-row" },
+            h(SiteIcon, { src: r3.favicon }),
+            h("div", { style: { minWidth: 0 } }, h("div", null, r3.name || t("unnamedRule")), h("div", { className: "uspp-cttf-sub" }, r3.domain || t("noUrl"))),
+            h(MethodBadge, { rule: r3 }),
+            h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => edit(i3) }),
+            h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: () => del(i3) })
+          )))
+        ),
+        // 原版:「+ 新建」在列表下方左侧
+        h("div", { className: "uspp-cttf-list-add" }, h(Btn, { kind: "add", onClick: () => edit(null) }, t("newRule")))
       )
     );
   }
   var AutoSubmit_default = (U4) => {
-    const open = () => openDialog(RulesDialog, {}, { key: "automation", width: 750 });
+    const open = () => openDialog(RulesDialog, {}, { key: "automation", width: 750, className: "uspp-cttf-dlg-u uspp-cttf-dlg-auto" });
     return U4.definePlugin({
       name: "AutoSubmit",
       description: "Sends the message after a template is inserted, using per-site rules; includes the rule editor.",
@@ -2502,6 +4985,95 @@
     });
   };
 
+  // sites/chat/lib/importdiff.js
+  var comparable = (v3) => {
+    if (v3 === null || typeof v3 !== "object") return v3;
+    if (Array.isArray(v3)) return v3.map(comparable);
+    const o3 = {};
+    for (const k4 of Object.keys(v3).sort()) o3[k4] = comparable(v3[k4]);
+    return o3;
+  };
+  var deepEqual = (a3, b3) => a3 === b3 || JSON.stringify(comparable(a3)) === JSON.stringify(comparable(b3));
+  var normName = (v3) => {
+    const s3 = v3 == null ? "" : String(v3);
+    return (s3.normalize ? s3.normalize("NFKC") : s3).replace(/\s+/g, " ").trim();
+  };
+  function lisSet(seq3) {
+    const out = /* @__PURE__ */ new Set(), n2 = seq3.length;
+    if (!n2) return out;
+    const dp = Array(n2).fill(1), prev = Array(n2).fill(-1);
+    let best = 0;
+    for (let i3 = 1; i3 < n2; i3++) {
+      for (let j4 = 0; j4 < i3; j4++) if (seq3[j4] < seq3[i3] && dp[j4] + 1 > dp[i3]) {
+        dp[i3] = dp[j4] + 1;
+        prev[i3] = j4;
+      }
+      if (dp[i3] > dp[best]) best = i3;
+    }
+    for (let i3 = best; i3 >= 0; i3 = prev[i3]) out.add(seq3[i3]);
+    return out;
+  }
+  function buttonDiffs(curFolder, impFolder) {
+    const cb = curFolder?.buttons && typeof curFolder.buttons === "object" ? curFolder.buttons : {};
+    const ib = impFolder?.buttons && typeof impFolder.buttons === "object" ? impFolder.buttons : {};
+    const co = Object.keys(cb), io = Object.keys(ib);
+    const buckets = /* @__PURE__ */ new Map();
+    io.forEach((name, index) => {
+      const k4 = normName(name);
+      if (!buckets.has(k4)) buckets.set(k4, []);
+      buckets.get(k4).push({ name, index });
+    });
+    const used = /* @__PURE__ */ new Set();
+    const pairs = co.map((name) => {
+      const m3 = (buckets.get(normName(name)) || []).find((c3) => !used.has(c3.name));
+      if (m3) used.add(m3.name);
+      return { cur: name, imp: m3 ? m3.name : null, idx: m3 ? m3.index : -1 };
+    });
+    const keep = lisSet(pairs.filter((p3) => p3.idx >= 0).map((p3) => p3.idx));
+    const list = pairs.map((p3) => {
+      const c3 = cb[p3.cur] || null, i3 = p3.imp ? ib[p3.imp] || null : null;
+      const fields = [];
+      let renamed = false;
+      if (c3 && i3) {
+        for (const k4 of /* @__PURE__ */ new Set([...Object.keys(c3), ...Object.keys(i3)])) if (!deepEqual(c3[k4], i3[k4])) fields.push(k4);
+        renamed = String(p3.cur).trim() !== String(p3.imp).trim();
+      }
+      const orderChanged = p3.idx >= 0 && !keep.has(p3.idx);
+      const status3 = !i3 ? "removed" : fields.length || renamed || orderChanged ? "changed" : "unchanged";
+      return { name: p3.cur, currentName: p3.cur, importedName: p3.imp, current: c3, imported: i3, fields, renamed, orderChanged, status: status3 };
+    });
+    for (const name of io) if (!used.has(name)) list.push({ name, currentName: null, importedName: name, current: null, imported: ib[name], fields: [], renamed: false, orderChanged: false, status: "added" });
+    return { list, currentOrder: co, importedOrder: io };
+  }
+  function configDiff(curCfg, impCfg) {
+    const norm = (c3) => {
+      const folders2 = c3?.folders && typeof c3.folders === "object" ? c3.folders : {};
+      return { folders: folders2, order: Array.isArray(c3?.folderOrder) ? c3.folderOrder : Object.keys(folders2) };
+    };
+    const cur = norm(curCfg), imp = norm(impCfg);
+    const names = [];
+    for (const n2 of [...cur.order, ...imp.order, ...Object.keys(cur.folders), ...Object.keys(imp.folders)]) if (typeof n2 === "string" && n2 && !names.includes(n2)) names.push(n2);
+    const summary = { folder: { added: 0, removed: 0, changed: 0 }, button: { added: 0, removed: 0, changed: 0 } };
+    const folders = names.map((name) => {
+      const c3 = cur.folders[name] || null, i3 = imp.folders[name] || null;
+      const meta = c3 && i3 ? ["color", "textColor", "hidden"].filter((k4) => !deepEqual(c3[k4], i3[k4])) : [];
+      const bd = buttonDiffs(c3, i3);
+      const counts = { added: 0, removed: 0, changed: 0 };
+      for (const b3 of bd.list) if (counts[b3.status] != null) counts[b3.status]++;
+      for (const k4 of Object.keys(counts)) summary.button[k4] += counts[k4];
+      const orderChanged = bd.list.some((b3) => b3.orderChanged);
+      const folderMoved = !!c3 && !!i3 && cur.order.indexOf(name) !== imp.order.indexOf(name);
+      let status3 = "unchanged";
+      if (!c3) status3 = "added";
+      else if (!i3) status3 = "removed";
+      else if (meta.length || orderChanged || counts.added || counts.removed || counts.changed) status3 = "changed";
+      if (summary.folder[status3] != null) summary.folder[status3]++;
+      return { name, current: c3, imported: i3, meta, orderChanged, folderMoved, buttons: bd.list, currentOrder: bd.currentOrder, importedOrder: bd.importedOrder, counts, status: status3 };
+    });
+    const same = folders.every((f3) => f3.status === "unchanged");
+    return { folders, summary, same };
+  }
+
   // sites/chat/plugins/ConfigTransfer/index.js
   var LEGACY_KEY = "chatGPTButtonFoldersConfig";
   var LEGACY_LANG = "cttf-language-preference";
@@ -2509,29 +5081,134 @@
   function exportFilename(d3 = /* @__PURE__ */ new Date()) {
     return `[Chat] Template Text Folders「${d3.getFullYear()}-${pad(d3.getMonth() + 1)}-${pad(d3.getDate())}」「${pad(d3.getHours())}：${pad(d3.getMinutes())}：${pad(d3.getSeconds())}」.json`;
   }
-  function DiffSummary({ cur, next }) {
-    const d3 = diffSummary(cur, next);
-    if (d3.same) return h("div", { className: "uspp-cttf-muted2" }, t("noDiff"));
-    const list = (label, items) => items.length ? h(Fragment, null, h("b", null, `${label} (${items.length})`), h("ul", null, items.map((n2) => h("li", { key: n2 }, n2)))) : null;
-    return h(
-      "div",
-      { className: "uspp-cttf-diff" },
-      list(t("diffAdded"), d3.added),
-      list(t("diffRemoved"), d3.removed),
-      list(t("diffChanged"), d3.changed),
-      d3.orderChanged && h("div", null, "• " + t("diffOrder")),
-      d3.settingsChanged && h("div", null, "• " + t("diffSettings"))
-    );
-  }
   function StatsCols({ left, right, leftLabel, rightLabel, extra: extra2 }) {
     const a3 = stats(left), b3 = stats(right);
     return h(
       "div",
       { className: "uspp-cttf-cols" },
-      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, leftLabel), t("stats", { f: a3.folders, b: a3.buttons })),
-      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, rightLabel), t("stats", { f: b3.folders, b: b3.buttons }), extra2 && h("div", { className: "uspp-cttf-sub" }, extra2))
+      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, leftLabel), h(StatLines, { s: a3 })),
+      h("div", { className: "uspp-cttf-section uspp-cttf-col-card" }, h("b", null, rightLabel), h(StatLines, { s: b3 }), extra2 && h("div", { className: "uspp-cttf-sub" }, extra2))
     );
   }
+  function StatLines({ s: s3 }) {
+    return h(
+      "div",
+      { className: "uspp-cttf-stat-lines" },
+      h("div", null, h("span", { className: "uspp-cttf-stat-dot", "data-kind": "folders" }, s3.folders), h("span", null, t("unitFolders"))),
+      h("div", null, h("span", { className: "uspp-cttf-stat-dot", "data-kind": "buttons" }, s3.buttons), h("span", null, t("unitButtons")))
+    );
+  }
+  var DBadge = ({ kind, children }) => h("span", { className: "uspp-cttf-d-badge", "data-kind": kind }, children);
+  var STATUS_TEXT = { added: "dAdded", removed: "dRemoved", changed: "dChanged" };
+  function DiffDetail({ close, cur, next, leftLabel, rightLabel }) {
+    const d3 = configDiff(cur, next);
+    const [sel, setSel] = useState(() => (d3.folders.find((f4) => f4.status !== "unchanged") || d3.folders[0] || {}).name || null);
+    useEffect(() => {
+      const onKey = (e3) => {
+        if (e3.key === "Escape") {
+          e3.stopPropagation();
+          close();
+        }
+      };
+      document.addEventListener("keydown", onKey, true);
+      return () => document.removeEventListener("keydown", onKey, true);
+    }, []);
+    const f3 = d3.folders.find((x4) => x4.name === sel) || null;
+    const sum = (group, keys) => keys.filter((k4) => d3.summary[group][k4]).map((k4) => h(DBadge, { key: k4, kind: k4 }, t((group === "folder" ? { added: "dFolderAdded", removed: "dFolderRemoved", changed: "dFolderChanged" } : { added: "dBtnAdded", removed: "dBtnRemoved", changed: "dBtnChanged" })[k4], { n: d3.summary[group][k4] })));
+    const sep = () => lang() === "zh" ? "、" : ", ";
+    const column = (side, label) => {
+      const folder = side === "current" ? f3.current : f3.imported;
+      const order = side === "current" ? f3.currentOrder || [] : f3.importedOrder || [];
+      const byName = /* @__PURE__ */ new Map();
+      for (const b3 of f3.buttons) {
+        if (b3.currentName != null) byName.set(b3.currentName, b3);
+        if (b3.importedName != null) byName.set(b3.importedName, b3);
+      }
+      return h(
+        "div",
+        { className: "uspp-cttf-d-col" },
+        h("div", { className: "uspp-cttf-d-colhead" }, label),
+        h(
+          "div",
+          { className: "uspp-cttf-d-collist" },
+          !folder || !order.length ? h("div", { className: "uspp-cttf-d-empty" }, side === "current" ? t("dNoCur") : t("dNoImp")) : order.map((name) => {
+            const b3 = byName.get(name) || { status: "unchanged", fields: [] };
+            const btn = folder.buttons?.[name];
+            const st = b3.status === "added" && side !== "imported" ? "unchanged" : b3.status === "removed" && side !== "current" ? "unchanged" : b3.status;
+            let label2 = b3.status !== "unchanged" ? t(STATUS_TEXT[b3.status]) : null;
+            if (b3.status === "changed") {
+              const types = [b3.renamed && t("dRenamed"), b3.fields.length && t("dFields"), b3.orderChanged && t("dOrder")].filter(Boolean).join(sep());
+              if (types) label2 = t("dChangedTypes", { types });
+            }
+            return h(
+              "div",
+              { key: name, className: "uspp-cttf-d-item", "data-status": st },
+              h("div", { className: "uspp-cttf-d-row" }, h("span", { className: "uspp-cttf-d-btnwrap" }, h(Chip, { name, btn, withIcon: true })), label2 && h(DBadge, { kind: b3.status }, label2)),
+              b3.status === "changed" && b3.fields.length > 0 && h("div", { className: "uspp-cttf-d-fields" }, t("dChangedFields", { fields: b3.fields.join(", ") }))
+            );
+          })
+        )
+      );
+    };
+    return h(
+      Fragment,
+      null,
+      h(DialogHeader, { title: t("diffTitle"), close }),
+      h(
+        DialogBody,
+        { className: "uspp-cttf-d-body" },
+        d3.same ? h("div", { className: "uspp-cttf-d-none" }, t("diffNone")) : h(
+          Fragment,
+          null,
+          h(
+            "div",
+            { className: "uspp-cttf-d-summary" },
+            h("div", { className: "uspp-cttf-d-sumgroup" }, sum("folder", ["added", "removed", "changed"])),
+            h("div", { className: "uspp-cttf-d-sumgroup" }, sum("button", ["added", "removed", "changed"]))
+          ),
+          h(
+            "div",
+            { className: "uspp-cttf-d-main" },
+            h(
+              "div",
+              { className: "uspp-cttf-d-side" },
+              h("div", { className: "uspp-cttf-d-sidehead" }, t("diffFolders")),
+              h("div", { className: "uspp-cttf-d-sidelist" }, d3.folders.map((x4) => {
+                const fo = x4.current || x4.imported || {};
+                return h(
+                  "button",
+                  { key: x4.name, type: "button", className: "uspp-cttf-d-folder", "aria-selected": String(x4.name === sel), "data-status": x4.status, onClick: () => setSel(x4.name) },
+                  h("span", { className: "uspp-cttf-d-fname", style: { background: fo.color, color: fo.textColor } }, x4.name),
+                  h(
+                    "span",
+                    { className: "uspp-cttf-d-ftags" },
+                    x4.status !== "unchanged" && h(DBadge, { kind: x4.status }, x4.status === "changed" && (x4.orderChanged || x4.meta.length) ? t("dChangedTypes", { types: [x4.orderChanged && t("dOrder"), x4.meta.length > 0 && t("dSettings")].filter(Boolean).join(sep()) }) : t(STATUS_TEXT[x4.status]))
+                  )
+                );
+              }))
+            ),
+            h(
+              "div",
+              { className: "uspp-cttf-d-detail" },
+              !f3 ? h("div", { className: "uspp-cttf-d-empty" }, t("dPick")) : h(
+                Fragment,
+                null,
+                h("div", { className: "uspp-cttf-d-dhead" }, h("div", { className: "uspp-cttf-d-dname" }, f3.name), h(
+                  "span",
+                  { className: "uspp-cttf-d-dbadges" },
+                  ["added", "removed", "changed"].filter((k4) => f3.counts[k4]).map((k4) => h(DBadge, { key: k4, kind: k4 }, t({ added: "dBtnAdded", removed: "dBtnRemoved", changed: "dBtnChanged" }[k4], { n: f3.counts[k4] })))
+                )),
+                f3.status === "added" && h("div", { className: "uspp-cttf-d-info" }, t("dWillAdd")),
+                f3.status === "removed" && h("div", { className: "uspp-cttf-d-info" }, t("dWillRemove")),
+                h("div", { className: "uspp-cttf-d-cols" }, column("current", leftLabel || t("currentConfig")), column("imported", rightLabel || t("importedConfig")))
+              )
+            )
+          )
+        )
+      )
+    );
+  }
+  var openDiffDetail = (cur, next, labels = {}) => openDialog(DiffDetail, { cur, next, ...labels }, { key: "import-diff", dismissable: false, width: 960, className: "uspp-cttf-dlg-u uspp-cttf-dlg-diff" });
   function confirmImport(incoming, { onCancel } = {}) {
     const next = normalizeConfig(incoming, lang());
     return new Promise((resolve2) => {
@@ -2544,29 +5221,32 @@
         }
       };
       function View({ close }) {
-        const [showDiff, setShowDiff] = useState(false);
         const cur = config.data;
         return h(Gone, { onGone: () => finish2(false) }, h(
           Fragment,
           null,
-          h(DialogHeader, { title: t("importTitle"), close }),
+          h(DialogHeader, { title: h("span", { className: "uspp-cttf-info-title" }, t("importTitle")) }),
           h(
             DialogBody,
             null,
-            h(StatsCols, { left: cur, right: next, leftLabel: t("currentConfig"), rightLabel: t("importedConfig") }),
-            h("div", { className: "uspp-cttf-warn2" }, t("importWarn")),
-            showDiff && h(DiffSummary, { cur, next })
+            h(
+              Card,
+              { className: "uspp-cttf-card-lg uspp-cttf-cmp-card" },
+              h("h4", { className: "uspp-cttf-cmp-title" }, t("cmpTitle")),
+              h(StatsCols, { left: cur, right: next, leftLabel: t("currentConfig"), rightLabel: t("importedConfig") })
+            ),
+            h("div", { className: "uspp-cttf-warn-box" }, h("span", { className: "uspp-cttf-warn-ic" }, "⚠️"), h("strong", null, t("importWarn")))
           ),
           h(
             DialogFooter,
             null,
-            h(Btn, { onClick: () => setShowDiff(!showDiff) }, showDiff ? t("hideDiff") : t("viewDiff")),
+            h(Btn, { className: "uspp-cttf-imp-diffbtn", onClick: () => openDiffDetail(cur, incoming) }, t("viewDiff")),
             h("span", { style: { flex: 1 } }),
             h(Btn, { kind: "cancel", onClick: () => {
               finish2(false);
               close();
             } }, t("cancel")),
-            h(Btn, { kind: "primary", onClick: () => {
+            h(Btn, { kind: "info", onClick: () => {
               config.set(next, { source: "import" });
               toast(t("importDone"), "SUCCESS");
               finish2(true);
@@ -2575,7 +5255,7 @@
           )
         ));
       }
-      openDialog(View, {}, { key: "import", dismissable: false, width: 480 });
+      openDialog(View, {}, { key: "import", dismissable: false, width: 480, className: "uspp-cttf-dlg-u uspp-cttf-dlg-imp" });
     });
   }
   function parseConfigText(text) {
@@ -2614,9 +5294,17 @@
       useLive();
       const [tab, setTab] = useState(initial || "appearance");
       const [, force] = useState(0);
-      useEffect(() => U4.onSlotChange("configTabs", () => force((x4) => x4 + 1)), []);
+      useEffect(() => {
+        const o1 = U4.onSlotChange("configTabs", () => force((x4) => x4 + 1));
+        const o22 = U4.onSlotChange("syncSections", () => force((x4) => x4 + 1));
+        return () => {
+          o1?.();
+          o22?.();
+        };
+      }, []);
       const extra2 = U4.getSlotItems("configTabs");
-      const tabs = [{ value: "appearance", label: t("tabAppearance") }, { value: "config", label: t("tabConfig") }, ...extra2.map((x4) => ({ value: x4.id, label: typeof x4.label === "function" ? x4.label() : x4.label }))];
+      const syncs = U4.getSlotItems("syncSections");
+      const tabs = [{ value: "appearance", label: t("tabAppearance") }, { value: "config", label: t("tabConfig") }, ...syncs.length ? [{ value: "sync", label: t("tabSync") }] : [], ...extra2.map((x4) => ({ value: x4.id, label: typeof x4.label === "function" ? x4.label() : x4.label }))];
       const p3 = prefs.get();
       const ext = extra2.find((x4) => x4.id === tab);
       return h(
@@ -2627,29 +5315,65 @@
           DialogBody,
           null,
           h(Tabs, { tabs, value: tab, onChange: setTab }),
+          // 原版 showConfigSettingsDialog:左侧 130 宽标签 + 右侧控件,行下边线,行距 20
           tab === "appearance" && h(
-            Fragment,
-            null,
-            h(SettingRow, { title: t("language") }, h(Choices, {
-              label: t("language"),
-              value: p3.language,
-              onChange: (v3) => prefs.set({ language: v3 }),
-              options: [{ value: "auto", label: t("langAuto") }, { value: "zh", label: t("langZh") }, { value: "en", label: t("langEn") }]
-            })),
-            h(SwitchRow, { title: t("folderIcons"), checked: !!config.data.showFolderIcons, onChange: (v3) => config.update((d3) => {
-              d3.showFolderIcons = v3;
-            }) })
+            "div",
+            { className: "uspp-cttf-cfg-rows uspp-cttf-cfg-mb" },
+            h(
+              "div",
+              { className: "uspp-cttf-cfg-row" },
+              h("span", { className: "uspp-cttf-cfg-label" }, t("language"), ":"),
+              h("div", { className: "uspp-cttf-cfg-langs" }, [["auto", t("langAuto")], ["zh", t("langZh")], ["en", t("langEn")]].map(([v3, label]) => h("button", { key: v3, type: "button", className: "uspp-cttf-cfg-lang" + (p3.language === v3 ? " uspp-cttf-active" : ""), onClick: () => prefs.set({ language: v3 }) }, label)))
+            ),
+            h(
+              "div",
+              { className: "uspp-cttf-cfg-row" },
+              h("span", { className: "uspp-cttf-cfg-label" }, t("folderIconsLabel")),
+              h(
+                "div",
+                { className: "uspp-cttf-cfg-switchwrap" },
+                h(
+                  "label",
+                  { className: "uspp-cttf-cfg-switch" },
+                  h("input", { type: "checkbox", checked: !!config.data.showFolderIcons, onChange: (e3) => {
+                    const v3 = e3.target.checked;
+                    config.update((d3) => {
+                      d3.showFolderIcons = v3;
+                    });
+                  } }),
+                  h("span", { className: "uspp-cttf-cfg-slider" })
+                ),
+                h("span", { className: "uspp-cttf-cfg-state" + (config.data.showFolderIcons ? " uspp-cttf-on" : "") }, config.data.showFolderIcons ? t("iconsVisible") : t("iconsHidden"))
+              )
+            )
           ),
           tab === "config" && h(
-            Fragment,
-            null,
-            [["export", t("exportHint"), exportConfig], ["import", t("importHint"), importFromFile], ["reset", t("resetHint"), resetConfig]].map(([k4, hint, fn2]) => h(SettingRow, { key: k4, title: t(k4), description: hint }, h(Btn, { kind: k4 === "reset" ? "danger" : "primary", onClick: () => fn2() }, t(k4))))
+            "div",
+            { className: "uspp-cttf-cfg-rows" },
+            h(
+              "div",
+              { className: "uspp-cttf-cfg-row" },
+              h("span", { className: "uspp-cttf-cfg-label" }, t("restoreDefaults")),
+              h("button", { type: "button", className: "uspp-cttf-cfg-btn uspp-cttf-cfg-reset", title: t("resetHint"), onClick: () => resetConfig() }, t("reset"))
+            ),
+            h(
+              "div",
+              { className: "uspp-cttf-cfg-row uspp-cttf-cfg-row-last" },
+              h("span", { className: "uspp-cttf-cfg-label" }, t("importExport")),
+              h(
+                "div",
+                { className: "uspp-cttf-cfg-btns" },
+                h("button", { type: "button", className: "uspp-cttf-cfg-btn uspp-cttf-cfg-import", title: t("importHint"), onClick: () => importFromFile() }, t("import")),
+                h("button", { type: "button", className: "uspp-cttf-cfg-btn uspp-cttf-cfg-export", title: t("exportHint"), onClick: () => exportConfig() }, t("export"))
+              )
+            )
           ),
+          tab === "sync" && h("div", { className: "uspp-cttf-sync-stack" }, syncs.map((x4) => h(U4.ErrorBoundary, { key: x4.id, fallback: null }, h(x4.render, { close })))),
           ext && h(U4.ErrorBoundary, { fallback: null }, h(ext.render, { close }))
         )
       );
     }
-    const open = (tab) => openDialog(ScriptConfig, { tab }, { key: "script-config", width: 400, dismissable: false });
+    const open = (tab) => openDialog(ScriptConfig, { tab }, { key: "script-config", width: 400, dismissable: false, className: "uspp-cttf-dlg-u uspp-cttf-dlg-cfg" });
     function migrateLegacy() {
       let raw2 = null;
       try {
@@ -2722,17 +5446,536 @@
     });
   };
 
+  // sites/chat/lib/drive.js
+  var TOKEN_URL = "https://oauth2.googleapis.com/token";
+  var FILES_URL = "https://www.googleapis.com/drive/v3/files";
+  var UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+  var DEFAULT_DRIVE_FILE = "[Chat] Template Text Folders.backup.json";
+  var safeStringify = (v3, fb = "") => {
+    try {
+      return JSON.stringify(v3);
+    } catch {
+      return fb;
+    }
+  };
+  var accessToken = "";
+  var accessTokenExpireAt = 0;
+  var resetAuthCache = () => {
+    accessToken = "";
+    accessTokenExpireAt = 0;
+  };
+  var hasGM2 = () => typeof GM_xmlhttpRequest === "function";
+  var hasFetch = () => typeof fetch === "function";
+  var requestApiAvailable = () => hasGM2() || hasFetch();
+  function viaGM(o3) {
+    if (!hasGM2()) return null;
+    return new Promise((resolve2, reject) => {
+      try {
+        GM_xmlhttpRequest({
+          method: o3.method || "GET",
+          url: o3.url,
+          headers: o3.headers,
+          data: o3.data,
+          anonymous: true,
+          responseType: "text",
+          onload: (r3) => r3.status === 0 ? reject(new Error("GM_xmlhttpRequest returned status 0 (likely blocked or offline).")) : resolve2({ status: r3.status, responseText: r3.responseText || "" }),
+          onerror: (e3) => reject(new Error(e3?.error || e3?.message || safeStringify(e3, "{}"))),
+          ontimeout: () => reject(new Error("timeout"))
+        });
+      } catch (e3) {
+        reject(e3);
+      }
+    });
+  }
+  async function viaFetch(o3) {
+    if (!hasFetch()) return null;
+    const r3 = await fetch(o3.url, { method: o3.method || "GET", headers: o3.headers, body: o3.data, credentials: "omit", mode: "cors", cache: "no-store" });
+    return { status: r3.status, responseText: await r3.text() };
+  }
+  async function request(o3) {
+    const order = drive.get().requestMode === "adguard" ? [viaFetch, viaGM] : [viaGM, viaFetch];
+    let last2 = null;
+    for (const fn2 of order) {
+      try {
+        const r3 = await fn2(o3);
+        if (r3) return r3;
+      } catch (e3) {
+        last2 = e3;
+      }
+    }
+    throw last2 || new Error("No request API available for Drive sync.");
+  }
+  var httpError = (label, r3) => {
+    const e3 = new Error(`${label} HTTP ${r3?.status ?? 0}: ${r3?.responseText || "[empty response]"}`);
+    e3.status = r3?.status ?? 0;
+    return e3;
+  };
+  var hasCredentials = () => {
+    const s3 = drive.get();
+    return !!(s3.clientId && s3.clientSecret && s3.refreshToken);
+  };
+  var fileName = () => (drive.get().fileName || "").trim() || DEFAULT_DRIVE_FILE;
+  async function refreshToken() {
+    const s3 = drive.get();
+    const body = [["client_id", s3.clientId], ["client_secret", s3.clientSecret], ["refresh_token", s3.refreshToken], ["grant_type", "refresh_token"]].map(([k4, v3]) => `${encodeURIComponent(k4)}=${encodeURIComponent(String(v3 || ""))}`).join("&");
+    let r3;
+    try {
+      r3 = await request({ method: "POST", url: TOKEN_URL, headers: { "Content-Type": "application/x-www-form-urlencoded" }, data: body });
+    } catch (e3) {
+      throw new Error(`Drive token request failed: ${e3?.message || safeStringify(e3, "{}")}`);
+    }
+    const json = r3.responseText ? JSON.parse(r3.responseText) : {};
+    if (r3.status >= 200 && r3.status < 300) {
+      if (json.error) throw new Error(`Drive token error: ${safeStringify(json, "[invalid json]")}`);
+      return json;
+    }
+    throw new Error(`Drive token HTTP ${r3.status}: ${r3.responseText || "[empty response]"}`);
+  }
+  async function token() {
+    const now2 = Date.now();
+    if (accessToken && now2 < accessTokenExpireAt - 6e4) return accessToken;
+    const p3 = await refreshToken();
+    accessToken = p3.access_token;
+    accessTokenExpireAt = now2 + (Number(p3.expires_in) || 3600) * 1e3;
+    return accessToken;
+  }
+  async function listFiles(tk, name) {
+    const params = new URLSearchParams({ pageSize: "5", fields: "files(id,name,mimeType,modifiedTime,size)", orderBy: "modifiedTime desc" });
+    params.set("q", `(trashed = false) and name = '${String(name || "").replace(/'/g, "\\'")}'`);
+    let r3;
+    try {
+      r3 = await request({ method: "GET", url: `${FILES_URL}?${params}`, headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
+    } catch (e3) {
+      throw new Error(`Drive list network error: ${e3?.message || safeStringify(e3, "{}")}`);
+    }
+    if (r3.status >= 200 && r3.status < 300) {
+      const d3 = JSON.parse(r3.responseText || "{}");
+      return Array.isArray(d3.files) ? d3.files : [];
+    }
+    throw httpError("Drive list", r3);
+  }
+  async function downloadFile(id, tk) {
+    let r3;
+    try {
+      r3 = await request({ method: "GET", url: `${FILES_URL}/${encodeURIComponent(id)}?alt=media`, headers: { Authorization: `Bearer ${tk}` } });
+    } catch (e4) {
+      throw new Error(`Drive download network error: ${e4?.message || safeStringify(e4, "{}")}`);
+    }
+    if (r3.status >= 200 && r3.status < 300) return r3.responseText || "";
+    let parsed = null;
+    try {
+      parsed = r3.responseText ? JSON.parse(r3.responseText) : null;
+    } catch {
+      parsed = null;
+    }
+    const e3 = new Error(parsed?.error?.message ? `Drive download HTTP ${r3.status}: ${parsed.error.message}` : `Drive download HTTP ${r3.status}: ${r3.responseText || ""}`);
+    e3.status = r3.status;
+    throw e3;
+  }
+  async function uploadFile({ tk, id, name, content }) {
+    const boundary = `cttfBoundary${Date.now()}`;
+    const body = [
+      `--${boundary}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify({ name, mimeType: "application/json" }),
+      `--${boundary}`,
+      "Content-Type: application/json",
+      "",
+      content,
+      `--${boundary}--`,
+      ""
+    ].join("\r\n");
+    const url = id ? `${UPLOAD_URL}/${encodeURIComponent(id)}?uploadType=multipart` : `${UPLOAD_URL}?uploadType=multipart`;
+    let r3;
+    try {
+      r3 = await request({ method: id ? "PATCH" : "POST", url, headers: { Authorization: `Bearer ${tk}`, "Content-Type": `multipart/related; boundary=${boundary}` }, data: body });
+    } catch (e3) {
+      throw new Error(`Drive upload network error: ${e3?.message || safeStringify(e3, "{}")}`);
+    }
+    const json = r3.responseText ? JSON.parse(r3.responseText) : {};
+    if (r3.status >= 200 && r3.status < 300) return json;
+    throw new Error(`Drive upload HTTP ${r3.status}: ${r3.responseText || "[empty response]"}`);
+  }
+  async function uploadToDrive(content) {
+    const tk = await token();
+    const name = fileName();
+    const cached = (drive.get().fileId || "").trim();
+    let res;
+    try {
+      res = await uploadFile({ tk, id: cached, name, content });
+    } catch (e3) {
+      if (!cached) throw e3;
+      res = await uploadFile({ tk, id: "", name, content });
+    }
+    drive.set({ fileId: res?.id || cached || "", fileName: res?.name || name, lastSyncedAt: Date.now() });
+    return res;
+  }
+  var isAuth = (s3) => s3 === 401 || s3 === 403;
+  var isStale = (s3) => s3 === 404 || s3 === 400 || isAuth(s3);
+  async function downloadFromDrive(notFoundText) {
+    let tk = await token();
+    const name = fileName();
+    const notFound = () => {
+      const e3 = new Error(notFoundText);
+      e3.code = "NOT_FOUND";
+      return e3;
+    };
+    const attempt = async ({ relist = false, retry: retry2 = true } = {}) => {
+      let meta2 = null;
+      let id2 = (drive.get().fileId || "").trim();
+      if (!id2 || relist) {
+        try {
+          const files = await listFiles(tk, name);
+          if (!files.length) throw notFound();
+          meta2 = files[0];
+          id2 = meta2.id || "";
+        } catch (e3) {
+          if (retry2 && isAuth(e3?.status || 0)) {
+            resetAuthCache();
+            tk = await token();
+            return attempt({ relist, retry: false });
+          }
+          throw e3;
+        }
+      }
+      try {
+        return { content: await downloadFile(id2, tk), id: id2, meta: meta2 };
+      } catch (e3) {
+        const s3 = e3?.status || 0;
+        if (retry2 && isAuth(s3)) {
+          resetAuthCache();
+          tk = await token();
+          return attempt({ relist, retry: false });
+        }
+        if (!relist && isStale(s3)) return attempt({ relist: true, retry: false });
+        throw e3;
+      }
+    };
+    const { content, id, meta } = await attempt();
+    drive.set({ fileId: id, fileName: meta?.name || drive.get().fileName || name, lastSyncedAt: Date.now() });
+    return { id, content };
+  }
+
+  // sites/chat/plugins/DriveSync/index.js
+  var normDraft = (d3) => ({
+    clientId: String(d3.clientId || "").trim(),
+    clientSecret: String(d3.clientSecret || "").trim(),
+    refreshToken: String(d3.refreshToken || "").trim(),
+    fileName: String(d3.fileName || "").trim() || DEFAULT_DRIVE_FILE,
+    requestMode: d3.requestMode === "adguard" ? "adguard" : "default",
+    configCollapsed: d3.configCollapsed === true
+  });
+  var status = { kind: "info", text: "" };
+  var statusListeners = /* @__PURE__ */ new Set();
+  var setStatus = (kind, text) => {
+    status = { kind, text };
+    for (const fn2 of [...statusListeners]) fn2();
+  };
+  var busy2 = false;
+  function saveDraft(draft) {
+    const prev = drive.get();
+    const next = normDraft(draft);
+    const credsChanged = prev.clientId !== next.clientId || prev.clientSecret !== next.clientSecret || prev.refreshToken !== next.refreshToken;
+    const patch = { ...next };
+    if (credsChanged) {
+      resetAuthCache();
+      patch.fileId = "";
+    } else if (prev.fileName !== next.fileName) patch.fileId = "";
+    drive.set(patch);
+  }
+  function parseRemote(text) {
+    let obj;
+    try {
+      obj = JSON.parse(text || "{}");
+    } catch {
+      throw new Error(t("dInvalid"));
+    }
+    if (!obj || typeof obj !== "object" || !isValidConfig(obj)) throw new Error(t("dInvalid"));
+    return { raw: obj, cfg: normalizeConfig(obj, lang()) };
+  }
+  async function fetchRemote() {
+    try {
+      const r3 = await downloadFromDrive(t("dNotFound"));
+      return { ...parseRemote(r3.content), notFound: false };
+    } catch (e3) {
+      if (e3?.code === "NOT_FOUND") return { notFound: true };
+      throw e3;
+    }
+  }
+  var serialize = () => JSON.stringify(config.data, null, 2);
+  function diffChoice(mode, remote) {
+    const release = editingGuard.enter();
+    return new Promise((resolve2) => {
+      let done2 = false;
+      const finish2 = (v3) => {
+        if (!done2) {
+          done2 = true;
+          release();
+          resolve2(v3);
+        }
+      };
+      function View({ close }) {
+        const pick = (v3) => {
+          finish2(v3);
+          close();
+        };
+        const ls = stats(config.data), rs = stats(remote.cfg);
+        return h(
+          DialogBody,
+          null,
+          h(
+            "div",
+            { className: "uspp-cttf-dd-head" },
+            h("h3", { className: "uspp-cttf-dd-title" }, "☁️ ", t("dDiffTitle")),
+            h("span", { className: "uspp-cttf-dd-op" }, mode === "upload" ? t("dOpUpload") : t("dOpPull"))
+          ),
+          h("p", { className: "uspp-cttf-dd-desc" }, t("dDiffDesc")),
+          h(
+            "div",
+            { className: "uspp-cttf-dd-grid" },
+            h("div", { className: "uspp-cttf-dd-card" }, h("div", { className: "uspp-cttf-dd-ct" }, t("dLocal")), h("div", { className: "uspp-cttf-dd-cs" }, `${ls.folders} ${t("dFolderCount")} · ${ls.buttons} ${t("dBtnCount")}`)),
+            h("div", { className: "uspp-cttf-dd-card uspp-cttf-dd-remote" }, h("div", { className: "uspp-cttf-dd-ct" }, t("dRemote")), h("div", { className: "uspp-cttf-dd-cs" }, `${rs.folders} ${t("dFolderCount")} · ${rs.buttons} ${t("dBtnCount")}`))
+          ),
+          h(
+            "div",
+            { className: "uspp-cttf-dd-foot" },
+            h("button", { type: "button", className: "uspp-cttf-dd-btn uspp-cttf-dd-diff", onClick: () => openDiffDetail(config.data, remote.raw, { leftLabel: t("dLocal"), rightLabel: t("dRemote") }) }, t("viewDiff")),
+            h(
+              "div",
+              { className: "uspp-cttf-dd-acts" },
+              h("button", { type: "button", className: "uspp-cttf-dd-btn uspp-cttf-dd-local", onClick: () => pick("local") }, t("dUseLocal")),
+              h("button", { type: "button", className: "uspp-cttf-dd-btn uspp-cttf-dd-useremote", onClick: () => pick("remote") }, t("dUseRemote")),
+              h("button", { type: "button", className: "uspp-cttf-dd-btn uspp-cttf-dd-cancel", onClick: () => pick("cancel") }, t("cancel"))
+            )
+          )
+        );
+      }
+      openDialog(View, {}, { key: "drive-diff", width: 560, dismissable: false, className: "uspp-cttf-dlg-drivediff" });
+    });
+  }
+  async function run(mode) {
+    if (!requestApiAvailable()) return setStatus("error", t("dNoApi"));
+    if (!hasCredentials()) return setStatus("error", t("dNeedCreds"));
+    busy2 = true;
+    setStatus("info", t("dChecking"));
+    try {
+      const remote = await fetchRemote();
+      if (remote.notFound) {
+        if (mode === "pull") return setStatus("error", t("dNotFound"));
+        setStatus("info", t("dNotFound"));
+        await uploadToDrive(serialize());
+        return setStatus("ok", t("dUploaded"));
+      }
+      if (sameConfig(config.data, remote.cfg)) return setStatus("ok", t("dSame"));
+      const pick = await diffChoice(mode, remote);
+      if (pick === "cancel") return setStatus("info", t("dCancelled"));
+      if (pick === "local") {
+        await uploadToDrive(serialize());
+        return setStatus("ok", t("dUploaded"));
+      }
+      config.set(remote.cfg, { source: "remote" });
+      return setStatus("ok", mode === "upload" ? t("dUsedRemoteNoUpload") : t("dUsedRemote"));
+    } catch (e3) {
+      console.error(`[cttf] Drive ${mode} failed`);
+      setStatus("error", e3?.message || t("dInvalid"));
+    } finally {
+      busy2 = false;
+      setStatus(status.kind, status.text);
+    }
+  }
+  function SyncField({ label, value, onInput, secret, minRows = 1, placeholder }) {
+    const [visible2, setVisible] = useState(!secret);
+    const ref = useRef(null);
+    useEffect(() => {
+      const el = ref.current;
+      if (!el) return;
+      const cs = getComputedStyle(el);
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2 || 18;
+      const extra2 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      if (secret && !visible2) {
+        el.style.height = `${lh + extra2}px`;
+        return;
+      }
+      el.style.height = "auto";
+      el.style.height = `${Math.max(el.scrollHeight, lh * minRows + extra2)}px`;
+    });
+    return h(
+      "label",
+      { className: "uspp-cttf-ds-flabel" },
+      h("span", { className: "uspp-cttf-ds-fname" }, "·", label),
+      h(
+        "div",
+        { className: "uspp-cttf-ds-field", "data-visible": String(visible2) },
+        h("textarea", { ref, className: "uspp-cttf-ds-ta", rows: minRows, value, placeholder, autoComplete: "off", spellCheck: false, onInput: (e3) => onInput(e3.target.value) }),
+        secret && h("button", { type: "button", className: "uspp-cttf-ds-eye", "aria-label": t("dToggleVis"), "aria-pressed": String(visible2), title: visible2 ? t("dHide") : t("dShow"), onClick: () => setVisible(!visible2) }, visible2 ? "🙈" : "👁")
+      )
+    );
+  }
+  var dirtyRef = { dirty: false, save: () => {
+  } };
+  function DriveSection() {
+    useLive();
+    const [, force] = useState(0);
+    useEffect(() => {
+      const f3 = () => force((x4) => x4 + 1);
+      statusListeners.add(f3);
+      const off = drive.subscribe(f3);
+      return () => {
+        statusListeners.delete(f3);
+        off();
+      };
+    }, []);
+    const saved = drive.get();
+    const [draft, setDraft] = useState(() => normDraft(saved));
+    const set = (k4, v3) => setDraft((d3) => ({ ...d3, [k4]: v3 }));
+    const dirty2 = JSON.stringify(normDraft(draft)) !== JSON.stringify(normDraft(saved));
+    const doSave = () => {
+      saveDraft(draft);
+      setDraft(normDraft(drive.get()));
+    };
+    dirtyRef.dirty = saved.enabled && dirty2;
+    dirtyRef.save = doSave;
+    useEffect(() => {
+      const guard = async () => {
+        if (!dirtyRef.dirty) return true;
+        const pick = await chooseBox({ title: t("dUnsavedTitle"), body: t("dUnsavedMsg"), width: 420, choices: [
+          { label: t("dContinue"), value: "keep", kind: "plain" },
+          { label: t("dDiscard"), value: "discard", kind: "danger" },
+          { label: t("dSaveClose"), value: "save", kind: "primary" }
+        ] });
+        if (pick === "save") {
+          dirtyRef.save();
+          setStatus("ok", t("dSaved"));
+          return true;
+        }
+        return pick === "discard";
+      };
+      entry.closeGuards.add(guard);
+      return () => entry.closeGuards.delete(guard);
+    }, []);
+    const on2 = saved.enabled === true;
+    const applyNow = (patch) => {
+      const d3 = { ...draft, ...patch };
+      setDraft(d3);
+      saveDraft(d3);
+    };
+    const go = async (mode) => {
+      doSave();
+      await run(mode);
+    };
+    return h(
+      "div",
+      { className: "uspp-cttf-ds" },
+      h(
+        "div",
+        { className: "uspp-cttf-ds-headwrap" },
+        h(
+          "div",
+          { className: "uspp-cttf-ds-head" },
+          h("div", { className: "uspp-cttf-ds-title" }, t("dTitle")),
+          h(
+            "div",
+            { className: "uspp-cttf-cfg-switchwrap" },
+            h(
+              "label",
+              { className: "uspp-cttf-cfg-switch", title: t("dToggleTip") },
+              h("input", { type: "checkbox", checked: on2, onChange: (e3) => {
+                drive.set({ enabled: e3.target.checked });
+                setStatus("info", "");
+              } }),
+              h("span", { className: "uspp-cttf-cfg-slider" })
+            )
+          )
+        ),
+        h("div", { className: "uspp-cttf-ds-modstatus" }, on2 ? "" : t("dOffDefault"))
+      ),
+      on2 && h(
+        "div",
+        { className: "uspp-cttf-ds-box" },
+        h(
+          "div",
+          { className: "uspp-cttf-ds-inner" },
+          h(
+            "div",
+            { className: "uspp-cttf-ds-modewrap" },
+            h(
+              "div",
+              { className: "uspp-cttf-ds-modegrid" },
+              h("span", { className: "uspp-cttf-ds-modelabel" }, t("dRequestMode"), ":"),
+              h("div", { className: "uspp-cttf-ds-modes" }, [["default", t("dModeDefault"), t("dModeDefaultTip")], ["adguard", t("dModeAdguard"), t("dModeAdguardTip")]].map(([v3, label, tip]) => h("button", { key: v3, type: "button", className: "uspp-cttf-ds-mode" + (draft.requestMode === v3 ? " uspp-cttf-active" : ""), title: tip, "aria-pressed": String(draft.requestMode === v3), onClick: () => applyNow({ requestMode: v3 }) }, label)))
+            )
+          ),
+          h("div", { className: "uspp-cttf-ds-hr" }),
+          h(
+            "div",
+            { className: "uspp-cttf-ds-fold" },
+            h(
+              "div",
+              { className: "uspp-cttf-ds-foldhead", onClick: () => applyNow({ configCollapsed: !draft.configCollapsed }) },
+              h("span", { className: "uspp-cttf-ds-foldtitle" }, t("dConfigInfo")),
+              h("span", { className: "uspp-cttf-ds-arrow" }, draft.configCollapsed ? "▶" : "▼")
+            ),
+            !draft.configCollapsed && h(
+              "div",
+              { className: "uspp-cttf-ds-fields" },
+              h(SyncField, { label: t("dClientId"), value: draft.clientId, minRows: 3, placeholder: "xxx.apps.googleusercontent.com", onInput: (v3) => set("clientId", v3) }),
+              h(SyncField, { label: t("dClientSecret"), value: draft.clientSecret, secret: true, placeholder: "your_client_secret", onInput: (v3) => set("clientSecret", v3) }),
+              h(SyncField, { label: t("dRefreshToken"), value: draft.refreshToken, secret: true, placeholder: "ya29....", onInput: (v3) => set("refreshToken", v3) }),
+              h(SyncField, { label: t("dFileName"), value: draft.fileName, placeholder: DEFAULT_DRIVE_FILE, onInput: (v3) => set("fileName", v3) })
+            )
+          )
+        ),
+        !draft.configCollapsed && h(
+          "div",
+          { className: "uspp-cttf-ds-saverow" },
+          h("button", { type: "button", className: "uspp-cttf-ds-btn uspp-cttf-ds-save", disabled: busy2, onClick: () => {
+            doSave();
+            setStatus("ok", t("dSaved"));
+          } }, t("dSave"))
+        ),
+        h("div", { className: "uspp-cttf-ds-hr uspp-cttf-ds-hr2" }),
+        h(
+          "div",
+          { className: "uspp-cttf-ds-actrow" },
+          h(
+            "div",
+            { className: "uspp-cttf-ds-acts" },
+            h("button", { type: "button", className: "uspp-cttf-ds-btn uspp-cttf-ds-up", disabled: busy2, onClick: () => go("upload") }, t("dUpload")),
+            h("button", { type: "button", className: "uspp-cttf-ds-btn uspp-cttf-ds-pull", disabled: busy2, onClick: () => go("pull") }, t("dPull"))
+          ),
+          h("span", { className: "uspp-cttf-ds-status", "data-kind": status.kind }, status.text)
+        )
+      )
+    );
+  }
+  var DriveSync_default = (U4) => U4.definePlugin({
+    name: "DriveSync",
+    description: "Sync the template config through Google Drive (OAuth refresh token): upload, pull and a diff choice, as in the original script. Off by default.",
+    authors: ["0-V-linuxdo"],
+    // 不设 required、不设 enabledByDefault:默认关闭
+    preview: livePreview(() => {
+      const s3 = drive.get();
+      return h(
+        "div",
+        { className: "uspp-cttf-demo-list" },
+        h("div", null, h("span", null, t("dTitle")), h("span", { className: "uspp-cttf-muted" }, s3.enabled ? t("yes") : t("no"))),
+        h("div", { className: "uspp-cttf-muted" }, t("lastSync", { t: s3.lastSyncedAt ? new Date(s3.lastSyncedAt).toLocaleString() : t("never") }))
+      );
+    }, () => t("previewDrive")),
+    settings: U4.definePluginSettings({ sync: openerSetting({ description: () => t("setDriveDesc"), label: () => t("tabSync"), onOpen: () => entry.openScriptConfig?.("sync") }) }),
+    startAt: U4.StartAt.SiteReady,
+    slots: { syncSections: { label: () => t("dTitle"), order: 10, render: DriveSection } },
+    start() {
+      drive.watch();
+    }
+  });
+
   // sites/chat/plugins/PromptManager/index.js
   var DRAG_FOLDER = "application/x-cttf-folder";
-  function PanelIcon({ open }) {
-    const p3 = (d3) => h("path", { d: d3 });
-    return h(
-      "svg",
-      { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
-      h("rect", { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
-      p3("M9 3v18"),
-      open ? p3("M16 15l-3-3 3-3") : p3("M14 9l3 3-3 3")
-    );
+  var SIDEBAR_PATH = "M 7.7148 49.5742 L 48.2852 49.5742 C 53.1836 49.5742 55.6446 47.1367 55.6446 42.3086 L 55.6446 13.6914 C 55.6446 8.8633 53.1836 6.4258 48.2852 6.4258 L 7.7148 6.4258 C 2.8398 6.4258 .3554 8.8398 .3554 13.6914 L .3554 42.3086 C .3554 47.1602 2.8398 49.5742 7.7148 49.5742 Z M 7.7851 45.8008 C 5.4413 45.8008 4.1288 44.5586 4.1288 42.1211 L 4.1288 13.8789 C 4.1288 11.4414 5.4413 10.1992 7.7851 10.1992 L 18.2148 10.1992 L 18.2148 45.8008 Z M 48.2147 10.1992 C 50.5350 10.1992 51.8708 11.4414 51.8708 13.8789 L 51.8708 42.1211 C 51.8708 44.5586 50.5350 45.8008 48.2147 45.8008 L 21.8944 45.8008 L 21.8944 10.1992 Z M 13.7148 18.8945 C 14.4179 18.8945 15.0507 18.2617 15.0507 17.5820 C 15.0507 16.8789 14.4179 16.2696 13.7148 16.2696 L 8.6757 16.2696 C 7.9726 16.2696 7.3632 16.8789 7.3632 17.5820 C 7.3632 18.2617 7.9726 18.8945 8.6757 18.8945 Z M 13.7148 24.9649 C 14.4179 24.9649 15.0507 24.3320 15.0507 23.6289 C 15.0507 22.9258 14.4179 22.3398 13.7148 22.3398 L 8.6757 22.3398 C 7.9726 22.3398 7.3632 22.9258 7.3632 23.6289 C 7.3632 24.3320 7.9726 24.9649 8.6757 24.9649 Z M 13.7148 31.0118 C 14.4179 31.0118 15.0507 30.4258 15.0507 29.7227 C 15.0507 29.0196 14.4179 28.4102 13.7148 28.4102 L 8.6757 28.4102 C 7.9726 28.4102 7.3632 29.0196 7.3632 29.7227 C 7.3632 30.4258 7.9726 31.0118 8.6757 31.0118 Z";
+  function PanelIcon() {
+    return h("svg", { width: 16, height: 16, viewBox: "0 0 56 56", fill: "currentColor", "aria-hidden": "true", style: { display: "block", flex: "0 0 auto" } }, h("path", { d: SIDEBAR_PATH }));
   }
   var PromptManager_default = (U4) => {
     let selected = null;
@@ -2780,28 +6023,27 @@
       return h(
         Fragment,
         null,
-        h(DialogHeader, { title: original ? t("editFolderTitle") : t("newFolderTitle"), close }),
+        h(
+          DialogHeader,
+          { title: original ? t("editFolderTitle") : t("newFolderTitle"), bar: true },
+          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || t("previewFolderLabel"), folder: { color, textColor }, withIcon: false }))
+        ),
         h(
           DialogBody,
           null,
-          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || "📁", folder: { color, textColor } })),
           h(Field, { label: t("folderName"), error: err }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: name, autoFocus: true, onInput: (e3) => {
             setName(e3.target.value);
             setErr("");
           }, onKeyDown: (e3) => {
             if (e3.key === "Enter") submit();
           } })),
-          h(
-            "div",
-            { className: "uspp-cttf-grid2" },
-            h(ColorField, { label: t("bgColor"), value: color, onChange: setColor }),
-            h(ColorField, { label: t("textColor"), value: textColor, onChange: setTextColor })
-          )
+          h(ColorField, { label: t("bgColor"), value: color, onChange: setColor }),
+          h(ColorField, { label: t("textColor"), value: textColor, onChange: setTextColor })
         ),
-        h(DialogFooter, null, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("save")))
+        h(DialogFooter, { split: true }, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("confirm")))
       );
     }
-    const editFolder = (name) => openDialog(FolderEditor, { name }, { key: "folder-editor", dismissable: false, width: 500 });
+    const editFolder = (name) => openDialog(FolderEditor, { name }, { key: "folder-editor", dismissable: false, width: 500, className: "uspp-cttf-dlg-ed uspp-cttf-dlg-folder" });
     async function deleteFolder(name) {
       const f3 = config.data.folders[name];
       if (!f3) return;
@@ -2812,11 +6054,24 @@
         body: () => h(
           Fragment,
           null,
-          h("div", { className: "uspp-cttf-warn2" }, t("irreversible")),
-          h("div", null, t("delFolderWarn")),
+          h("div", { className: "uspp-cttf-del-note" }, t("irreversible"), h("br"), t("delFolderWarn")),
           name === TOOL_FOLDER && h("div", { className: "uspp-cttf-muted2" }, t("delToolFolderNote")),
-          h("div", { className: "uspp-cttf-muted2" }, t("folderAppearance", { name, bg: f3.color, fg: f3.textColor })),
-          h("div", { className: "uspp-cttf-btn-preview", style: { flexWrap: "wrap", gap: "6px" } }, Object.entries(f3.buttons).map(([bn2, b3]) => h(Chip, { key: bn2, name: bn2, btn: b3 })))
+          h(
+            Card,
+            { plain: true },
+            h("div", { className: "uspp-cttf-del-head" }, h("strong", null, t("delFolderPreview")), h("span", { className: "uspp-cttf-del-chip", style: { background: f3.color, color: f3.textColor } }, name)),
+            h(DotLi, null, t("liName"), " ", name),
+            h(DotLi, null, t("liBg"), " ", h(Swatch, { color: f3.color }), f3.color),
+            h(DotLi, null, t("liFg"), " ", h(Swatch, { color: f3.textColor }), f3.textColor),
+            h("hr", { className: "uspp-cttf-del-hr" }),
+            h("div", { className: "uspp-cttf-del-head" }, h("strong", null, t("delFolderAll"))),
+            h("div", { className: "uspp-cttf-del-list" }, Object.entries(f3.buttons).map(([bn2, b3]) => h(
+              "div",
+              { key: bn2, className: "uspp-cttf-del-item" },
+              h("span", { className: "uspp-cttf-del-chip uspp-cttf-del-chip-sm", style: { background: b3.color, color: b3.textColor } }, bn2),
+              h("span", null, bn2)
+            )))
+          )
         )
       });
       if (!ok) return;
@@ -2883,21 +6138,24 @@
       return h(
         Fragment,
         null,
-        h(DialogHeader, { title: original ? t("editButtonTitle") : t("newButtonTitle"), close }),
+        h(
+          DialogHeader,
+          { title: original ? t("editButtonTitle") : t("newButtonTitle"), bar: true },
+          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || t("previewButtonLabel"), btn: preview, title: text, withIcon: false }))
+        ),
         h(
           DialogBody,
           null,
-          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name: name || "🔖", btn: preview, title: text })),
           h(Tabs, { tabs, value: tab, onChange: setTab }),
           err && h("div", { className: "uspp-cttf-field-err" }, err),
           tab === "template" && h(
-            Fragment,
-            null,
+            Card,
+            { className: "uspp-cttf-tpl-card" },
             h(
               "div",
               { className: "uspp-cttf-row2" },
-              h("span", { className: "uspp-cttf-muted2" }, t("insertVar")),
-              [["varInput", "{inputboard}"], ["varClipboard", "{clipboard}"], ["varSelection", "{selection}"], ["varInputOrClip", "{{inputboard}|{clipboard}}"]].map(([k4, v3]) => h(Btn, { key: k4, kind: "plain", size: "sm", onMouseDown: (e3) => e3.preventDefault(), onClick: () => insertVar(v3), title: v3 }, t(k4)))
+              h("span", { className: "uspp-cttf-tpl-label" }, t("insertVar")),
+              [["varInput", "{inputboard}"], ["varClipboard", "{clipboard}"], ["varSelection", "{selection}"], ["varInputOrClip", "{{inputboard}|{clipboard}}"]].map(([k4, v3]) => h(Btn, { key: k4, kind: "var", size: "sm", onMouseDown: (e3) => e3.preventDefault(), onClick: () => insertVar(v3), title: v3 }, t(k4)))
             ),
             h("textarea", { ref: ta, className: "uspp-cttf-textarea uspp-cttf-ta", value: text, placeholder: t("templatePlaceholder"), onInput: (e3) => setText2(e3.target.value), spellCheck: false })
           ),
@@ -2908,23 +6166,19 @@
               setName(e3.target.value);
               setErr("");
             } })),
-            !isTool && h(Field, { label: t("buttonIcon"), hint: t("buttonIconHint") }, h("input", { className: "uspp-cttf-input uspp-cttf-in", value: favicon, placeholder: "https://… / data:image/…", onInput: (e3) => setFavicon(e3.target.value) })),
-            h(
-              "div",
-              { className: "uspp-cttf-grid2" },
-              h(ColorField, { label: t("bgColor"), value: color, onChange: setColor }),
-              h(ColorField, { label: t("textColor"), value: textColor, onChange: setTextColor })
-            )
+            !isTool && h(Field, { label: t("buttonIcon") }, h(FaviconField, { value: favicon, onChange: setFavicon, preview: /^(https?:|data:)/i.test(favicon.trim()) ? favicon.trim() : "", fallback: buttonIcon(name, { type: "template" }).emoji || buttonIcon(name, { type: "template" }).fallback, placeholder: t("faviconPh"), hint: t("buttonIconHint") })),
+            h(ColorField, { label: t("bgColor"), value: color, onChange: setColor }),
+            h(ColorField, { label: t("textColor"), value: textColor, onChange: setTextColor })
           ),
-          tab === "submit" && h(SwitchRow, { title: t("autoSubmitLabel"), checked: !!auto, onChange: setAuto })
+          tab === "submit" && h("label", { className: "uspp-cttf-auto-cb" }, h("input", { type: "checkbox", checked: !!auto, onChange: (e3) => setAuto(e3.target.checked) }), t("autoSubmitLabel"))
         ),
-        h(DialogFooter, null, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("save")))
+        h(DialogFooter, { split: true }, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, t("confirm")))
       );
     }
     const editButton = (folder, name) => {
       const b3 = name ? config.data.folders[folder]?.buttons[name] : null;
       if (b3?.type === "tool" && folder === TOOL_FOLDER) return toast(t("toolLocked"), "WARNING");
-      openDialog(ButtonEditor, { folder, name }, { key: "button-editor", dismissable: false, width: 500 });
+      openDialog(ButtonEditor, { folder, name }, { key: "button-editor", dismissable: false, width: 500, className: "uspp-cttf-dlg-ed" });
     };
     async function deleteButton(folder, name) {
       const b3 = config.data.folders[folder]?.buttons[name];
@@ -2937,11 +6191,22 @@
         body: () => h(
           Fragment,
           null,
-          h("div", { className: "uspp-cttf-btn-preview" }, h(Chip, { name, btn: b3 })),
-          h("div", { className: "uspp-cttf-muted2" }, t("folderAppearance", { name, bg: b3.color, fg: b3.textColor })),
-          b3.type === "template" && h(Field, { label: t("template") }, h("textarea", { className: "uspp-cttf-textarea uspp-cttf-ta", style: { minHeight: "80px" }, readOnly: true, value: b3.text })),
-          b3.type === "template" && h("div", { className: "uspp-cttf-muted2" }, `${t("colAutoSubmit")}: ${b3.autoSubmit ? t("yes") : t("no")}`),
-          h("div", { className: "uspp-cttf-warn2" }, t("irreversible"))
+          h("div", { className: "uspp-cttf-del-note" }, t("irreversible")),
+          h(
+            Card,
+            { plain: true },
+            h("div", { className: "uspp-cttf-del-head" }, h("strong", null, t("delBtnPreview")), h("span", { className: "uspp-cttf-del-chip uspp-cttf-del-chip-btn", style: { background: b3.color, color: b3.textColor } }, name)),
+            h(DotLi, null, t("liName"), " ", name),
+            h(DotLi, null, t("liBtnBg"), " ", h(Swatch, { color: b3.color }), b3.color),
+            h(DotLi, null, t("liBtnFg"), " ", h(Swatch, { color: b3.textColor }), b3.textColor),
+            b3.type === "template" && h(
+              Fragment,
+              null,
+              h("hr", { className: "uspp-cttf-del-hr" }),
+              h("div", { className: "uspp-cttf-del-head" }, h("strong", null, t("delBtnTpl"))),
+              h("textarea", { className: "uspp-cttf-textarea uspp-cttf-ta uspp-cttf-del-ta", readOnly: true, value: b3.text })
+            )
+          )
         )
       });
       if (!ok) return;
@@ -3006,7 +6271,7 @@
             }
           },
           h("div", { style: { display: "flex", alignItems: "center", gap: "6px", minWidth: 0 } }, h(Chip, { name, folder: f3, withIcon: c3.showFolderIcons, title: t("folderButtonCount", { name, n: n2 }) })),
-          h("div", { className: "uspp-cttf-center uspp-cttf-mini-switch", onClick: (e3) => e3.stopPropagation() }, h(Switch, { checked: !f3.hidden, label: t("colShow"), onChange: (v3) => save((d3) => {
+          h("div", { className: "uspp-cttf-center uspp-cttf-mini-switch", onClick: (e3) => e3.stopPropagation() }, h(Checkbox, { checked: !f3.hidden, label: t("colShow"), onChange: (v3) => save((d3) => {
             d3.folders[name].hidden = !v3;
           }) })),
           h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: (e3) => {
@@ -3054,7 +6319,7 @@
           },
           h("div", { style: { minWidth: 0 } }, h(Chip, { name, btn: b3, title: b3.text })),
           h("div", { className: "uspp-cttf-vars", title: vars }, vars),
-          h("div", { className: "uspp-cttf-center" }, b3.type === "tool" ? "—" : h("div", { className: "uspp-cttf-mini-switch" }, h(Switch, { checked: !!b3.autoSubmit, label: t("colAutoSubmit"), onChange: (v3) => save((d3) => {
+          h("div", { className: "uspp-cttf-center" }, b3.type === "tool" ? "—" : h("div", { className: "uspp-cttf-mini-switch" }, h(Checkbox, { checked: !!b3.autoSubmit, label: t("colAutoSubmit"), onChange: (v3) => save((d3) => {
             d3.folders[selected].buttons[name].autoSubmit = v3;
           }) }))),
           h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => editButton(selected, name) }),
@@ -3070,15 +6335,15 @@
           {
             title: t("panelTitle"),
             close,
-            lead: h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-side-toggle", title: t("toggleSidebar"), "aria-label": t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
+            lead: h("button", { type: "button", className: "uspp-cttf-btn uspp-cttf-btn-icon uspp-cttf-side-toggle", title: collapsed ? t("expandSidebar") : t("toggleSidebar"), "aria-label": collapsed ? t("expandSidebar") : t("toggleSidebar"), "aria-expanded": String(!collapsed), onClick: () => {
               sideCollapsed = !collapsed;
               setCollapsed(!collapsed);
-            } }, h(PanelIcon, { open: !collapsed }))
+            } }, h(PanelIcon))
           },
           h(Badge, { kind: "folders", title: t("folderCount", { n: s3.folders }) }, String(s3.folders)),
           h(Badge, { kind: "buttons", title: t("buttonCount", { n: s3.buttons }) }, String(s3.buttons)),
           h("span", { style: { flex: 1 } }),
-          headerItems.map((it) => h(Btn, { key: it.id, kind: "plain", onClick: () => it.onClick?.() }, typeof it.label === "function" ? it.label() : it.label))
+          headerItems.map((it) => h(Btn, { key: it.id, kind: "info", onClick: () => it.onClick?.() }, typeof it.label === "function" ? it.label() : it.label))
         ),
         h(
           "div",
@@ -3259,12 +6524,357 @@
     });
   };
 
+  // sites/chat/plugins/SiteStyleRules/index.js
+  var MATCHER_TYPES = () => [["domain", t("mDomain")], ["url-prefix", t("mUrlPrefix")], ["url", t("mUrl")], ["regexp", t("mRegexp")]];
+  var typeLabel = (type) => (MATCHER_TYPES().find(([v3]) => v3 === type) || [, t("matchersLabel")])[1];
+  var fmtTime = (ts) => Number(ts) > 0 ? new Date(Number(ts)).toLocaleString() : t("infoSnapshot");
+  var fmtSource = (url) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url || "-";
+    }
+  };
+  var stamp = () => {
+    const d3 = /* @__PURE__ */ new Date(), p3 = (n2) => String(n2).padStart(2, "0");
+    return `${d3.getFullYear()}${p3(d3.getMonth() + 1)}${p3(d3.getDate())}-${p3(d3.getHours())}${p3(d3.getMinutes())}${p3(d3.getSeconds())}`;
+  };
+  function SiteIcon2({ src, fallback = "🌐", size = 26 }) {
+    const [bad, setBad] = useState(false);
+    if (!src || bad) return h("span", { className: "uspp-cttf-ss-ic", style: { fontSize: size === 26 ? "16px" : `${Math.round(size * 0.7)}px` } }, fallback);
+    return h("img", { className: "uspp-cttf-ss-ic", src, alt: "", width: size, height: size, referrerPolicy: "no-referrer", loading: "lazy", onError: () => setBad(true) });
+  }
+  var Pill = ({ kind, children }) => h("span", { className: "uspp-cttf-ss-pill", "data-kind": kind }, children);
+  function StyleEditor({ close, index, draft }) {
+    useEffect(() => editingGuard.enter(), []);
+    const cur = index != null ? (config.data.customStyleRules || [])[index] : null;
+    const base = cur || draft || {};
+    const [tab, setTab] = useState("basic");
+    const [name, setName] = useState(base.name || "");
+    const [matchers, setMatchers] = useState(() => (Array.isArray(base.matchers) && base.matchers.length ? base.matchers : [{ type: "domain", value: location.hostname }]).map((m3) => ({ type: m3.type || "domain", value: m3.value || "" })));
+    const [favicon, setFavicon] = useState(base.favicon || "");
+    const [height, setHeight] = useState(base.layout?.height ?? "");
+    const [bottom, setBottom] = useState(base.layout?.bottomSpacing ?? "");
+    const [css, setCss] = useState(base.cssCode || "");
+    const [err, setErr] = useState("");
+    const host2 = matchers.find((m3) => m3.type === "domain")?.value || (() => {
+      try {
+        return new URL(matchers[0]?.value).hostname;
+      } catch {
+        return "";
+      }
+    })();
+    const setM = (i3, patch) => setMatchers((ms) => ms.map((m3, j4) => j4 === i3 ? { ...m3, ...patch } : m3));
+    const submit = () => {
+      const ms = [];
+      for (const m3 of matchers) {
+        if (!m3.value.trim()) continue;
+        try {
+          const n2 = normalizeStyleMatcher(m3);
+          if (n2) ms.push(n2);
+        } catch {
+          setTab("basic");
+          return setErr(t("badRegexp", { v: m3.value }));
+        }
+      }
+      if (!ms.length) {
+        setTab("basic");
+        return setErr(t("noMatcher"));
+      }
+      const layout = {};
+      const hh = clampStyleHeight(height), bb = clampBottomSpacing(bottom);
+      if (typeof hh === "number") layout.height = hh;
+      if (typeof bb === "number") layout.bottomSpacing = bb;
+      const rule = ensureStyleRule({ id: cur?.id, name: name.trim() || t("untitledCustom"), source: "custom", enabled: cur ? cur.enabled !== false : true, matchers: ms, cssCode: css, layout, favicon: favicon.trim() || faviconFor(host2) }, { fallbackSource: "custom" });
+      updateCustom((list) => {
+        if (index != null && list[index]) list[index] = rule;
+        else list.push(rule);
+      });
+      close();
+    };
+    const tabs = [["basic", t("styleTabBasic")], ["layout", t("styleTabLayout")], ["css", t("styleTabCss")]];
+    return h(
+      Fragment,
+      null,
+      // 原版 style-editor-dialog:无右上角关闭;卡片 gap 16 / padding 16;胶囊标签页;字段为 13px/600 标签 + 40px 输入框
+      h(DialogHeader, { title: index != null ? t("editStyleTitle") : t("newStyleTitle") }),
+      h(
+        DialogBody,
+        null,
+        err && h("div", { className: "uspp-cttf-field-err" }, err),
+        h(
+          "div",
+          { className: "uspp-cttf-rule-card uspp-cttf-ss-editor" },
+          h("div", { className: "uspp-cttf-ss-pills", role: "tablist" }, tabs.map(([v3, l3]) => h("button", { key: v3, type: "button", role: "tab", className: "uspp-cttf-ss-pilltab", "aria-selected": String(tab === v3), onClick: () => setTab(v3) }, l3))),
+          h(
+            "div",
+            { className: "uspp-cttf-ss-panel" },
+            tab === "basic" && h(
+              Fragment,
+              null,
+              h("label", { className: "uspp-cttf-rl" }, t("styleName"), h("input", { className: "uspp-cttf-rin", value: name, onInput: (e3) => setName(e3.target.value) })),
+              h(
+                "div",
+                { className: "uspp-cttf-ss-msect" },
+                h("label", { className: "uspp-cttf-ss-mtitle" }, t("matchersLabel")),
+                h("div", { className: "uspp-cttf-ss-mrows" }, matchers.map((m3, i3) => h(
+                  "div",
+                  { key: i3, className: "uspp-cttf-ss-mrow" },
+                  h("select", { className: "uspp-cttf-ss-select", value: m3.type, onChange: (e3) => setM(i3, { type: e3.target.value }) }, MATCHER_TYPES().map(([v3, l3]) => h("option", { key: v3, value: v3 }, l3))),
+                  h("input", { className: "uspp-cttf-rin uspp-cttf-ss-mval", value: m3.value, spellCheck: false, onInput: (e3) => {
+                    setM(i3, { value: e3.target.value });
+                    setErr("");
+                  } }),
+                  h("button", { type: "button", className: "uspp-cttf-ss-x", title: t("removeMatcher"), "aria-label": t("removeMatcher"), onClick: () => setMatchers((ms) => ms.filter((_3, j4) => j4 !== i3)) }, "✕")
+                ))),
+                h("button", { type: "button", className: "uspp-cttf-ss-addm", onClick: () => setMatchers((ms) => [...ms, { type: "domain", value: "" }]) }, t("addMatcher"))
+              ),
+              h("label", { className: "uspp-cttf-rl" }, t("styleIcon"), h(FaviconField, { value: favicon, onChange: setFavicon, preview: favicon.trim() || faviconFor(host2), fallback: "🎨", placeholder: t("styleIconPh"), hint: t("styleIconHint"), onAuto: () => setFavicon(faviconFor(host2)), autoLabel: t("fetchIcon") }))
+            ),
+            tab === "layout" && h(
+              Fragment,
+              null,
+              h("label", { className: "uspp-cttf-rl" }, t("heightOpt"), h("input", { className: "uspp-cttf-rin", type: "number", min: 20, max: 200, step: 1, value: height, placeholder: t("inherit"), onInput: (e3) => setHeight(e3.target.value) })),
+              h("label", { className: "uspp-cttf-rl" }, t("bottomOpt"), h("input", { className: "uspp-cttf-rin", type: "number", min: -200, max: 200, step: 1, value: bottom, placeholder: t("inherit"), onInput: (e3) => setBottom(e3.target.value) }))
+            ),
+            tab === "css" && h("label", { className: "uspp-cttf-rl" }, t("cssLabel"), h("textarea", { className: "uspp-cttf-ss-css", value: css, spellCheck: false, onInput: (e3) => setCss(e3.target.value) }))
+          )
+        )
+      ),
+      h(DialogFooter, { split: true }, h(Btn, { kind: "cancel", onClick: close }, t("cancel")), h(Btn, { kind: "primary", onClick: submit }, index != null ? t("save") : t("create")))
+    );
+  }
+  var editStyle = (index, draft) => openDialog(StyleEditor, { index, draft }, { key: "style-editor", dismissable: false, width: 560, className: "uspp-cttf-dlg-u uspp-cttf-dlg-sse" });
+  function RuleRow({ rule, index, label, official }) {
+    const [open, setOpen] = useState(false);
+    const name = stripLabel(rule.name, label) || rule.name || (official ? t("untitledOfficial") : t("untitledCustom"));
+    const toggle = (on3) => {
+      if (official) updateOfficial((b3) => {
+        const r3 = b3.rules.find((x4) => x4.id === rule.id);
+        if (r3) r3.enabled = on3;
+      });
+      else updateCustom((list) => {
+        if (list[index]) list[index] = { ...list[index], enabled: on3 };
+      });
+    };
+    const del = async () => {
+      const ok = await confirmBox({ title: t("delStyleConfirm", { name: rule.name || t("untitledCustom") }), danger: true, confirmText: t("delete") });
+      if (ok) updateCustom((list) => {
+        list.splice(index, 1);
+      });
+    };
+    const on2 = rule.enabled !== false;
+    const groups = groupMatchers(rule.matchers);
+    const urlOnly = rule.matchers.length > 0 && rule.matchers.every((m3) => m3.type !== "regexp");
+    const lay = rule.layout || {};
+    return h(
+      "div",
+      { className: "uspp-cttf-ss-rule", "data-off": String(!on2) },
+      h(
+        "div",
+        { className: "uspp-cttf-ss-rule-head", role: "button", tabIndex: 0, onClick: () => setOpen(!open), onKeyDown: (e3) => {
+          if (e3.key === "Enter" || e3.key === " ") {
+            e3.preventDefault();
+            setOpen(!open);
+          }
+        } },
+        h("label", { className: "uspp-cttf-ss-toggle", title: on2 ? t("disableRuleTip") : t("enableRuleTip"), onClick: (e3) => e3.stopPropagation() }, h("input", { type: "checkbox", checked: on2, "aria-label": on2 ? t("disableRuleTip") : t("enableRuleTip"), onChange: (e3) => toggle(e3.target.checked) })),
+        h("strong", { className: "uspp-cttf-ss-rule-name" }, name),
+        !official && h(
+          "span",
+          { className: "uspp-cttf-ss-rule-acts", onClick: (e3) => e3.stopPropagation() },
+          h(IconBtn, { icon: "EditIcon", label: t("colEdit"), onClick: () => editStyle(index) }),
+          h(IconBtn, { icon: "TrashIcon", label: t("colDelete"), onClick: del })
+        )
+      ),
+      // 原版展开区:匹配规则 / CSS / 布局徽章(按钮栏高度、距页面底部,未设置时显示「继承」),间距 10
+      open && h(
+        "div",
+        { className: "uspp-cttf-ss-details" },
+        h(
+          "div",
+          { className: "uspp-cttf-ss-sec uspp-cttf-ss-msec" },
+          h("span", { className: "uspp-cttf-ss-sec-label" }, urlOnly ? t("urlLabel") : t("matchersLabel")),
+          h("div", { className: "uspp-cttf-ss-mlist" }, groups.map((g4) => h(
+            "div",
+            { key: g4.type, className: "uspp-cttf-ss-mgroup" },
+            h("span", { className: "uspp-cttf-ss-mtype" }, typeLabel(g4.type)),
+            g4.values.length > 1 ? h("ul", null, g4.values.map((v3, i3) => h("li", { key: i3 }, h("code", null, v3)))) : h("div", null, h("code", null, g4.values[0]))
+          )))
+        ),
+        h(
+          "div",
+          { className: "uspp-cttf-ss-sec uspp-cttf-ss-csec" },
+          h("span", { className: "uspp-cttf-ss-sec-label" }, t("cssShort")),
+          h("pre", { className: "uspp-cttf-ss-code", title: rule.cssCode || "" }, rule.cssCode || "—")
+        ),
+        h(
+          "div",
+          { className: "uspp-cttf-ss-laybadges" },
+          h("span", { className: "uspp-cttf-ss-laybadge uspp-cttf-ss-lay-h" }, `${t("heightShort")}: ${typeof lay.height === "number" ? `${lay.height}px` : t("layoutInherit")}`),
+          h("span", { className: "uspp-cttf-ss-laybadge uspp-cttf-ss-lay-b" }, `${t("bottomShort")}: ${typeof lay.bottomSpacing === "number" ? `${lay.bottomSpacing}px` : t("layoutInherit")}`)
+        )
+      )
+    );
+  }
+  function SiteRules({ close, groupKey, tab: initialTab }) {
+    useLive();
+    const [tab, setTab] = useState(initialTab || "official");
+    const g4 = siteGroups(t("otherSite")).find((x4) => x4.key === groupKey);
+    if (!g4) return h(Fragment, null, h(DialogHeader, { title: t("siteRulesTitle"), close }), h(DialogBody, null, h("div", { className: "uspp-cttf-ss-empty" }, t("stylesEmpty"))));
+    const list = tab === "official" ? g4.official : g4.custom;
+    const draft = () => ({ name: "", matchers: [{ type: "domain", value: g4.host || location.hostname }], favicon: g4.favicon });
+    return h(
+      Fragment,
+      null,
+      h(DialogHeader, { title: t("siteRulesTitle"), close }),
+      h(
+        DialogBody,
+        null,
+        h(
+          "div",
+          { className: "uspp-cttf-ss-site" },
+          h(SiteIcon2, { src: g4.favicon }),
+          h("div", { className: "uspp-cttf-ss-site-id" }, h("div", { className: "uspp-cttf-ss-site-name" }, h("strong", null, g4.label), g4.key === currentSiteKey() && h(Pill, { kind: "current" }, t("currentSite"))), h("div", { className: "uspp-cttf-sub" }, g4.host)),
+          h(
+            "div",
+            { className: "uspp-cttf-ss-site-tabs" },
+            h("button", { type: "button", className: "uspp-cttf-ss-srctab", "data-kind": "official", "aria-selected": String(tab === "official"), onClick: () => setTab("official") }, t("tabOfficialRules")),
+            h("button", { type: "button", className: "uspp-cttf-ss-srctab", "data-kind": "custom", "aria-selected": String(tab === "custom"), onClick: () => setTab("custom") }, t("tabCustomRules")),
+            h("span", { className: "uspp-cttf-ss-addhost", style: tab === "custom" ? null : { visibility: "hidden", pointerEvents: "none" } }, h(Btn, { kind: "add", onClick: () => editStyle(null, draft()) }, t("newRule")))
+          )
+        ),
+        list.length ? h("div", { className: "uspp-cttf-ss-rules" }, list.map((x4) => h(RuleRow, { key: (tab === "official" ? "o:" : "c:") + (x4.rule.id || x4.index), rule: x4.rule, index: x4.index, label: g4.label, official: tab === "official" }))) : h("div", { className: "uspp-cttf-ss-empty" }, tab === "official" ? t("noOfficialRules") : t("noCustomRules"))
+      )
+    );
+  }
+  async function pullOfficial(setBusy) {
+    setBusy(true);
+    try {
+      const text = await requestText(OFFICIAL_STYLE_SOURCE_URL);
+      const next = buildOfficialStyleBundleFromUserCss(text, { sourceUrl: OFFICIAL_STYLE_SOURCE_URL, lastFetchedAt: Date.now() });
+      if (!next.rules.length) throw new Error("empty");
+      const prev = new Map(officialBundle().rules.map((r3) => [r3.id, r3.enabled !== false]));
+      next.rules = next.rules.map((r3) => ({ ...r3, enabled: prev.has(r3.id) ? prev.get(r3.id) : r3.enabled !== false }));
+      config.update((d3) => {
+        d3.officialStyleBundle = next;
+      });
+      toast(t("fetchOk", { version: next.version || "-" }), "SUCCESS");
+    } catch (e3) {
+      toast(t("fetchFail", { msg: e3?.message || String(e3) }), "ERROR");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function exportCss() {
+    const text = serializeStylePackageToUserCss({ officialStyleBundle: officialBundle(), customStyleRules: customRules().map((x4) => x4.rule) });
+    download(text, `[Chat] Template Text Folders Styles ${stamp()}.user.css`, "text/css");
+    toast(t("exportCssOk"), "SUCCESS");
+  }
+  async function importCss() {
+    const text = await pickFile(".css,.user.css,text/css");
+    if (text == null) return;
+    let parsed;
+    try {
+      parsed = parseUserStyleFile(text);
+    } catch (e3) {
+      return toast(t("importCssFail", { msg: e3?.message || String(e3) }), "ERROR");
+    }
+    const grouped = splitRulesBySource(parsed.rules);
+    const version2 = parsed.metadata.officialVersion || officialBundle().version || "-";
+    const ok = await confirmBox({
+      title: t("importCssTitle"),
+      confirmText: t("confirm"),
+      body: () => h(Fragment, null, h("div", null, t("importCssSummary", { o: grouped.official.length, c: grouped.custom.length, v: version2 })), h("div", { className: "uspp-cttf-warn-box" }, h("span", { className: "uspp-cttf-warn-ic" }, "⚠️"), h("strong", null, t("importCssWarn"))))
+    });
+    if (!ok) return;
+    try {
+      const bundle = grouped.official.length ? buildOfficialStyleBundleFromUserCss(text, { sourceUrl: parsed.metadata.officialSourceUrl || OFFICIAL_STYLE_SOURCE_URL }) : officialBundle();
+      config.update((d3) => {
+        d3.officialStyleBundle = bundle;
+        d3.customStyleRules = grouped.custom.map((r3) => ({ ...r3, source: "custom" }));
+      });
+      toast(t("importCssOk"), "SUCCESS");
+    } catch (e3) {
+      toast(t("importCssFail", { msg: e3?.message || String(e3) }), "ERROR");
+    }
+  }
+  function StylesDialog({ close }) {
+    useLive();
+    const [busy4, setBusy] = useState(false);
+    const b3 = officialBundle();
+    const groups = siteGroups(t("otherSite"));
+    const cur = currentSiteKey();
+    const open = (key, tab) => openDialog(SiteRules, { groupKey: key, tab }, { key: "site-rules", width: 654, className: "uspp-cttf-dlg-u uspp-cttf-dlg-ss uspp-cttf-dlg-ssr" });
+    return h(
+      Fragment,
+      null,
+      h(
+        DialogHeader,
+        { title: t("siteStyles"), close },
+        h(Btn, { kind: "add", size: "sm", disabled: busy4, onClick: () => pullOfficial(setBusy) }, busy4 ? t("fetching") : t("pullOfficial"))
+      ),
+      h(
+        DialogBody,
+        null,
+        h(
+          "div",
+          { className: "uspp-cttf-ss-badges" },
+          h(Pill, { kind: "version" }, `${t("infoVersion")}: ${b3.version || t("infoSnapshot")}`),
+          h(Pill, { kind: "fetched" }, `${t("infoFetched")}: ${fmtTime(b3.lastFetchedAt)}`),
+          h(Pill, { kind: "source" }, `${t("infoSource")}: ${fmtSource(b3.sourceUrl || OFFICIAL_STYLE_SOURCE_URL)}`)
+        ),
+        h(
+          "div",
+          { className: "uspp-cttf-list-frame uspp-cttf-ss-frame" },
+          h("div", { className: "uspp-cttf-ss-row uspp-cttf-tbl-head" }, h("span", null, t("colIcon")), h("span", null, t("colSite")), h("span", null, t("colOfficialStyles")), h("span", null, t("colCustomStyles"))),
+          h(
+            "div",
+            { className: "uspp-cttf-list-body uspp-cttf-ss-body" },
+            groups.length ? groups.map((g4) => h(
+              "div",
+              { key: g4.key, className: "uspp-cttf-ss-row uspp-cttf-rule-row" },
+              h(SiteIcon2, { src: g4.favicon }),
+              h("div", { style: { minWidth: 0 } }, h("div", { className: "uspp-cttf-ss-site-name" }, h("strong", null, g4.label), g4.key === cur && h(Pill, { kind: "current" }, t("currentSite"))), h("div", { className: "uspp-cttf-sub" }, g4.host)),
+              h("button", { type: "button", className: "uspp-cttf-ss-count", "data-kind": "official", title: t("colOfficialStyles"), onClick: () => open(g4.key, "official") }, g4.official.length),
+              h("button", { type: "button", className: "uspp-cttf-ss-count", "data-kind": "custom", title: t("colCustomStyles"), onClick: () => open(g4.key, "custom") }, g4.custom.length)
+            )) : h("div", { className: "uspp-cttf-ss-empty" }, t("stylesEmpty"))
+          )
+        ),
+        h(
+          "div",
+          { className: "uspp-cttf-ss-foot" },
+          h(Btn, { kind: "add", onClick: () => editStyle(null, { matchers: [{ type: "domain", value: location.hostname }] }) }, t("newRule")),
+          h("span", { style: { flex: 1 } }),
+          h(Btn, { kind: "info", title: t("importCssTip"), onClick: importCss }, t("importCss")),
+          h(Btn, { kind: "success", title: t("exportCssTip"), onClick: exportCss }, t("exportCss"))
+        )
+      )
+    );
+  }
+  var SiteStyleRules_default = (U4) => {
+    const open = () => openDialog(StylesDialog, {}, { key: "site-styles", width: 700, className: "uspp-cttf-dlg-u uspp-cttf-dlg-ss" });
+    return U4.definePlugin({
+      name: "SiteStyleRules",
+      description: "Per-site style rules: official built-in rules plus your own CSS and toolbar layout overrides; .user.css import / export.",
+      authors: ["0-V-linuxdo"],
+      required: true,
+      preview: livePreview(() => {
+        const gs = siteGroups(t("otherSite"));
+        return h("div", { className: "uspp-cttf-demo-list" }, gs.slice(0, 5).map((g4) => h("div", { key: g4.key }, h("span", null, g4.label), h("span", { className: "uspp-cttf-muted" }, `${g4.official.length} / ${g4.custom.length}`))));
+      }, () => t("siteStylesShort")),
+      settings: U4.definePluginSettings({ styles: openerSetting({ description: () => t("siteStylesShort"), label: () => t("siteStyles"), onOpen: open }) }),
+      startAt: U4.StartAt.Init,
+      slots: { managerHeader: { label: () => t("siteStyles"), order: 20, onClick: open } }
+    });
+  };
+
   // sites/chat/lib/webdav.js
   var WebDavError = class extends Error {
-    constructor(code, status2, message) {
+    constructor(code, status3, message) {
       super(message);
       this.code = code;
-      this.status = status2;
+      this.status = status3;
     }
   };
   var b64 = (s3) => btoa(String.fromCharCode(...new TextEncoder().encode(s3)));
@@ -3280,7 +6890,7 @@
       return s3;
     }
   }
-  function request({ method, url, headers = {}, data, timeout = 3e4 }) {
+  function request2({ method, url, headers = {}, data, timeout = 3e4 }) {
     return new Promise((resolve2, reject) => {
       if (typeof GM_xmlhttpRequest !== "function") return reject(new WebDavError("nogm", 0, "GM_xmlhttpRequest unavailable"));
       GM_xmlhttpRequest({
@@ -3307,19 +6917,19 @@
     }
     return out;
   }
-  var fail = (status2, what) => {
-    if (status2 === 401 || status2 === 403) return new WebDavError("auth", status2, `${what}: ${status2} unauthorized`);
-    if (status2 === 404 || status2 === 409) return new WebDavError("notfound", status2, `${what}: ${status2} not found`);
-    if (status2 === 507) return new WebDavError("full", status2, `${what}: insufficient storage`);
-    if (status2 >= 500) return new WebDavError("server", status2, `${what}: server error ${status2}`);
-    return new WebDavError("http", status2, `${what}: HTTP ${status2}`);
+  var fail = (status3, what) => {
+    if (status3 === 401 || status3 === 403) return new WebDavError("auth", status3, `${what}: ${status3} unauthorized`);
+    if (status3 === 404 || status3 === 409) return new WebDavError("notfound", status3, `${what}: ${status3} not found`);
+    if (status3 === 507) return new WebDavError("full", status3, `${what}: insufficient storage`);
+    if (status3 >= 500) return new WebDavError("server", status3, `${what}: server error ${status3}`);
+    return new WebDavError("http", status3, `${what}: HTTP ${status3}`);
   };
   function createClient(cfg2) {
     const auth = cfg2.username || cfg2.password ? { Authorization: `Basic ${b64(`${cfg2.username || ""}:${cfg2.password || ""}`)}` } : {};
     const fileUrl = joinUrl(cfg2.url, cfg2.path);
     const dirUrl = fileUrl.replace(/[^/]+$/, "");
     async function propfind(url, depth = "0") {
-      const r3 = await request({ method: "PROPFIND", url, headers: { ...auth, Depth: depth, "Content-Type": "application/xml; charset=utf-8" }, data: `<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>` });
+      const r3 = await request2({ method: "PROPFIND", url, headers: { ...auth, Depth: depth, "Content-Type": "application/xml; charset=utf-8" }, data: `<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>` });
       return r3;
     }
     async function ensureDir() {
@@ -3328,7 +6938,7 @@
       let cur = base;
       for (const seg of rest) {
         cur += seg + "/";
-        const r3 = await request({ method: "MKCOL", url: cur, headers: auth });
+        const r3 = await request2({ method: "MKCOL", url: cur, headers: auth });
         if (![200, 201, 204, 301, 405].includes(r3.status)) throw fail(r3.status, "MKCOL");
       }
     }
@@ -3342,7 +6952,7 @@
       },
       /** 读文件:不存在时返回 null */
       async get() {
-        const r3 = await request({ method: "GET", url: fileUrl, headers: { ...auth, "Cache-Control": "no-cache" } });
+        const r3 = await request2({ method: "GET", url: fileUrl, headers: { ...auth, "Cache-Control": "no-cache" } });
         if (r3.status === 404) return null;
         if (r3.status < 200 || r3.status >= 300) throw fail(r3.status, "GET");
         return { text: r3.text, etag: r3.headers.etag || "", modified: r3.headers["last-modified"] || "" };
@@ -3352,7 +6962,7 @@
       async put(text, { ifMatch } = {}) {
         const headers = { ...auth, "Content-Type": "application/json; charset=utf-8" };
         if (ifMatch) headers["If-Match"] = ifMatch;
-        const put = () => request({ method: "PUT", url: fileUrl, headers, data: text });
+        const put = () => request2({ method: "PUT", url: fileUrl, headers, data: text });
         let r3 = await put();
         if (r3.status === 404 || r3.status === 409) {
           await ensureDir();
@@ -3369,11 +6979,11 @@
   var CRED_KEYS = ["serverUrl", "username", "password", "remotePath"];
   var RUNTIME_KEY = "cttf.webdav.runtime";
   var TAB_ID = Math.random().toString(36).slice(2);
-  var status = { kind: "info", text: "" };
-  var statusListeners = /* @__PURE__ */ new Set();
-  var setStatus = (kind, text) => {
-    status = { kind, text };
-    for (const fn2 of [...statusListeners]) fn2();
+  var status2 = { kind: "info", text: "" };
+  var statusListeners2 = /* @__PURE__ */ new Set();
+  var setStatus2 = (kind, text) => {
+    status2 = { kind, text };
+    for (const fn2 of [...statusListeners2]) fn2();
   };
   var device = () => `${navigator.userAgentData?.brands?.find((b3) => !/Not.?A.?Brand|Chromium/i.test(b3.brand))?.brand || navigator.userAgent.match(/(Firefox|Safari|Chrome)\/[\d.]+/)?.[1] || "Browser"} @ ${location.hostname}`;
   function messageFor(e3) {
@@ -3390,7 +7000,7 @@
     return null;
   }
   var client = () => createClient({ url: webdav.get().serverUrl, username: webdav.get().username, password: webdav.get().password, path: webdav.get().remotePath });
-  function parseRemote(text) {
+  function parseRemote2(text) {
     let obj;
     try {
       obj = JSON.parse(text);
@@ -3400,7 +7010,7 @@
     if (!isValidConfig(obj)) throw new WebDavError("invalid", 0, "invalid config");
     return normalizeConfig(obj, lang());
   }
-  var serialize = (cfg2) => JSON.stringify({ ...cfg2, _sync: { app: "chat-template-text-folders", schema: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), device: device() } }, null, 2);
+  var serialize2 = (cfg2) => JSON.stringify({ ...cfg2, _sync: { app: "chat-template-text-folders", schema: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), device: device() } }, null, 2);
   function markSynced(cfg2, remote) {
     webdav.set({ lastSyncedAt: Date.now(), lastRemoteETag: remote?.etag || "", lastRemoteModified: remote?.modified || "", lastSyncedHash: hashConfig(cfg2) });
   }
@@ -3418,7 +7028,7 @@
   };
   async function putLocal(c3, remoteEtag) {
     const local = config.data;
-    const r3 = await c3.put(serialize(local), { ifMatch: remoteEtag || void 0 });
+    const r3 = await c3.put(serialize2(local), { ifMatch: remoteEtag || void 0 });
     let meta = r3;
     if (!r3.etag) {
       try {
@@ -3435,15 +7045,13 @@
   }
   function conflictBox(op, remoteCfg, remote) {
     function Body() {
-      const [show, setShow] = useState(false);
       return h(
         Fragment,
         null,
         h("div", null, t("conflictMsg")),
         h("div", { className: "uspp-cttf-muted2" }, op === "upload" ? t("opUpload") : t("opPull")),
         h(StatsCols, { left: config.data, right: remoteCfg, leftLabel: t("currentConfig"), rightLabel: t("remoteConfig"), extra: remote.modified ? t("remoteModified", { t: new Date(remote.modified).toLocaleString() }) : null }),
-        h(Btn, { onClick: () => setShow(!show) }, show ? t("hideDiff") : t("viewDiff")),
-        show && h(DiffSummary, { cur: config.data, next: remoteCfg })
+        h("div", null, h(Btn, { onClick: () => openDiffDetail(config.data, remoteCfg, { rightLabel: t("remoteConfig") }) }, t("viewDiff")))
       );
     }
     const release = editingGuard.enter();
@@ -3476,13 +7084,13 @@
       if (bad) return { kind: "error", text: bad };
       const c3 = client();
       try {
-        if (!auto) setStatus("info", t("checking"));
+        if (!auto) setStatus2("info", t("checking"));
         const remote = await c3.get();
         if (!remote) {
           await putLocal(c3);
           return { kind: "ok", text: t("uploaded") };
         }
-        const remoteCfg = parseRemote(remote.text);
+        const remoteCfg = parseRemote2(remote.text);
         const local = config.data;
         if (sameConfig(remoteCfg, local)) {
           markSynced(local, remote);
@@ -3511,7 +7119,7 @@
       if (bad) return { kind: "error", text: bad };
       const c3 = client();
       try {
-        if (!auto) setStatus("info", t("checking"));
+        if (!auto) setStatus2("info", t("checking"));
         const remote = await c3.get();
         if (!remote) {
           if (auto) {
@@ -3520,7 +7128,7 @@
           }
           return { kind: "info", text: t("noRemote") };
         }
-        const remoteCfg = parseRemote(remote.text);
+        const remoteCfg = parseRemote2(remote.text);
         const local = config.data;
         if (sameConfig(remoteCfg, local)) {
           markSynced(local, remote);
@@ -3543,7 +7151,7 @@
   async function testConnection(draft) {
     const s3 = draft ? { ...webdav.get(), ...draft } : webdav.get();
     if (!s3.serverUrl.trim()) return { kind: "error", text: t("syncIncomplete") };
-    setStatus("info", t("testing"));
+    setStatus2("info", t("testing"));
     try {
       await createClient({ url: s3.serverUrl, username: s3.username, password: s3.password, path: s3.remotePath }).test();
       return { kind: "ok", text: t("testOk") };
@@ -3556,10 +7164,10 @@
     const [, force] = useState(0);
     useEffect(() => {
       const f3 = () => force((x4) => x4 + 1);
-      statusListeners.add(f3);
+      statusListeners2.add(f3);
       const off2 = webdav.subscribe(f3);
       return () => {
-        statusListeners.delete(f3);
+        statusListeners2.delete(f3);
         off2();
       };
     }, []);
@@ -3574,19 +7182,19 @@
       if (credChanged) Object.assign(patch, { lastRemoteETag: "", lastSyncedHash: "", lastRemoteModified: "" });
       webdav.set(patch);
       setDraft((d3) => ({ ...d3, ...patch }));
-      setStatus("ok", t("saved"));
+      setStatus2("ok", t("saved"));
       return true;
     };
     useEffect(() => {
       const guard = async () => {
-        if (!dirtyRef.dirty) return true;
+        if (!dirtyRef2.dirty) return true;
         const pick = await chooseBox({ title: t("unsavedTitle"), body: "", choices: [
           { label: t("keepEditing"), value: "keep", kind: "plain" },
           { label: t("discardAndClose"), value: "discard", kind: "danger" },
           { label: t("saveAndClose"), value: "save", kind: "primary" }
         ], width: 420 });
         if (pick === "save") {
-          dirtyRef.save();
+          dirtyRef2.save();
           return true;
         }
         return pick === "discard";
@@ -3594,11 +7202,11 @@
       entry.closeGuards.add(guard);
       return () => entry.closeGuards.delete(guard);
     }, []);
-    dirtyRef.dirty = dirty2;
-    dirtyRef.save = doSave;
-    const run = async (fn2) => {
+    dirtyRef2.dirty = dirty2;
+    dirtyRef2.save = doSave;
+    const run2 = async (fn2) => {
       const r3 = await fn2();
-      if (r3?.text) setStatus(r3.kind, r3.text);
+      if (r3?.text) setStatus2(r3.kind, r3.text);
     };
     const off = !draft.enabled;
     const insecure = /^http:\/\//i.test(draft.serverUrl.trim());
@@ -3631,17 +7239,17 @@
         !off && h(
           Fragment,
           null,
-          h(Btn, { disabled: !!inFlight, onClick: () => run(() => testConnection({ serverUrl: draft.serverUrl.trim(), username: draft.username.trim(), password: draft.password, remotePath: draft.remotePath.trim() || "ChatTemplateTextFolders/config.json" })) }, t("testConn")),
-          h(Btn, { disabled: !!inFlight || dirty2, title: dirty2 ? t("saveFirst") : void 0, onClick: () => run(() => upload()) }, t("upload")),
-          h(Btn, { disabled: !!inFlight || dirty2, title: dirty2 ? t("saveFirst") : void 0, onClick: () => run(() => pull()) }, t("pull"))
+          h(Btn, { disabled: !!inFlight, onClick: () => run2(() => testConnection({ serverUrl: draft.serverUrl.trim(), username: draft.username.trim(), password: draft.password, remotePath: draft.remotePath.trim() || "ChatTemplateTextFolders/config.json" })) }, t("testConn")),
+          h(Btn, { disabled: !!inFlight || dirty2, title: dirty2 ? t("saveFirst") : void 0, onClick: () => run2(() => upload()) }, t("upload")),
+          h(Btn, { disabled: !!inFlight || dirty2, title: dirty2 ? t("saveFirst") : void 0, onClick: () => run2(() => pull()) }, t("pull"))
         )
       ),
       !off && dirty2 && h("div", { className: "uspp-cttf-muted2" }, t("saveFirst")),
-      status.text && h("div", { className: "uspp-cttf-status", "data-kind": status.kind }, status.text),
+      status2.text && h("div", { className: "uspp-cttf-status", "data-kind": status2.kind }, status2.text),
       h("div", { className: "uspp-cttf-muted2" }, t("lastSync", { t: saved.lastSyncedAt ? new Date(saved.lastSyncedAt).toLocaleString() : t("never") }))
     );
   }
-  var dirtyRef = { dirty: false, save: () => {
+  var dirtyRef2 = { dirty: false, save: () => {
   } };
   function runtime() {
     return gmGet(RUNTIME_KEY, {}) || {};
@@ -3725,9 +7333,9 @@
           h("div", { className: "uspp-cttf-muted" }, t("lastSync", { t: s3.lastSyncedAt ? new Date(s3.lastSyncedAt).toLocaleString() : t("never") }))
         );
       }, () => t("previewSync")),
-      settings: U4.definePluginSettings({ sync: openerSetting({ description: () => t("setSyncDesc"), label: () => t("tabSync"), onOpen: () => entry.openScriptConfig?.("WebDAVSync") }) }),
+      settings: U4.definePluginSettings({ sync: openerSetting({ description: () => t("setSyncDesc"), label: () => t("tabSync"), onOpen: () => entry.openScriptConfig?.("sync") }) }),
       startAt: U4.StartAt.SiteReady,
-      slots: { configTabs: { label: () => t("tabSync"), order: 10, render: SyncTab } },
+      slots: { syncSections: { label: () => t("tabSync"), order: 20, render: SyncTab } },
       start() {
         webdav.watch();
         offConfig = config.subscribe((_doc, source) => {
@@ -3757,11 +7365,19 @@
     d3.site = "chat";
     return d3;
   }), ((U4) => {
+    const d3 = typeof DriveSync_default === "function" ? DriveSync_default(U4) : DriveSync_default;
+    d3.site = "chat";
+    return d3;
+  }), ((U4) => {
     const d3 = typeof PromptManager_default === "function" ? PromptManager_default(U4) : PromptManager_default;
     d3.site = "chat";
     return d3;
   }), ((U4) => {
     const d3 = typeof PromptToolbar_default === "function" ? PromptToolbar_default(U4) : PromptToolbar_default;
+    d3.site = "chat";
+    return d3;
+  }), ((U4) => {
+    const d3 = typeof SiteStyleRules_default === "function" ? SiteStyleRules_default(U4) : SiteStyleRules_default;
     d3.site = "chat";
     return d3;
   }), ((U4) => {
@@ -4097,7 +7713,7 @@
   var isSite = (id) => getSite().id === id;
   var getSites = () => [...registry.values()];
   var getSiteById = (id) => registry.get(id) || (id === GENERIC2.id ? GENERIC2 : null);
-  var siteKey = () => isGeneric() ? location.hostname || "local" : getSite().id;
+  var siteKey2 = () => isGeneric() ? location.hostname || "local" : getSite().id;
   function switchTo(def) {
     if (!isGeneric() || current === def) return false;
     if (pickSite(location.href, [def]) !== def) return false;
@@ -4275,7 +7891,7 @@
     }
     return v3;
   }
-  var serialize2 = (obj) => JSON.stringify(obj, replacer);
+  var serialize3 = (obj) => JSON.stringify(obj, replacer);
   function parseStored(raw2) {
     try {
       let v3 = raw2;
@@ -4392,7 +8008,7 @@
       found.sort((a3, b3) => b3.score - a3.score);
       const data = found[0].data;
       for (const f3 of found.slice(1)) fillFrom(data, f3.data);
-      const memory = JSON.parse(serialize2(PlainSettings), reviver);
+      const memory = JSON.parse(serialize3(PlainSettings), reviver);
       replaceContents(mergeMissing(data, memory));
       logger3.info(`设置已从 ${found.map((f3) => f3.name).join(" + ")} 读取`);
     }
@@ -4429,7 +8045,7 @@
     return changedPaths.length;
   }
   function replaceAll(data) {
-    const before = JSON.parse(serialize2(PlainSettings), reviver);
+    const before = JSON.parse(serialize3(PlainSettings), reviver);
     replaceContents(data);
     const paths = [];
     const diff = (a3, b3, path) => {
@@ -4477,7 +8093,7 @@
     if (!PlainSettings.plugins || Object.keys(PlainSettings.plugins).length === 0) return;
     let json;
     try {
-      json = serialize2(PlainSettings);
+      json = serialize3(PlainSettings);
     } catch (e3) {
       logger3.warn("设置序列化失败", e3);
       return;
@@ -7243,9 +10859,9 @@ ${orphaned.join("\n")}`);
   // ../../../../../../root/Userscriptpp/core/lib/backup.js
   var logger10 = new Logger("Backup", "#93c5fd");
   var BACKUP_FORMAT = "userscript-pp-settings";
-  var clone = (v3) => parseStored(serialize2(v3)) ?? JSON.parse(serialize2(v3));
+  var clone2 = (v3) => parseStored(serialize3(v3)) ?? JSON.parse(serialize3(v3));
   function exportSettings({ includeSensitive = false } = {}) {
-    const settings2 = clone(PlainSettings);
+    const settings2 = clone2(PlainSettings);
     if (!includeSensitive) {
       for (const name of Object.keys(settings2.plugins || {})) {
         for (const k4 of sensitiveKeys(name)) if (settings2.plugins[name] && k4 in settings2.plugins[name]) delete settings2.plugins[name][k4];
@@ -7281,7 +10897,7 @@ ${orphaned.join("\n")}`);
     };
   }
   async function importSettings(settings2) {
-    const data = clone(settings2);
+    const data = clone2(settings2);
     data.plugins ??= {};
     for (const name of Object.keys(PlainSettings.plugins)) {
       for (const k4 of sensitiveKeys(name)) {
@@ -7363,10 +10979,10 @@ ${orphaned.join("\n")}`);
               }
             }
           }
-          const status2 = r3.status || 200;
-          const body = status2 === 204 || status2 === 304 ? null : r3.responseText ?? r3.response ?? "";
+          const status3 = r3.status || 200;
+          const body = status3 === 204 || status3 === 304 ? null : r3.responseText ?? r3.response ?? "";
           try {
-            resolve2(new Response(body, { status: status2 < 200 || status2 > 599 ? 200 : status2, statusText: r3.statusText || "", headers }));
+            resolve2(new Response(body, { status: status3 < 200 || status3 > 599 ? 200 : status3, statusText: r3.statusText || "", headers }));
           } catch (e3) {
             reject(e3);
           }
@@ -7420,11 +11036,11 @@ ${orphaned.join("\n")}`);
   }
   var SITES_PATH = "plugins.Settings.sites";
   var EMPTY = Object.freeze({});
-  function readPartition(key = siteKey()) {
+  function readPartition(key = siteKey2()) {
     const p3 = raw().sites?.[key];
     return p3 && typeof p3 === "object" ? p3 : EMPTY;
   }
-  function writePartition(key = siteKey()) {
+  function writePartition(key = siteKey2()) {
     const r3 = raw();
     if (!r3.sites || typeof r3.sites !== "object" || Array.isArray(r3.sites)) S2().sites = {};
     if (!r3.sites[key] || typeof r3.sites[key] !== "object") S2().sites[key] = {};
@@ -7452,7 +11068,7 @@ ${orphaned.join("\n")}`);
   }
   var getThemes = () => themesList().map((t4) => ({ ...t4 }));
   function foreignAllSiteThemes() {
-    const key = siteKey(), out = [];
+    const key = siteKey2(), out = [];
     for (const [k4, part] of Object.entries(raw().sites || {})) if (k4 !== key) {
       for (const t4 of themesOf(part)) if (t4?.allSites) out.push(t4);
     }
@@ -8094,12 +11710,12 @@ ${orphaned.join("\n")}`);
     for (const exp of moduleCache.values()) if (isWritableJsx(exp)) return exp;
     return null;
   }
-  var busy2 = false;
+  var busy3 = false;
   function wrap(orig) {
     const wrapped = function(type, props, key) {
       const set = typeof type === "string" ? stringHooks.get(type) : hooks.get(type);
-      if (!set || busy2 || !props) return orig.apply(this, arguments);
-      busy2 = true;
+      if (!set || busy3 || !props) return orig.apply(this, arguments);
+      busy3 = true;
       try {
         for (const fn2 of set) {
           try {
@@ -8110,7 +11726,7 @@ ${orphaned.join("\n")}`);
           }
         }
       } finally {
-        busy2 = false;
+        busy3 = false;
       }
       return orig.apply(this, arguments);
     };
@@ -9530,10 +13146,10 @@ uspp-cttf-root > * { pointer-events: auto; }
   // ../../../../../../root/Userscriptpp/core/settings/ThemesTab.js
   function OnlineThemeModal({ onClose }) {
     const [url, setUrl] = useState2("");
-    const [busy3, setBusy] = useState2(false);
+    const [busy4, setBusy] = useState2(false);
     const [error, setError] = useState2(null);
     const submit = async () => {
-      if (busy3) return;
+      if (busy4) return;
       setBusy(true);
       setError(null);
       try {
@@ -9553,10 +13169,10 @@ uspp-cttf-root > * { pointer-events: auto; }
         width: 480,
         footer: [
           h4(Button, { key: "c", onClick: onClose }, "Cancel"),
-          h4(Button, { key: "i", variant: "primary", onClick: submit, disabled: busy3 || !url.trim() }, busy3 ? "Importing..." : "Import")
+          h4(Button, { key: "i", variant: "primary", onClick: submit, disabled: busy4 || !url.trim() }, busy4 ? "Importing..." : "Import")
         ]
       },
-      h4(Input, { autoFocus: true, type: "url", placeholder: "https://example.com/theme.css", value: url, onChange: (e3) => setUrl(e3.target.value), onEnter: submit, disabled: busy3 }),
+      h4(Input, { autoFocus: true, type: "url", placeholder: "https://example.com/theme.css", value: url, onChange: (e3) => setUrl(e3.target.value), onEnter: submit, disabled: busy4 }),
       error && h4("div", { className: "uspp-cttf-error", role: "alert", style: { marginTop: 8 } }, error)
     );
   }
@@ -10012,7 +13628,7 @@ uspp-cttf-root > * { pointer-events: auto; }
         return Object.fromEntries(getSites().map((s3) => [s3.id, s3]));
       },
       isSite,
-      siteKey,
+      siteKey: siteKey2,
       // 插件
       plugins,
       registerPlugin,
