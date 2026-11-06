@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.21
+// @version      2.0.22
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.21" : "0.0.0";
+  var VERSION = true ? "2.0.22" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -3084,10 +3084,14 @@
     return false;
   }
   var ruleHits = (r3, loc) => r3 && r3.enabled !== false && Array.isArray(r3.matchers) && r3.matchers.some((m3) => matcherHits(m3, loc));
+  var customOn = false;
+  var setCustomStylesEnabled = (v3) => {
+    customOn = !!v3;
+  };
   function matching(loc = location, cfg2 = config.data) {
     return {
       official: officialBundle(cfg2).rules.filter((r3) => ruleHits(r3, loc)),
-      custom: customRules(cfg2).map((x4) => x4.rule).filter((r3) => ruleHits(r3, loc))
+      custom: customOn ? customRules(cfg2).map((x4) => x4.rule).filter((r3) => ruleHits(r3, loc)) : []
     };
   }
   function layoutOverride(loc = location, cfg2 = config.data) {
@@ -3211,231 +3215,6 @@
       fetch(url, { cache: "no-store", credentials: "omit" }).then((r3) => r3.ok ? r3.text() : Promise.reject(new Error(`HTTP ${r3.status}`))).then(resolve2, reject);
     });
   }
-
-  // sites/chat/index.js
-  var chat_default = (U4) => {
-    bindApi(U4);
-    const host2 = typeof location !== "undefined" ? hostFor(location.href) : null;
-    let barEl = null, root2 = null;
-    const stateListeners = /* @__PURE__ */ new Set();
-    let lastState = "";
-    function geometry() {
-      const c3 = config.data;
-      const o3 = typeof host2.bar === "function" ? host2.bar(location.href) || {} : host2.bar || {};
-      let s3 = {};
-      try {
-        s3 = layoutOverride(location, c3);
-      } catch {
-        s3 = {};
-      }
-      const height = Math.min(200, Math.max(20, Number(s3.height ?? o3.height ?? c3.buttonBarHeight) || 40));
-      return { height, bottom: s3.bottom ?? o3.bottom ?? c3.buttonBarBottomSpacing };
-    }
-    const restyle = () => {
-      try {
-        applyStyles(location, config.data);
-      } catch (e3) {
-        console.warn("[cttf] site styles", e3);
-      }
-    };
-    let regionEl = null, ro = null;
-    function region() {
-      const sels = host2.region || [];
-      let el = null;
-      for (const sel of sels) {
-        try {
-          el = [...document.querySelectorAll(sel)].find((e3) => e3.getBoundingClientRect().width > 200) || null;
-        } catch {
-          el = null;
-        }
-        if (el) break;
-      }
-      if (el !== regionEl) {
-        ro?.disconnect();
-        regionEl = el;
-        if (el && typeof ResizeObserver === "function") {
-          ro = new ResizeObserver(() => schedule());
-          ro.observe(el);
-        }
-      }
-      if (!el) return null;
-      const r3 = el.getBoundingClientRect();
-      return { left: Math.max(0, Math.round(r3.left)), width: Math.round(Math.min(r3.width, innerWidth - Math.max(0, r3.left))) };
-    }
-    const hiddenHere = () => {
-      try {
-        return typeof host2.hide === "function" ? !!host2.hide(new URL(location.href)) : false;
-      } catch {
-        return false;
-      }
-    };
-    function BarHost() {
-      const [, force] = U4.react.useReducer((x4) => x4 + 1, 0);
-      U4.react.useEffect(() => U4.onSlotChange("bar", () => force()), []);
-      const items = U4.getSlotItems("bar");
-      return U4.react.h(U4.react.Fragment || "div", null, items.map((d3) => U4.react.h(U4.ErrorBoundary, { key: d3.id, fallback: null, label: `bar:${d3.id}` }, d3.render ? U4.react.h(d3.render, {}) : null)));
-    }
-    function update() {
-      if (!isSettled()) return;
-      const want = U4.getSlotItems("bar").length > 0 && hasEditable();
-      if (!want) {
-        if (barEl?.isConnected) U4.unmount(barEl);
-        emitState();
-        return;
-      }
-      if (!barEl) {
-        barEl = document.createElement("div");
-        barEl.className = "uspp-cttf-bar";
-        barEl.setAttribute("data-uspp-cttf", "bar");
-        barEl.setAttribute("data-host", host2.id);
-        for (const ev of ["keydown", "keyup", "keypress"]) barEl.addEventListener(ev, (e3) => e3.stopPropagation());
-      }
-      if (!barEl.isConnected && document.body) U4.mount(document.body, barEl);
-      const g4 = geometry();
-      const m3 = barMetrics(g4.height, g4.bottom);
-      for (const [k4, v3] of [["bar-h", m3.H], ["bar-bottom", m3.bottom], ["bar-py", m3.py], ["bar-px", m3.px], ["bar-gap", m3.gap], ["btn-h", m3.bh], ["btn-fs", m3.fs], ["btn-vp", m3.vp], ["btn-hp", m3.hp], ["btn-r", m3.r], ["btn-lh", m3.lh]]) U4.setStyle(barEl, `--uspp-cttf-${k4}`, `${v3}px`);
-      const reg = region();
-      U4.setStyle(barEl, "--uspp-cttf-bar-left", reg ? `${reg.left}px` : null);
-      U4.setStyle(barEl, "--uspp-cttf-bar-w", reg ? `${reg.width}px` : null);
-      U4.setAttr(barEl, "data-hidden", hiddenHere() ? "true" : null);
-      if (!root2) {
-        const R3 = U4.react.getRenderer();
-        if (!R3) {
-          setTimeout(update, 300);
-          return;
-        }
-        root2 = R3.createRoot(barEl);
-        root2.render(U4.react.h(BarHost, null));
-      }
-      emitState();
-    }
-    function emitState() {
-      const s3 = JSON.stringify(barState());
-      if (s3 === lastState) return;
-      lastState = s3;
-      for (const fn2 of [...stateListeners]) {
-        try {
-          fn2(barState());
-        } catch (e3) {
-          console.error(e3);
-        }
-      }
-    }
-    function barState() {
-      const shown2 = !!barEl?.isConnected && barEl.getAttribute("data-hidden") !== "true";
-      const g4 = geometry(), m3 = barMetrics(g4.height, g4.bottom);
-      return { shown: shown2, height: m3.H, bottom: m3.bottom };
-    }
-    const schedule = U4.debounce(update, 150);
-    const common = {
-      host: host2,
-      composer: composer_exports,
-      get barElement() {
-        return barEl;
-      },
-      barState,
-      onBarStateChange: (fn2) => {
-        stateListeners.add(fn2);
-        return () => stateListeners.delete(fn2);
-      },
-      refresh: () => update()
-    };
-    function siteTheme() {
-      const de = document.documentElement;
-      if (!de) return null;
-      const cls = de.classList, b3 = document.body?.classList;
-      if (cls.contains("dark") || b3?.contains("dark") || cls.contains("theme-dark")) return "dark";
-      if (cls.contains("light") || b3?.contains("light") || cls.contains("theme-light")) return "light";
-      for (const a3 of ["data-theme", "data-color-mode", "data-mode", "data-bs-theme"]) {
-        const v3 = (de.getAttribute(a3) || document.body?.getAttribute(a3) || "").toLowerCase();
-        if (v3.includes("dark")) return "dark";
-        if (v3.includes("light")) return "light";
-      }
-      const cs = (de.style.colorScheme || "").trim();
-      if (cs === "dark" || cs === "light") return cs;
-      return null;
-    }
-    const prefersDark = () => {
-      try {
-        return matchMedia("(prefers-color-scheme: dark)").matches;
-      } catch {
-        return false;
-      }
-    };
-    function applyTheme2() {
-      const de = document.documentElement;
-      if (!de) return;
-      const want = siteTheme() || (prefersDark() ? "dark" : "light");
-      if (de.getAttribute("data-uspp-cttf-theme") !== want) U4.setAttr(de, "data-uspp-cttf-theme", want);
-    }
-    function watchTheme() {
-      applyTheme2();
-      try {
-        matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme2);
-      } catch {
-      }
-      const mo2 = new MutationObserver((recs) => {
-        if (recs.some((r3) => r3.attributeName !== "data-uspp-cttf-theme")) applyTheme2();
-      });
-      const opts = { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-color-mode", "data-mode", "data-bs-theme"] };
-      if (document.documentElement) mo2.observe(document.documentElement, opts);
-      const onBody = () => {
-        if (document.body) {
-          mo2.observe(document.body, opts);
-          applyTheme2();
-        }
-      };
-      if (document.body) onBody();
-      else document.addEventListener("DOMContentLoaded", onBody, { once: true });
-    }
-    return U4.defineSite({
-      id: "chat",
-      theme: () => siteTheme() || (prefersDark() ? "dark" : "light"),
-      name: "AI Chat",
-      matches: ALL_MATCHES,
-      // 页面上出现输入框即视为就绪;一直没有时 20 秒后照常启动插件
-      ready: () => hasEditable(),
-      readyTimeout: 2e4,
-      route: true,
-      slots: [{ name: "bar", kind: "component", context: "{ render: 组件 }:渲染在页面底部按钮栏里,order 越小越靠左" }],
-      common,
-      start() {
-        config.init();
-        prefs.watch();
-        setProfile(host2);
-        trackComposition();
-        U4.registerStyle("uspp-cttf-chat-bar", BAR_CSS + PANEL_CSS + (host2.css || ""));
-        U4.onSlotChange("bar", schedule);
-        config.subscribe(schedule);
-        restyle();
-        config.subscribe(restyle);
-        const sel = [.../* @__PURE__ */ new Set([...host2.input || [], "textarea", "[contenteditable='true']"])].join(",");
-        U4.observe(sel, { added: schedule, removed: schedule });
-        U4.onRouteChange(() => {
-          restyle();
-          schedule();
-          setTimeout(schedule, 350);
-        });
-        addEventListener("resize", schedule);
-        startSettle({
-          ssr: !!host2.ssr,
-          // 有 readyInput 的站点等真正的编辑器接管(ChatGPT 首屏的 textarea 只是 SSR 占位,写进去会丢)
-          hasEditable: () => host2.readyInput ? !!document.querySelector(host2.readyInput) : hasEditable()
-        }).then(() => {
-          try {
-            watchTheme();
-          } catch {
-          }
-          try {
-            U4.ensureUiRoot?.();
-          } catch {
-          }
-          update();
-        });
-        schedule();
-      }
-    });
-  };
 
   // sites/chat/lib/i18n.js
   var ZH = {
@@ -4650,7 +4429,7 @@
   }
 
   // sites/chat/lib/actions.js
-  var entry = { openManager: null, openScriptConfig: null, openAutomation: null, closeGuards: /* @__PURE__ */ new Set() };
+  var entry = { openManager: null, openScriptConfig: null, openAutomation: null, restyle: null, closeGuards: /* @__PURE__ */ new Set() };
   async function guardedClose(close) {
     for (const g4 of [...entry.closeGuards]) {
       try {
@@ -4690,7 +4469,7 @@
     if (!r3.ok) return false;
     if (btn.autoSubmit) {
       const expected = replace ? text : getText(el);
-      const res = await autoSubmit({ el, expected, rules: config.data.domainAutoSubmitSettings });
+      const res = await autoSubmit({ el, expected, rules: entry.openAutomation ? config.data.domainAutoSubmitSettings : [] });
       if (!res.ok && res.reason === "timeout") toast(t("autoSubmitTimeout"), "WARNING");
       else if (!res.ok && res.reason === "notfound") toast(t("autoSubmitFail"), "WARNING");
     }
@@ -4756,6 +4535,235 @@
     return true;
   }
   var runButton = (btn) => btn.type === "tool" ? runTool(btn.action) : runTemplate(btn);
+
+  // sites/chat/index.js
+  var chat_default = (U4) => {
+    bindApi(U4);
+    const host2 = typeof location !== "undefined" ? hostFor(location.href) : null;
+    let barEl = null, root2 = null;
+    const stateListeners = /* @__PURE__ */ new Set();
+    let lastState = "";
+    function geometry() {
+      const c3 = config.data;
+      const o3 = typeof host2.bar === "function" ? host2.bar(location.href) || {} : host2.bar || {};
+      let s3 = {};
+      try {
+        s3 = layoutOverride(location, c3);
+      } catch {
+        s3 = {};
+      }
+      const height = Math.min(200, Math.max(20, Number(s3.height ?? o3.height ?? c3.buttonBarHeight) || 40));
+      return { height, bottom: s3.bottom ?? o3.bottom ?? c3.buttonBarBottomSpacing };
+    }
+    const restyle = () => {
+      try {
+        applyStyles(location, config.data);
+      } catch (e3) {
+        console.warn("[cttf] site styles", e3);
+      }
+    };
+    let regionEl = null, ro = null;
+    function region() {
+      const sels = host2.region || [];
+      let el = null;
+      for (const sel of sels) {
+        try {
+          el = [...document.querySelectorAll(sel)].find((e3) => e3.getBoundingClientRect().width > 200) || null;
+        } catch {
+          el = null;
+        }
+        if (el) break;
+      }
+      if (el !== regionEl) {
+        ro?.disconnect();
+        regionEl = el;
+        if (el && typeof ResizeObserver === "function") {
+          ro = new ResizeObserver(() => schedule());
+          ro.observe(el);
+        }
+      }
+      if (!el) return null;
+      const r3 = el.getBoundingClientRect();
+      return { left: Math.max(0, Math.round(r3.left)), width: Math.round(Math.min(r3.width, innerWidth - Math.max(0, r3.left))) };
+    }
+    const hiddenHere = () => {
+      try {
+        return typeof host2.hide === "function" ? !!host2.hide(new URL(location.href)) : false;
+      } catch {
+        return false;
+      }
+    };
+    function BarHost() {
+      const [, force] = U4.react.useReducer((x4) => x4 + 1, 0);
+      U4.react.useEffect(() => U4.onSlotChange("bar", () => force()), []);
+      const items = U4.getSlotItems("bar");
+      return U4.react.h(U4.react.Fragment || "div", null, items.map((d3) => U4.react.h(U4.ErrorBoundary, { key: d3.id, fallback: null, label: `bar:${d3.id}` }, d3.render ? U4.react.h(d3.render, {}) : null)));
+    }
+    function update() {
+      if (!isSettled()) return;
+      const want = U4.getSlotItems("bar").length > 0 && hasEditable();
+      if (!want) {
+        if (barEl?.isConnected) U4.unmount(barEl);
+        emitState();
+        return;
+      }
+      if (!barEl) {
+        barEl = document.createElement("div");
+        barEl.className = "uspp-cttf-bar";
+        barEl.setAttribute("data-uspp-cttf", "bar");
+        barEl.setAttribute("data-host", host2.id);
+        for (const ev of ["keydown", "keyup", "keypress"]) barEl.addEventListener(ev, (e3) => e3.stopPropagation());
+      }
+      if (!barEl.isConnected && document.body) U4.mount(document.body, barEl);
+      const g4 = geometry();
+      const m3 = barMetrics(g4.height, g4.bottom);
+      for (const [k4, v3] of [["bar-h", m3.H], ["bar-bottom", m3.bottom], ["bar-py", m3.py], ["bar-px", m3.px], ["bar-gap", m3.gap], ["btn-h", m3.bh], ["btn-fs", m3.fs], ["btn-vp", m3.vp], ["btn-hp", m3.hp], ["btn-r", m3.r], ["btn-lh", m3.lh]]) U4.setStyle(barEl, `--uspp-cttf-${k4}`, `${v3}px`);
+      const reg = region();
+      U4.setStyle(barEl, "--uspp-cttf-bar-left", reg ? `${reg.left}px` : null);
+      U4.setStyle(barEl, "--uspp-cttf-bar-w", reg ? `${reg.width}px` : null);
+      U4.setAttr(barEl, "data-hidden", hiddenHere() ? "true" : null);
+      if (!root2) {
+        const R3 = U4.react.getRenderer();
+        if (!R3) {
+          setTimeout(update, 300);
+          return;
+        }
+        root2 = R3.createRoot(barEl);
+        root2.render(U4.react.h(BarHost, null));
+      }
+      emitState();
+    }
+    function emitState() {
+      const s3 = JSON.stringify(barState());
+      if (s3 === lastState) return;
+      lastState = s3;
+      for (const fn2 of [...stateListeners]) {
+        try {
+          fn2(barState());
+        } catch (e3) {
+          console.error(e3);
+        }
+      }
+    }
+    function barState() {
+      const shown2 = !!barEl?.isConnected && barEl.getAttribute("data-hidden") !== "true";
+      const g4 = geometry(), m3 = barMetrics(g4.height, g4.bottom);
+      return { shown: shown2, height: m3.H, bottom: m3.bottom };
+    }
+    const schedule = U4.debounce(update, 150);
+    const common = {
+      host: host2,
+      composer: composer_exports,
+      get barElement() {
+        return barEl;
+      },
+      barState,
+      onBarStateChange: (fn2) => {
+        stateListeners.add(fn2);
+        return () => stateListeners.delete(fn2);
+      },
+      refresh: () => update()
+    };
+    function siteTheme() {
+      const de = document.documentElement;
+      if (!de) return null;
+      const cls = de.classList, b3 = document.body?.classList;
+      if (cls.contains("dark") || b3?.contains("dark") || cls.contains("theme-dark")) return "dark";
+      if (cls.contains("light") || b3?.contains("light") || cls.contains("theme-light")) return "light";
+      for (const a3 of ["data-theme", "data-color-mode", "data-mode", "data-bs-theme"]) {
+        const v3 = (de.getAttribute(a3) || document.body?.getAttribute(a3) || "").toLowerCase();
+        if (v3.includes("dark")) return "dark";
+        if (v3.includes("light")) return "light";
+      }
+      const cs = (de.style.colorScheme || "").trim();
+      if (cs === "dark" || cs === "light") return cs;
+      return null;
+    }
+    const prefersDark = () => {
+      try {
+        return matchMedia("(prefers-color-scheme: dark)").matches;
+      } catch {
+        return false;
+      }
+    };
+    function applyTheme2() {
+      const de = document.documentElement;
+      if (!de) return;
+      const want = siteTheme() || (prefersDark() ? "dark" : "light");
+      if (de.getAttribute("data-uspp-cttf-theme") !== want) U4.setAttr(de, "data-uspp-cttf-theme", want);
+    }
+    function watchTheme() {
+      applyTheme2();
+      try {
+        matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme2);
+      } catch {
+      }
+      const mo2 = new MutationObserver((recs) => {
+        if (recs.some((r3) => r3.attributeName !== "data-uspp-cttf-theme")) applyTheme2();
+      });
+      const opts = { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-color-mode", "data-mode", "data-bs-theme"] };
+      if (document.documentElement) mo2.observe(document.documentElement, opts);
+      const onBody = () => {
+        if (document.body) {
+          mo2.observe(document.body, opts);
+          applyTheme2();
+        }
+      };
+      if (document.body) onBody();
+      else document.addEventListener("DOMContentLoaded", onBody, { once: true });
+    }
+    return U4.defineSite({
+      id: "chat",
+      theme: () => siteTheme() || (prefersDark() ? "dark" : "light"),
+      name: "AI Chat",
+      matches: ALL_MATCHES,
+      // 页面上出现输入框即视为就绪;一直没有时 20 秒后照常启动插件
+      ready: () => hasEditable(),
+      readyTimeout: 2e4,
+      route: true,
+      slots: [{ name: "bar", kind: "component", context: "{ render: 组件 }:渲染在页面底部按钮栏里,order 越小越靠左" }],
+      common,
+      start() {
+        config.init();
+        prefs.watch();
+        setProfile(host2);
+        trackComposition();
+        U4.registerStyle("uspp-cttf-chat-bar", BAR_CSS + PANEL_CSS + (host2.css || ""));
+        U4.onSlotChange("bar", schedule);
+        config.subscribe(schedule);
+        restyle();
+        config.subscribe(restyle);
+        entry.restyle = () => {
+          restyle();
+          schedule();
+        };
+        const sel = [.../* @__PURE__ */ new Set([...host2.input || [], "textarea", "[contenteditable='true']"])].join(",");
+        U4.observe(sel, { added: schedule, removed: schedule });
+        U4.onRouteChange(() => {
+          restyle();
+          schedule();
+          setTimeout(schedule, 350);
+        });
+        addEventListener("resize", schedule);
+        startSettle({
+          ssr: !!host2.ssr,
+          // 有 readyInput 的站点等真正的编辑器接管(ChatGPT 首屏的 textarea 只是 SSR 占位,写进去会丢)
+          hasEditable: () => host2.readyInput ? !!document.querySelector(host2.readyInput) : hasEditable()
+        }).then(() => {
+          try {
+            watchTheme();
+          } catch {
+          }
+          try {
+            U4.ensureUiRoot?.();
+          } catch {
+          }
+          update();
+        });
+        schedule();
+      }
+    });
+  };
 
   // sites/chat/plugins/AutoSubmit/index.js
   function methodLabel(r3) {
@@ -4971,7 +4979,8 @@
       name: "AutoSubmit",
       description: "Sends the message after a template is inserted, using per-site rules; includes the rule editor.",
       authors: ["0-V-linuxdo"],
-      required: true,
+      // 可关闭;默认开启(与原版一致)。关掉后「⚡ 自动化」入口消失,按钮的自动提交改用默认发送方式
+      enabledByDefault: true,
       preview: livePreview(() => {
         const rules = config.data.domainAutoSubmitSettings;
         return h(
@@ -6866,14 +6875,23 @@
       name: "SiteStyleRules",
       description: "Per-site style rules: official built-in rules plus your own CSS and toolbar layout overrides; .user.css import / export.",
       authors: ["0-V-linuxdo"],
-      required: true,
+      // 可关闭;默认开启(与原版一致)。关掉后「🎨 网站样式」入口消失、自定义样式不再注入;官方规则仍生效(给按钮栏让位等适配)
+      enabledByDefault: true,
       preview: livePreview(() => {
         const gs = siteGroups(t("otherSite"));
         return h("div", { className: "uspp-cttf-demo-list" }, gs.slice(0, 5).map((g4) => h("div", { key: g4.key }, h("span", null, g4.label), h("span", { className: "uspp-cttf-muted" }, `${g4.official.length} / ${g4.custom.length}`))));
       }, () => t("siteStylesShort")),
       settings: U4.definePluginSettings({ styles: openerSetting({ description: () => t("siteStylesShort"), label: () => t("siteStyles"), onOpen: open }) }),
       startAt: U4.StartAt.Init,
-      slots: { managerHeader: { label: () => t("siteStyles"), order: 20, onClick: open } }
+      slots: { managerHeader: { label: () => t("siteStyles"), order: 20, onClick: open } },
+      start() {
+        setCustomStylesEnabled(true);
+        entry.restyle?.();
+      },
+      stop() {
+        setCustomStylesEnabled(false);
+        entry.restyle?.();
+      }
     });
   };
 
@@ -7329,7 +7347,8 @@
       name: "WebDAVSync",
       description: "Sync the template config through WebDAV: test, upload, pull, conflict resolution, optional auto sync.",
       authors: ["0-V-linuxdo"],
-      required: true,
+      // 可在插件列表里关掉;默认开启(插件开着但 WebDAV 同步本身默认未启用,不会发任何请求)
+      enabledByDefault: true,
       // 只显示开关状态与上次同步时间,不显示服务器地址 / 账号 / 密码
       preview: livePreview(() => {
         const s3 = webdav.get();
