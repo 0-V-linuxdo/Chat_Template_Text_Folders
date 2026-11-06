@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [Chat] Template Text Folders
 // @namespace    https://github.com/0-V-linuxdo/Chat_Template_Text_Folders
-// @version      2.0.20
+// @version      2.0.21
 // @description  在 AI 聊天网页的输入框下方添加「提示词模板」文件夹与按钮,一键插入 / 发送常用文本;支持 WebDAV 同步。
 // @author       0-V-linuxdo
 // @icon         https://github.com/0-V-linuxdo/Chat_Template_Text_Folders/raw/refs/heads/main/Icon.svg
@@ -86,7 +86,7 @@
     unmenu: typeof GM_unregisterMenuCommand === "function" ? GM_unregisterMenuCommand : null,
     clipboard: typeof GM_setClipboard === "function" ? GM_setClipboard : null
   };
-  var VERSION = true ? "2.0.20" : "0.0.0";
+  var VERSION = true ? "2.0.21" : "0.0.0";
   var IS_DEV = true ? false : false;
   var BUILD_TYPE = IS_DEV ? "development" : "production";
   var isChromium = () => !!W.chrome;
@@ -1731,6 +1731,14 @@
 :root[data-uspp-cttf-theme="dark"] .uspp-cttf-dlg { --o-ds-ta-border: #3f3f46; }
 @media (prefers-color-scheme: dark) { :root:not([data-uspp-cttf-theme]) .uspp-cttf-dlg { --o-ds-ta-border: #3f3f46; } }
 .uspp-cttf-ds-ta::placeholder { color: var(--o-input-fg); opacity: .72; }
+
+/* 子弹窗打开时主弹窗「抖动」:框架遮罩带 .12s 淡入(opacity 0→1),opacity<1 的祖先会成为 backdrop root,
+   拦截层的 blur(2px) 在淡入期间看不到下面的主弹窗,动画一结束才突然生效,主弹窗由清晰跳成模糊、亮度也跳一下。
+   原版遮罩无动画、模糊一开始就在,这里同样去掉本脚本弹窗遮罩的淡入 */
+.uspp-cttf-overlay:has(> .uspp-cttf-dlg-guard), .uspp-cttf-overlay:has(.uspp-cttf-dlg-guard) { animation: none; }
+/* 插件设置弹窗:各页签内容高度不同,弹窗固定为最大高度,切页签时不再忽高忽低(内容区自行滚动) */
+.uspp-cttf-modal:has(> .uspp-cttf-modal-body > .uspp-cttf-panel) { height: min(85vh, 760px); }
+.uspp-cttf-modal:has(> .uspp-cttf-modal-body > .uspp-cttf-panel) > .uspp-cttf-modal-body { flex: 1 1 auto; min-height: 0; }
 `;
 
   // sites/chat/lib/settle.js
